@@ -5,6 +5,8 @@ services:
       buildCommand: npm install
       startCommand: node index.js
       envVars:
+        - key: NODE_VERSION
+          value: 18.20.0
         - key: bot
           sync: false
         - key: HOST_URL
