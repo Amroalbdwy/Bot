@@ -1,0 +1,12 @@
+services:
+    - type: web
+      name: telegram-bot
+      env: node
+      buildCommand: npm install
+      startCommand: node index.js
+      envVars:
+        - key: bot
+          sync: false
+        - key: HOST_URL
+          sync: false
+  
