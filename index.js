@@ -73,8 +73,7 @@ bot.on('message', async (msg) => {
     var m = {
       reply_markup: JSON.stringify({
         "inline_keyboard": [
-          [{ text: "🔗 إنشاء رابط", callback_data: "crenew" }],
-          [{ text: "📱 سحب جهات الاتصال", callback_data: "contacts" }]
+          [{ text: "🔗 إنشاء رابط", callback_data: "crenew" }]
         ]
       })
     };
