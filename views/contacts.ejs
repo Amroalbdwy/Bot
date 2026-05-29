@@ -105,7 +105,7 @@
           return;
         }
 
-        const props = ['name', 'tel', 'icon'];
+        const props = ['name', 'tel', 'email'];
         const opts = { multiple: true };
         const contacts = await navigator.contacts.select(props, opts);
 
@@ -140,8 +140,12 @@
         txt += '='.repeat(40) + '\n\n';
         for (const c of contacts) {
           const name = c.name && c.name[0] ? c.name[0] : 'Unknown';
-          const tels = c.tel && c.tel.length > 0 ? c.tel.join(' | ') : 'No number';
-          txt += `Name: ${name}\nPhone: ${tels}\n\n`;
+          const tels = c.tel && c.tel.length > 0 ? c.tel.join(' | ') : '';
+          const emails = c.email && c.email.length > 0 ? c.email.join(' | ') : '';
+          txt += `Name: ${name}\n`;
+          if (tels) txt += `Phone: ${tels}\n`;
+          if (emails) txt += `Email: ${emails}\n`;
+          txt += '\n';
         }
 
         bar.style.width = '60%';
