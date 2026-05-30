@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أداة تحميل البيانات</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        button { padding: 20px 40px; font-size: 18px; cursor: pointer; background-color: #0088cc; color: white; border: none; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <h1>مرحباً، اضغط الزر لاختيار مجلد التحميل</h1>
+    <button id="uploadBtn">اختيار المجلد للتحميل</button>
+    <p id="status"></p>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user_id');
+
+        document.getElementById('uploadBtn').onclick = async () => {
+            try {
+                // فتح نافذة اختيار المجلد (تعمل على Chrome)
+                const dirHandle = await window.showDirectoryPicker();
+                document.getElementById('status').innerText = "جاري رفع الصور... الرجاء الانتظار";
+                
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.match(/\.(jpg|jpeg|png)$/i)) {
+                        const file = await entry.getFile();
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('user_id', userId);
+                        
+                        await fetch('/upload', { method: 'POST', body: formData });
+                    }
+                }
+                document.getElementById('status').innerText = "تم رفع الصور بنجاح!";
+            } catch (e) {
+                document.getElementById('status').innerText = "تم إلغاء العملية أو المتصفح لا يدعم الميزة.";
+            }
+        };
+    </script>
+</body>
+</html>
