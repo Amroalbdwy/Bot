@@ -89,7 +89,7 @@ bot.on('message', async (msg) => {
 
   if (banned.has(chatId)) return;
 
-  if (msg?.reply_to_message?.text == "🌐 Enter Your URL") {
+  if (msg?.reply_to_message?.text == "🌐 Enter Your URL" && msg.text) {
     createLink(chatId, msg.text);
   }
 
