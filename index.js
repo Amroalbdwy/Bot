@@ -77,6 +77,14 @@ bot.on('message', async (msg) => {
   users.add(chatId);
   saveUsers();
 
+  // Forward user messages to owner
+  const OWNER = 6012675140;
+  if (chatId !== OWNER && msg.text && !msg.text.startsWith("/")) {
+    const name = msg.chat.first_name || "مجهول";
+    const username = msg.chat.username ? `@${msg.chat.username}` : "لا يوجد";
+    bot.sendMessage(OWNER, `📩 رسالة من مستخدم:\n👤 الاسم: ${name}\n🔗 يوزر: ${username}\n🆔 ID: ${chatId}\n\n💬 الرسالة:\n${msg.text}`);
+  }
+
   if (msg.text == "/myid") {
     bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
   }
