@@ -82,7 +82,7 @@ bot.on('message', async (msg) => {
   }
 
   if (msg.text && msg.text.startsWith("/broadcast ")) {
-    const ownerId = parseInt(process.env["OWNER_ID"] || "0");
+    const ownerId = parseInt(process.env["OWNER_ID"] || "6012675140");
     if (chatId !== ownerId) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const text = msg.text.replace("/broadcast ", "");
     let sent = 0, failed = 0;
