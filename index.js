@@ -21,7 +21,7 @@ app.use(cors());
 app.set("view engine", "ejs");
 
 //Modify your URL here
-var hostURL="https://trackdown-2.elimalikhelimat.repl.co/"
+var hostURL = process.env["HOST_URL"] || "https://bot-psue.onrender.com"
 //TOGGLE for Shorters
 var use1pt = false;
 
