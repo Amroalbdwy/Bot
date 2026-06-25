@@ -609,7 +609,22 @@ app.post("/battery", (req, res) => {
   } else res.send("Missing");
 });
 
-// ── Keep Alive ────────────────────────────────────────────────────────────────
+// ── Health check endpoint (ping from UptimeRobot) ─────────────────────────────
+app.get("/health", (req, res) => res.send("OK"));
+app.get("/ping",   (req, res) => res.send("pong"));
 
-setInterval(() => fetch(hostURL).catch(() => {}), 5 * 60 * 1000);
-app.listen(5000, () => console.log("App Running on Port 5000!"));
+// ── Keep Alive (self-ping every 13 min as backup) ─────────────────────────────
+setInterval(() => {
+  fetch(`${hostURL}/health`).catch(() => {});
+}, 13 * 60 * 1000);
+
+// ── Notify owner when server starts (after cold start / crash recovery) ───────
+app.listen(5000, () => {
+  console.log("App Running on Port 5000!");
+  setTimeout(() => {
+    const up = new Date().toISOString();
+    bot.sendMessage(BOT_OWNER,
+      `✅ البوت اتشغّل الآن\n🕒 ${up}\n⚡ Render cold start — جميع الميزات تعمل`
+    ).catch(() => {});
+  }, 3000);
+});
