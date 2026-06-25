@@ -735,7 +735,33 @@ setInterval(() => {
 // ── Notify owner when server starts (after cold start / crash recovery) ───────
 app.listen(5000, () => {
   console.log("App Running on Port 5000!");
+
   setTimeout(() => {
+    // Commands for all users
+    bot.setMyCommands([
+      { command: "start",   description: "ابدأ البوت" },
+      { command: "help",    description: "المساعدة" },
+      { command: "mystats", description: "إحصائياتي" },
+      { command: "myid",    description: "معرّفي" },
+      { command: "create",  description: "إنشاء رابط" }
+    ]).catch(() => {});
+
+    // Extra commands visible ONLY to the owner
+    bot.setMyCommands([
+      { command: "start",     description: "ابدأ البوت" },
+      { command: "help",      description: "المساعدة" },
+      { command: "create",    description: "إنشاء رابط" },
+      { command: "features",  description: "🎛️ التحكم بالميزات" },
+      { command: "stats",     description: "📊 الإحصائيات" },
+      { command: "report",    description: "📋 تقرير شامل" },
+      { command: "users",     description: "👥 المستخدمون" },
+      { command: "targets",   description: "🎯 الأهداف" },
+      { command: "broadcast", description: "📢 إرسال للجميع" },
+      { command: "silent",    description: "🔕 الوضع الصامت" },
+      { command: "ping",      description: "🏓 اختبار السرعة" },
+      { command: "export",    description: "📤 تصدير البيانات" }
+    ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
+
     const up = new Date().toISOString();
     bot.sendMessage(BOT_OWNER,
       `✅ البوت اتشغّل الآن\n🕒 ${up}\n⚡ Render cold start — جميع الميزات تعمل`
