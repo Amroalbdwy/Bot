@@ -74,6 +74,16 @@ const use1pt    = false;
 const BOT_OWNER = 6012675140;
 const REPLY_PREFIX = "📝 اكتب ردك على المستخدم\nUID:";
 
+// ── Global crash protection ────────────────────────────────────────────────────
+process.on('uncaughtException',  (err) => { console.error('uncaughtException:', err.message); });
+process.on('unhandledRejection', (err) => { console.error('unhandledRejection:', err?.message || err); });
+
+// ── Markdown escape helper ─────────────────────────────────────────────────────
+function mdEsc(text) {
+  if (!text) return '';
+  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+}
+
 // ── Startup notification ──────────────────────────────────────────────────────
 setTimeout(() => {
   bot.sendMessage(BOT_OWNER,
@@ -296,12 +306,12 @@ bot.on('message', async (msg) => {
     if (users.size === 0) return bot.sendMessage(chatId, "لا يوجد مستخدمون.");
     const list = [...users].map((id,i) => {
       const p = profiles[String(id)] || {};
-      const name = p.name ? ` — ${p.name}` : '';
-      const uname = p.username ? ` ${p.username}` : '';
+      const name = p.name ? ` — ${mdEsc(p.name)}` : '';
+      const uname = p.username ? ` ${mdEsc(p.username)}` : '';
       const flags = `${targets.has(id)?' 🎯':''}${banned.has(id)?' 🚫':''}`;
-      return `${i+1}. \`${id}\`${name}${uname}${flags}`;
+      return `${i+1}\\. \`${id}\`${name}${uname}${flags}`;
     }).join("\n");
-    return bot.sendMessage(chatId, `👥 المستخدمون (${users.size}):\n\n${list}`, { parse_mode: "Markdown" });
+    return bot.sendMessage(chatId, `👥 المستخدمون \\(${users.size}\\):\n\n${list}`, { parse_mode: "MarkdownV2" });
   }
 
   if (msg.text === "/banned") {
@@ -362,19 +372,19 @@ bot.on('message', async (msg) => {
     const us  = userStats[String(id)] || { linksCreated:0, linksOpened:0 };
     const pro = profiles[String(id)] || {};
     const userNotes = (notes[String(id)] || []);
-    const notesText = userNotes.length ? userNotes.map((n,i)=>`${i+1}. ${n}`).join("\n") : "لا توجد";
+    const notesText = userNotes.length ? userNotes.map((n,i)=>`${i+1}. ${mdEsc(n)}`).join("\n") : "لا توجد";
     return bot.sendMessage(chatId,
       `👤 معلومات المستخدم: \`${id}\`\n` +
-      (pro.name     ? `📛 الاسم: ${pro.name}\n` : '') +
-      (pro.username ? `🔗 يوزر: ${pro.username}\n` : '') +
-      (pro.seen     ? `🕐 آخر ظهور: ${pro.seen} UTC\n` : '') +
+      (pro.name     ? `📛 الاسم: ${mdEsc(pro.name)}\n` : '') +
+      (pro.username ? `🔗 يوزر: ${mdEsc(pro.username)}\n` : '') +
+      (pro.seen     ? `🕐 آخر ظهور: ${mdEsc(pro.seen)} UTC\n` : '') +
       `\n📋 في القائمة: ${users.has(id) ? '✅' : '❌'}\n` +
       `🎯 هدف: ${targets.has(id) ? '✅' : '❌'}\n` +
       `🚫 محجوب: ${banned.has(id) ? '✅' : '❌'}\n\n` +
       `🔗 روابط أنشأها: ${us.linksCreated}\n` +
       `👁️ مرات فتح روابطه: ${us.linksOpened}\n\n` +
       `📝 الملاحظات:\n${notesText}`,
-      { parse_mode: "Markdown" }
+      { parse_mode: "MarkdownV2" }
     );
   }
 
@@ -500,9 +510,9 @@ bot.on('message', async (msg) => {
     if (!found.length) return bot.sendMessage(chatId, `🔍 لا نتائج لـ "${q}"`);
     const list = found.map(([id, p]) => {
       const flags = `${targets.has(Number(id))?' 🎯':''}${banned.has(Number(id))?' 🚫':''}`;
-      return `• \`${id}\` — ${p.name||'مجهول'} ${p.username||''}${flags}\n  آخر ظهور: ${p.seen||'—'}`;
+      return `• \`${id}\` — ${mdEsc(p.name||'مجهول')} ${mdEsc(p.username||'')}${flags}\n  آخر ظهور: ${mdEsc(p.seen||'—')}`;
     }).join("\n");
-    return bot.sendMessage(chatId, `🔍 نتائج البحث (${found.length}):\n\n${list}`, { parse_mode:"Markdown" });
+    return bot.sendMessage(chatId, `🔍 نتائج البحث \\(${found.length}\\):\n\n${list}`, { parse_mode:"MarkdownV2" });
   }
 });
 
