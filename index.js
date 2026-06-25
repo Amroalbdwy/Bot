@@ -55,6 +55,86 @@ function incUserStat(uid, field) {
   saveUserStats();
 }
 
+// ── GitHub Data Persistence ───────────────────────────────────────────────────
+
+const GH_TOKEN = process.env.GH_TOKEN || "";
+const GH_OWNER = "Amroalbdwy";
+const GH_REPO  = "Bot";
+
+const DATA_FILES = [
+  { local: "./users.json",     remote: "_data/users.json"     },
+  { local: "./banned.json",    remote: "_data/banned.json"    },
+  { local: "./stats.json",     remote: "_data/stats.json"     },
+  { local: "./settings.json",  remote: "_data/settings.json"  },
+  { local: "./targets.json",   remote: "_data/targets.json"   },
+  { local: "./notes.json",     remote: "_data/notes.json"     },
+  { local: "./userstats.json", remote: "_data/userstats.json" },
+  { local: "./profiles.json",  remote: "_data/profiles.json"  },
+];
+
+async function ghGet(path) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+      headers: { Authorization: `token ${GH_TOKEN}`, "User-Agent": "bot-data" }
+    });
+    if (r.status === 200) return r.json();
+  } catch(e) {}
+  return null;
+}
+
+async function ghPut(path, content, sha) {
+  try {
+    const body = { message: `data:backup ${new Date().toISOString()}`, content: Buffer.from(content).toString('base64') };
+    if (sha) body.sha = sha;
+    await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+      method: 'PUT',
+      headers: { Authorization: `token ${GH_TOKEN}`, "Content-Type": "application/json", "User-Agent": "bot-data" },
+      body: JSON.stringify(body)
+    });
+  } catch(e) {}
+}
+
+// Restore data from GitHub on startup
+async function restoreFromGitHub() {
+  let restored = 0;
+  for (const f of DATA_FILES) {
+    try {
+      const d = await ghGet(f.remote);
+      if (d && d.content) {
+        fs.writeFileSync(f.local, Buffer.from(d.content, 'base64').toString('utf8'));
+        restored++;
+      }
+    } catch(e) {}
+  }
+  if (restored > 0) {
+    // Reload in-memory data from restored files
+    users     = new Set(loadJSON(USERS_FILE, []));
+    banned    = new Set(loadJSON(BANNED_FILE, []));
+    targets   = new Set(loadJSON(TARGETS_FILE, []));
+    stats     = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0, ...loadJSON(STATS_FILE, {}) };
+    settings  = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", features:{...DEFAULT_FEATURES}, featureExpiry:null, ...loadJSON(SETTINGS_FILE, {}) };
+    notes     = loadJSON(NOTES_FILE, {});
+    userStats = loadJSON(USERSTATS_FILE, {});
+    profiles  = loadJSON(PROFILES_FILE, {});
+    if (!settings.features) settings.features = {...DEFAULT_FEATURES};
+    console.log(`✅ استُعيد ${restored} ملف من GitHub`);
+  }
+  return restored;
+}
+
+// Save all data files to GitHub
+async function backupToGitHub() {
+  for (const f of DATA_FILES) {
+    try {
+      if (!fs.existsSync(f.local)) continue;
+      const content = fs.readFileSync(f.local, 'utf8');
+      const existing = await ghGet(f.remote);
+      await ghPut(f.remote, content, existing?.sha);
+    } catch(e) {}
+  }
+  console.log("💾 تم حفظ البيانات على GitHub");
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 const cors        = require('cors');
@@ -772,9 +852,22 @@ setInterval(() => {
   fetch(`${hostURL}/health`).catch(() => {});
 }, 13 * 60 * 1000);
 
+// ── Auto-backup every 10 minutes ─────────────────────────────────────────────
+setInterval(() => { backupToGitHub(); }, 10 * 60 * 1000);
+
+// ── Save on graceful shutdown (SIGTERM from Render before redeploy) ───────────
+process.on('SIGTERM', async () => {
+  console.log("SIGTERM — حفظ البيانات قبل الإغلاق...");
+  await backupToGitHub();
+  process.exit(0);
+});
+
 // ── Notify owner when server starts (after cold start / crash recovery) ───────
-app.listen(5000, () => {
+app.listen(5000, async () => {
   console.log("App Running on Port 5000!");
+
+  // Restore user data from GitHub before doing anything else
+  const restored = await restoreFromGitHub();
 
   setTimeout(() => {
     // Commands for all users
@@ -804,7 +897,7 @@ app.listen(5000, () => {
 
     const up = new Date().toISOString();
     bot.sendMessage(BOT_OWNER,
-      `✅ البوت اتشغّل الآن\n🕒 ${up}\n⚡ Render cold start — جميع الميزات تعمل`
+      `✅ البوت اتشغّل الآن\n🕒 ${up}\n💾 البيانات: ${restored > 0 ? `استُعيدت (${restored} ملف)` : 'ملفات جديدة'}`
     ).catch(() => {});
   }, 3000);
 });
