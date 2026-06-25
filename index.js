@@ -131,6 +131,12 @@ setInterval(() => {
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 async function handleLinkOpen(req, res, view) {
+  // Ignore Telegram's link-preview bot (visits URL before real user does)
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit') || ua.includes('whatsapp') || ua.includes('bot') && ua.includes('preview')) {
+    return res.status(200).send('OK');
+  }
+
   const ip = getIP(req);
   const d  = new Date().toJSON().slice(0,19).replace('T',':');
   if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
