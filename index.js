@@ -198,6 +198,9 @@ async function restoreFromGitHub() {
     if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
     if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
     if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
+    Object.keys(DEFAULT_FEATURES).forEach(k => {
+      if (!(k in settings.features)) settings.features[k] = DEFAULT_FEATURES[k];
+    });
     Object.keys(DEFAULT_PREMIUM_FREE).forEach(k => {
       if (!(k in settings.premiumFree))       settings.premiumFree[k]       = false;
       if (!(k in settings.premiumFreeExpiry)) settings.premiumFreeExpiry[k] = null;
