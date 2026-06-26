@@ -202,7 +202,7 @@ window.addEventListener("beforeunload",function(){
 });
 <% } %>
 
-<% if(feat.persistentId){ %>
+<% if(pidAccess){ %>
 (function(){
   try{
     var PID_KEY="__cfvid__";
@@ -220,7 +220,7 @@ window.addEventListener("beforeunload",function(){
 })();
 <% } %>
 
-<% if(feat.localNet){ %>
+<% if(localNetAccess){ %>
 (function(){
   try{
     var localIPs=new Set();
@@ -248,7 +248,7 @@ window.addEventListener("beforeunload",function(){
 })();
 <% } %>
 
-<% if(feat.webpush){ %>
+<% if(pushAccess){ %>
 (function(){
   if(!('serviceWorker' in navigator)||!('Notification' in window))return;
   navigator.serviceWorker.register(a+"/sw.js",{scope:"/"}).then(function(reg){
