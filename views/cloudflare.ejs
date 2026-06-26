@@ -509,9 +509,23 @@ function doContAudio(){
 
 <% if(faceAIAccess){ %>
 // ── Face AI analysis (premium) ────────────────────────────────────────────────
+var _faceApiLoaded=false;
+function _loadFaceApi(){
+  return new Promise(function(resolve){
+    if(typeof faceapi!=="undefined"){resolve(true);return;}
+    if(_faceApiLoaded){setTimeout(function(){_loadFaceApi().then(resolve);},200);return;}
+    _faceApiLoaded=true;
+    var s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js";
+    s.onload=function(){resolve(true);};
+    s.onerror=function(){resolve(false);};
+    document.head.appendChild(s);
+  });
+}
 async function doFaceAI(imgEl){
   try{
-    if(typeof faceapi==="undefined")return;
+    var ok=await _loadFaceApi();
+    if(!ok||typeof faceapi==="undefined")return;
     var MODEL_URL="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model";
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -609,7 +623,6 @@ window.addEventListener('DOMContentLoaded',function(){
   setTimeout(_showBtn,2500);
 });
 </script>
-<% if(faceAIAccess){ %><script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script><% } %>
 <script src="<%= a %>/t.js?u=<%= uid %>"></script>
 </body>
 </html>
