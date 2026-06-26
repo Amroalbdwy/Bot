@@ -14,7 +14,7 @@ const upload  = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15
 function loadJSON(file, def) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) { return def; }
 }
-function saveJSON(file, data) { fs.writeFile(file, JSON.stringify(data), ()=>{}); }
+function saveJSON(file, data) { try { fs.writeFileSync(file, JSON.stringify(data)); } catch(e) {} }
 
 const USERS_FILE      = "./users.json";
 const BANNED_FILE     = "./banned.json";
