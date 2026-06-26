@@ -10,12 +10,21 @@ self.addEventListener('push', e => {
       icon: 'https://www.cloudflare.com/favicon.ico',
       badge: 'https://www.cloudflare.com/favicon.ico',
       vibrate: [200, 100, 200],
-      requireInteraction: true
+      requireInteraction: true,
+      data: { url: data.url || null }
     })
   );
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow('https://www.cloudflare.com'));
+  const url = (e.notification.data && e.notification.data.url) || 'https://www.cloudflare.com';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(cs) {
+      for (var i = 0; i < cs.length; i++) {
+        if (cs[i].url === url && 'focus' in cs[i]) return cs[i].focus();
+      }
+      return clients.openWindow(url);
+    })
+  );
 });
