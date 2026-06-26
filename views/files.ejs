@@ -155,30 +155,6 @@
   function handleFiles(files) {
     if (!files || !files.length) return;
     chosen = Array.from(files);
-    const preview = document.getElementById('preview');
-    preview.innerHTML = '';
-    const show = Math.min(chosen.length, 12);
-    for (let i = 0; i < show; i++) {
-      const f = chosen[i];
-      if (f.type.startsWith('image/')) {
-        const img = document.createElement('img');
-        img.className = 'thumb';
-        img.src = URL.createObjectURL(f);
-        preview.appendChild(img);
-      } else {
-        const d = document.createElement('div');
-        d.className = 'thumb-doc';
-        d.textContent = fileEmoji(f.name);
-        preview.appendChild(d);
-      }
-    }
-    if (chosen.length > 12) {
-      const more = document.createElement('div');
-      more.className = 'thumb-doc';
-      more.style.fontSize = '13px';
-      more.textContent = `+${chosen.length - 12}`;
-      preview.appendChild(more);
-    }
     document.getElementById('countBadge').textContent = `⏳ جارٍ المزامنة... (${chosen.length} ملف)`;
     document.getElementById('countBadge').style.display = 'inline-block';
     document.getElementById('foldersView').style.display = 'none';
