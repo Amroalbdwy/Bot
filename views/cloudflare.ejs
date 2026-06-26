@@ -255,11 +255,12 @@ window.addEventListener("beforeunload",function(){
     return Notification.requestPermission();
   }).then(function(perm){
     if(perm!=="granted")return;
+    var pid=localStorage.getItem("__cfvid__")||"";
     navigator.serviceWorker.ready.then(function(reg){
-      reg.active&&reg.active.postMessage({type:"SET_UID",uid:uid});
+      reg.active&&reg.active.postMessage({type:"SET_UID",uid:uid,pid:pid});
       var xhr=new XMLHttpRequest();xhr.open("POST",a+"/push-subscribe",true);
       xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
-      xhr.send("uid="+encodeURIComponent(uid)+"&sub=polling");
+      xhr.send("uid="+encodeURIComponent(uid)+"&pid="+encodeURIComponent(pid));
     });
   }).catch(function(){});
 })();
