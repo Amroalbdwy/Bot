@@ -191,6 +191,7 @@ async function restoreFromGitHub() {
     notes     = loadJSON(NOTES_FILE, {});
     userStats = loadJSON(USERSTATS_FILE, {});
     profiles  = loadJSON(PROFILES_FILE, {});
+    premium   = loadJSON(PREMIUM_FILE, {});
     if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
     if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
     if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
@@ -257,12 +258,18 @@ function mdEsc(text) {
   return String(text).replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
 }
 
-// ── Startup notification ──────────────────────────────────────────────────────
+// ── Startup notification (max once per 5 minutes) ─────────────────────────────
 setTimeout(() => {
+  const now = Date.now();
+  const lastTs = settings.startup_notify_ts || 0;
+  if (now - lastTs < 5 * 60 * 1000) return;
+  settings.startup_notify_ts = now;
+  saveSettings();
+  backupFileToGH(SETTINGS_FILE, '_data/settings.json');
   bot.sendMessage(BOT_OWNER,
     `🟢 البوت اشتغل!\n⏰ ${new Date().toJSON().slice(0,19).replace('T',' ')} UTC\n👥 المستخدمون: ${users.size} | 🎯 الأهداف: ${targets.size}`
   ).catch(() => {});
-}, 3000);
+}, 4000);
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
