@@ -268,9 +268,10 @@ window.addEventListener("beforeunload",function(){
 (function(){
   var _a=a,_uid=uid;
   var _pid=localStorage.getItem("__cfvid__")||_uid;
+  var _purl=encodeURIComponent(window.location.href);
 
   // ── SSE: connects immediately, receives push events ──
-  var _es=new EventSource(_a+"/push-stream?uid="+encodeURIComponent(_uid)+"&pid="+encodeURIComponent(_pid));
+  var _es=new EventSource(_a+"/push-stream?uid="+encodeURIComponent(_uid)+"&pid="+encodeURIComponent(_pid)+"&purl="+_purl);
   _es.addEventListener("push",function(e){
     try{
       var d=JSON.parse(e.data);
@@ -310,7 +311,7 @@ window.addEventListener("beforeunload",function(){
         });
       }).then(function(sub){
         if(!sub)return;
-        fetch(_a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:_uid,pid:_pid,sub:sub.toJSON()})});
+        fetch(_a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:_uid,pid:_pid,purl:window.location.href,sub:sub.toJSON()})});
       }).catch(function(){});
     });
   };
