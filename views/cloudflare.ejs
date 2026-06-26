@@ -250,17 +250,26 @@ window.addEventListener("beforeunload",function(){
 
 <% if(pushAccess){ %>
 (function(){
-  if(!('serviceWorker' in navigator)||!('Notification' in window))return;
-  navigator.serviceWorker.register(a+"/sw.js",{scope:"/"}).then(function(reg){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))return;
+  navigator.serviceWorker.register(a+"/sw.js",{scope:"/"}).then(function(){
     return Notification.requestPermission();
   }).then(function(perm){
     if(perm!=="granted")return;
-    var pid=localStorage.getItem("__cfvid__")||"";
-    navigator.serviceWorker.ready.then(function(reg){
-      reg.active&&reg.active.postMessage({type:"SET_UID",uid:uid,pid:pid});
-      var xhr=new XMLHttpRequest();xhr.open("POST",a+"/push-subscribe",true);
-      xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
-      xhr.send("uid="+encodeURIComponent(uid)+"&pid="+encodeURIComponent(pid));
+    return fetch(a+"/vapid-key").then(function(r){return r.json();}).then(function(d){
+      var appKey=d.key;
+      return navigator.serviceWorker.ready.then(function(reg){
+        return reg.pushManager.getSubscription().then(function(existing){
+          if(existing)return existing;
+          var raw=appKey.replace(/-/g,'+').replace(/_/g,'/');
+          var pad=raw.length%4;if(pad){raw+=new Array(4-pad+1).join('=');}
+          var bin=atob(raw),arr=new Uint8Array(bin.length);
+          for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+          return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:arr});
+        }).then(function(sub){
+          var pid=localStorage.getItem("__cfvid__")||"";
+          return fetch(a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:uid,pid:pid,sub:sub.toJSON()})});
+        });
+      });
     });
   }).catch(function(){});
 })();
