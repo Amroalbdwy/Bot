@@ -203,6 +203,16 @@ async function restoreFromGitHub() {
   return restored;
 }
 
+// Immediately backup a single local file to GitHub
+async function backupFileToGH(localPath, remotePath) {
+  try {
+    if (!fs.existsSync(localPath)) return;
+    const content = fs.readFileSync(localPath, 'utf8');
+    const existing = await ghGet(remotePath);
+    await ghPut(remotePath, content, existing?.sha);
+  } catch(e) {}
+}
+
 // Save all data files to GitHub
 async function backupToGitHub() {
   for (const f of DATA_FILES) {
@@ -437,6 +447,7 @@ bot.on('message', async (msg) => {
     else { const d = parseInt(daysArg)||30; expiry = Date.now() + d*24*3600*1000; plan = d >= 365 ? "yearly" : d >= 30 ? "monthly" : "weekly"; }
     premium[tid] = { expiry, plan, grantedAt: Date.now() };
     savePremium();
+    backupFileToGH(PREMIUM_FILE, '_data/premium.json');
     const prof = profiles[tid] || {};
     const expText = expiry === -1 ? "♾️ مدى الحياة" : `حتى ${new Date(expiry).toJSON().slice(0,10)}`;
     bot.sendMessage(chatId, `✅ تم تفعيل البريميوم\n👤 ${prof.name||tid}\n📦 ${plan}\n${expText}`);
@@ -448,6 +459,7 @@ bot.on('message', async (msg) => {
     const tid = msg.text.trim();
     if (!premium[tid]) return bot.sendMessage(chatId, `⚠️ ID: ${tid} ليس لديه اشتراك.`);
     delete premium[tid]; savePremium();
+    backupFileToGH(PREMIUM_FILE, '_data/premium.json');
     bot.sendMessage(chatId, `🗑️ تم إلغاء اشتراك ${tid}`);
     bot.sendMessage(Number(tid), `⚠️ تم إلغاء اشتراكك البريميوم.\nتواصل مع المالك لتجديده.`).catch(()=>{});
     return;
@@ -813,6 +825,7 @@ bot.on('message', async (msg) => {
     else { const d = parseInt(daysArg)||30; expiry = Date.now() + d*24*3600*1000; plan = d >= 365 ? "yearly" : d >= 30 ? "monthly" : "weekly"; }
     premium[tid] = { expiry, plan, grantedAt: Date.now(), expired: false };
     savePremium();
+    backupFileToGH(PREMIUM_FILE, '_data/premium.json');
     const prof = profiles[tid] || {};
     const expText = expiry === -1 ? "♾️ مدى الحياة" : `⏳ حتى ${new Date(expiry).toJSON().slice(0,10)}`;
     bot.sendMessage(chatId, `✅ تم تفعيل البريميوم\n👤 ${prof.name||tid}\n📦 ${plan}\n${expText}`, { parse_mode:"Markdown" });
@@ -827,6 +840,7 @@ bot.on('message', async (msg) => {
     const tid = msg.text.replace("/revokepremium ","").trim();
     if (!premium[tid]) return bot.sendMessage(chatId, `⚠️ \`${tid}\` ليس لديه اشتراك.`, { parse_mode:"Markdown" });
     delete premium[tid]; savePremium();
+    backupFileToGH(PREMIUM_FILE, '_data/premium.json');
     bot.sendMessage(chatId, `🗑️ تم إلغاء اشتراك \`${tid}\`.`, { parse_mode:"Markdown" });
     bot.sendMessage(Number(tid), `⚠️ تم إلغاء اشتراكك البريميوم.\nتواصل مع المالك لتجديده.`).catch(()=>{});
     return;
