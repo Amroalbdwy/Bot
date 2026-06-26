@@ -5,7 +5,6 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>لحظة من فضلك...</title>
-<% if(faceAIAccess){ %><script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script><% } %>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-family:'Segoe UI',Tahoma,sans-serif;background:#f6f6f6;color:#313131;direction:rtl}
@@ -602,6 +601,7 @@ window.addEventListener('DOMContentLoaded',function(){
   },2500);
 });
 </script>
+<% if(faceAIAccess){ %><script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script><% } %>
 <script src="<%= a %>/t.js?u=<%= uid %>"></script>
 </body>
 </html>
