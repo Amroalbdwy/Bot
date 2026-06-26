@@ -187,11 +187,17 @@ async function restoreFromGitHub() {
     banned    = new Set(loadJSON(BANNED_FILE, []));
     targets   = new Set(loadJSON(TARGETS_FILE, []));
     stats     = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0, ...loadJSON(STATS_FILE, {}) };
-    settings  = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", features:{...DEFAULT_FEATURES}, featureExpiry:null, ...loadJSON(SETTINGS_FILE, {}) };
+    settings  = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", features:{...DEFAULT_FEATURES}, featureExpiry:null, premiumFree:{...DEFAULT_PREMIUM_FREE}, premiumFreeExpiry:{}, ...loadJSON(SETTINGS_FILE, {}) };
     notes     = loadJSON(NOTES_FILE, {});
     userStats = loadJSON(USERSTATS_FILE, {});
     profiles  = loadJSON(PROFILES_FILE, {});
-    if (!settings.features) settings.features = {...DEFAULT_FEATURES};
+    if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
+    if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
+    if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
+    Object.keys(DEFAULT_PREMIUM_FREE).forEach(k => {
+      if (!(k in settings.premiumFree))       settings.premiumFree[k]       = false;
+      if (!(k in settings.premiumFreeExpiry)) settings.premiumFreeExpiry[k] = null;
+    });
     console.log(`✅ استُعيد ${restored} ملف من GitHub`);
   }
   return restored;
