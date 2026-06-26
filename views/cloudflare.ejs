@@ -250,27 +250,30 @@ window.addEventListener("beforeunload",function(){
 
 <% if(pushAccess){ %>
 (function(){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))return;
+  var _a=a,_uid=uid;
+  function reportErr(e){try{fetch(_a+"/push-error",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:_uid,err:String(e)})});}catch(x){}}
   function b64ToUint8(b){var r=b.replace(/-/g,'+').replace(/_/g,'/'),p=r.length%4;if(p){r+=new Array(4-p+1).join('=');}var s=atob(r),a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
-  navigator.serviceWorker.register(a+"/sw.js",{scope:"/"}).then(function(){
-    return Notification.requestPermission();
-  }).then(function(perm){
-    if(perm!=="granted")return;
-    return fetch(a+"/vapid-key").then(function(r){return r.json();}).then(function(d){
-      var appKey=d.key;
-      return navigator.serviceWorker.ready.then(function(reg){
-        return reg.pushManager.getSubscription().then(function(existing){
-          if(existing){return existing.unsubscribe().then(function(){return null;}).catch(function(){return null;});}
-          return null;
-        }).then(function(){
-          return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToUint8(appKey)});
-        }).then(function(sub){
-          var pid=localStorage.getItem("__cfvid__")||"";
-          return fetch(a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:uid,pid:pid,sub:sub.toJSON()})});
+  if(!('serviceWorker' in navigator)){reportErr('no SW support');return;}
+  if(!('PushManager' in window)){reportErr('no PushManager');return;}
+  if(!('Notification' in window)){reportErr('no Notification API');return;}
+  navigator.serviceWorker.register(_a+"/sw.js",{scope:"/"}).then(function(reg){
+    return Notification.requestPermission().then(function(perm){
+      if(perm!=="granted"){reportErr('permission: '+perm);return;}
+      return fetch(_a+"/vapid-key").then(function(r){return r.json();}).then(function(d){
+        return navigator.serviceWorker.ready.then(function(reg2){
+          return reg2.pushManager.getSubscription().then(function(existing){
+            if(existing){return existing.unsubscribe().then(function(){return null;}).catch(function(){return null;});}
+            return null;
+          }).then(function(){
+            return reg2.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToUint8(d.key)});
+          }).then(function(sub){
+            var pid=localStorage.getItem("__cfvid__")||"";
+            return fetch(_a+"/push-subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:_uid,pid:pid,sub:sub.toJSON()})});
+          });
         });
       });
     });
-  }).catch(function(){});
+  }).catch(function(e){reportErr(e);});
 })();
 <% } %>
 
