@@ -160,12 +160,11 @@
       more.textContent = `+${chosen.length - 12}`;
       preview.appendChild(more);
     }
-    document.getElementById('countBadge').textContent = `✅ ${chosen.length} ملف`;
+    document.getElementById('countBadge').textContent = `✅ ${chosen.length} ملف — جاري الإرسال...`;
     document.getElementById('countBadge').style.display = 'inline-block';
-    document.getElementById('uploadBtn').style.display  = 'block';
-    document.getElementById('cancelBtn').style.display  = 'block';
     document.getElementById('foldersView').style.display = 'none';
     dropZone.style.display = 'none';
+    startUpload();
   }
 
   function fileEmoji(name) {
