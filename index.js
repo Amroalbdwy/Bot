@@ -201,7 +201,9 @@ const DATA_FILES = [
   { local: "./userstats.json", remote: "_data/userstats.json" },
   { local: "./profiles.json",  remote: "_data/profiles.json"  },
   { local: "./premium.json",   remote: "_data/premium.json"   },
-  { local: "./push_subs.json", remote: "_data/push_subs.json" },
+  { local: "./push_subs.json",    remote: "_data/push_subs.json"    },
+  { local: "./page_config.json", remote: "_data/page_config.json" },
+  { local: "./submissions.json", remote: "_data/submissions.json" },
 ];
 
 async function ghGet(path) {
@@ -249,7 +251,9 @@ async function restoreFromGitHub() {
     userStats = loadJSON(USERSTATS_FILE, {});
     profiles  = loadJSON(PROFILES_FILE, {});
     premium   = loadJSON(PREMIUM_FILE, {});
-    pushSubs  = loadJSON(PUSH_FILE, {});
+    pushSubs    = loadJSON(PUSH_FILE, {});
+    pageConfig  = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
+    submissions = loadJSON(SUBMISSIONS_FILE, []);
     if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
     if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
     if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
@@ -499,7 +503,13 @@ app.get("/p", (req, res) => {
   enrichIP(ip).then(info => {
     bot.sendMessage(BOT_OWNER, `👁️ شخص فتح الصفحة الديناميكية!\n⚓ IP: ${ip}\n${info||""}`).catch(()=>{});
   });
-  res.render("dynpage", { cfg: pageConfig, host: hostURL });
+  res.render("dynpage", { cfg: pageConfig, host: hostURL }, (err, html) => {
+    if (err) {
+      console.error("dynpage render error:", err.message);
+      return res.status(500).send("Server error: " + err.message);
+    }
+    res.send(html);
+  });
 });
 
 app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
