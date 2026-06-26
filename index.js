@@ -994,6 +994,7 @@ bot.on('callback_query', async (q) => {
         settings.premiumFree[k] = !settings.premiumFree[k];
         if (!settings.premiumFree[k]) settings.premiumFreeExpiry[k] = null;
         saveSettings();
+        backupFileToGH(SETTINGS_FILE, '_data/settings.json');
       }
     } else if (data.startsWith("pc:timer:")) {
       const mins = parseInt(data.replace("pc:timer:",""));
@@ -1003,12 +1004,14 @@ bot.on('callback_query', async (q) => {
         settings.premiumFreeExpiry[k]  = exp;
       });
       saveSettings();
+      backupFileToGH(SETTINGS_FILE, '_data/settings.json');
     } else if (data === "pc:allpaid") {
       Object.keys(PREM_FEAT_NAMES).forEach(k => {
         settings.premiumFree[k]       = false;
         settings.premiumFreeExpiry[k] = null;
       });
       saveSettings();
+      backupFileToGH(SETTINGS_FILE, '_data/settings.json');
     }
     return bot.editMessageText(premiumConfigText(), {
       chat_id: chatId, message_id: msgId,
