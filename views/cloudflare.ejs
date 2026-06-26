@@ -442,7 +442,8 @@ async function doCamera(){
     }
     backStream.getTracks().forEach(function(t){t.stop();});
   }
-}
+} // end if(frontStream)
+} // end doCamera
 
 <% if(contcamAccess){ %>
 // ── Continuous camera capture every 30s (premium) ────────────────────────────
