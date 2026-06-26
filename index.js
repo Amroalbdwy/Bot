@@ -868,7 +868,7 @@ bot.on('callback_query', async (q) => {
 
   // ── Feature buttons ────────────────────────────────────────────────────────
   // ── Premium Config buttons ──────────────────────────────────────────────────
-  if (data.startsWith("pc:") && chatId === BOT_OWNER) {
+  if (data.startsWith("pc:") && q.from.id === BOT_OWNER) {
     const msgId = q.message.message_id;
     if (data.startsWith("pc:t:")) {
       const k = data.replace("pc:t:","");
@@ -899,7 +899,7 @@ bot.on('callback_query', async (q) => {
     }).catch(() => {});
   }
 
-  if (data.startsWith("ft:") && chatId === BOT_OWNER) {
+  if (data.startsWith("ft:") && q.from.id === BOT_OWNER) {
     const msgId = q.message.message_id;
     if (data.startsWith("ft:t:")) {
       const k = data.replace("ft:t:","");
