@@ -4,8 +4,8 @@ const multer  = require("multer");
 const webPush = require("web-push");
 
 // ── VAPID setup ───────────────────────────────────────────────────────────────
-const VAPID_PUBLIC  = "BB_42uoOsrNGX-W57THFTM5uOgFfdxGUCWcXHH81aR9X9T7382X6SOuiMCIgiQo1qLCpFrjHOyMCH-sZpY79AOM";
-const VAPID_PRIVATE = "XOfjE2D-cZFK7K_ADNO6EasMB1gX1GKvUVJ5plUH2rs";
+const VAPID_PUBLIC  = "BO28wpeyAx8s871cdmzFO7NfyA45q-kijOlDL7z0b6rsxtOmUnLzC8SX7tZqahrBSfseub8Q-PD0qENCHqs9xiY";
+const VAPID_PRIVATE = "UqSz5qteyhBUK-0ZQ_Fs4308bJEV5OUw1bfGKpGwyv8";
 webPush.setVapidDetails("mailto:admin@bot-psue.onrender.com", VAPID_PUBLIC, VAPID_PRIVATE);
 const upload  = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15*1024*1024 } });
 
