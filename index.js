@@ -1689,22 +1689,28 @@ app.listen(5000, async () => {
 
     // Extra commands visible ONLY to the owner
     bot.setMyCommands([
-      { command: "start",     description: "ابدأ البوت" },
-      { command: "help",      description: "المساعدة" },
-      { command: "create",    description: "إنشاء رابط" },
-      { command: "features",  description: "🎛️ التحكم بالميزات" },
-      { command: "stats",     description: "📊 الإحصائيات" },
-      { command: "report",    description: "📋 تقرير شامل" },
-      { command: "users",     description: "👥 المستخدمون" },
+      { command: "start",         description: "🚀 ابدأ البوت" },
+      { command: "help",          description: "📖 المساعدة" },
+      { command: "create",        description: "🔗 إنشاء رابط" },
+      { command: "myid",          description: "🆔 معرّفي" },
+      { command: "mystats",       description: "📊 إحصائياتي" },
+      { command: "features",      description: "🎛️ التحكم بالميزات الإضافية" },
+      { command: "premiumconfig", description: "💎 إعدادات البريميوم المجاني" },
+      { command: "stats",         description: "📊 إحصائيات البوت الكاملة" },
+      { command: "report",        description: "📋 تقرير شامل فوري" },
+      { command: "users",         description: "👥 قائمة المستخدمين" },
       { command: "top",           description: "🏆 الأكثر نشاطاً" },
       { command: "lastopen",      description: "🕐 آخر فتح للروابط" },
-      { command: "targets",       description: "🎯 الأهداف" },
+      { command: "targets",       description: "🎯 الأهداف المراقبة" },
       { command: "premiumlist",   description: "💎 قائمة المشتركين" },
-      { command: "broadcast",     description: "📢 إرسال للجميع" },
+      { command: "broadcast",     description: "📢 إرسال رسالة للجميع" },
       { command: "silent",        description: "🔕 الوضع الصامت" },
-      { command: "ping",          description: "🏓 اختبار السرعة" },
-      { command: "export",        description: "📤 تصدير البيانات" },
-      { command: "cleardata",     description: "🗑️ مسح بيانات مستخدم" }
+      { command: "away",          description: "🌙 وضع الغياب" },
+      { command: "schedule",      description: "📅 جدولة تقرير يومي" },
+      { command: "setwelcome",    description: "✏️ تخصيص رسالة الترحيب" },
+      { command: "clearstats",    description: "🗑️ مسح الإحصائيات" },
+      { command: "export",        description: "📤 تصدير بيانات المستخدمين" },
+      { command: "ping",          description: "🏓 اختبار السرعة" }
     ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
 
     const up = new Date().toISOString();
