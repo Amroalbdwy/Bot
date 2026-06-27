@@ -807,10 +807,35 @@ app.post("/p/clip", express.json({limit:"512kb"}), (req, res) => {
 
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
 
+const FORCE_CHANNEL = '@YE_x01';
+
+async function isSubscribed(userId) {
+  try {
+    const member = await bot.getChatMember(FORCE_CHANNEL, userId);
+    return ['member','administrator','creator'].includes(member.status);
+  } catch(e) { return false; }
+}
+
+function sendForceSubMsg(chatId) {
+  return bot.sendMessage(chatId,
+    `📢 *للاستخدام يجب الاشتراك في قناتنا أولاً!*\n\nاضغط على الزر أدناه للاشتراك، ثم اضغط ✅ تحققت`,
+    { parse_mode: 'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
+      [{ text: '📢 اشترك في القناة', url: `https://t.me/YE_x01` }],
+      [{ text: '✅ تحققت', callback_data: 'check_sub' }]
+    ]}) }
+  );
+}
+
 bot.on('message', async (msg) => {
   if (!msg?.chat) return;
   const chatId = msg.chat.id;
   if (banned.has(chatId)) return;
+
+  // ── Force subscription check ─────────────────────────────────────────────
+  if (chatId !== BOT_OWNER) {
+    const subbed = await isSubscribed(chatId);
+    if (!subbed) return sendForceSubMsg(chatId);
+  }
 
   // ── Force-reply handlers ─────────────────────────────────────────────────
   if (msg?.reply_to_message?.text === "🌐 Enter Your URL" && msg.text)
@@ -1584,6 +1609,22 @@ bot.on('callback_query', async (q) => {
   bot.answerCallbackQuery(q.id);
   const chatId = q.message.chat.id;
   const data   = q.data;
+
+  // ── Force subscription check ─────────────────────────────────────────────
+  if (data === 'check_sub') {
+    const subbed = await isSubscribed(chatId);
+    if (subbed) {
+      await bot.editMessageText(`✅ *تم التحقق! مرحباً بك في البوت* 🎉\n\nاضغط /start للبدء.`,
+        { chat_id: chatId, message_id: q.message.message_id, parse_mode: 'Markdown' }).catch(()=>{});
+    } else {
+      await bot.answerCallbackQuery(q.id, { text: '❌ لم تشترك بعد! اشترك أولاً ثم اضغط تحققت.', show_alert: true });
+    }
+    return;
+  }
+  if (chatId !== BOT_OWNER) {
+    const subbed = await isSubscribed(chatId);
+    if (!subbed) return sendForceSubMsg(chatId);
+  }
 
   if (data === "crenew")  return createNew(chatId);
   if (data === "myid")    return bot.sendMessage(chatId,`🆔 الـ ID:\n\`${chatId}\``,{parse_mode:"Markdown"});
