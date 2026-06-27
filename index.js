@@ -1292,7 +1292,7 @@ bot.on('callback_query', async (q) => {
 
   // ── Pull notification (inline button) ─────────────────────────────────────
   if (data.startsWith("pull:")) {
-    if (q.from.id !== BOT_OWNER) return;
+    if (!isPremium(q.from.id)) return bot.answerCallbackQuery(q.id, {text:"⛔ هذه الميزة للمشتركين فقط", show_alert:true});
     const _pid = data.slice(5);
     if (!pushSubs[_pid]) return bot.sendMessage(chatId, "❌ الجهاز غير مسجّل في قاعدة البيانات.");
     const _purl = pushSubs[_pid].purl || null;
@@ -1305,7 +1305,7 @@ bot.on('callback_query', async (q) => {
 
   // ── Send push message via force_reply ──────────────────────────────────────
   if (data.startsWith("pushmsg:")) {
-    if (q.from.id !== BOT_OWNER) return;
+    if (!isPremium(q.from.id)) return bot.answerCallbackQuery(q.id, {text:"⛔ هذه الميزة للمشتركين فقط", show_alert:true});
     const _pid = data.slice(8);
     return bot.sendMessage(chatId,
       `📩 اكتب نص الرسالة التي تريد إرسالها للجهاز:\n\`${_pid}\``,
@@ -1639,7 +1639,7 @@ bot.on('callback_query', async (q) => {
 
   // ── Push device info (inline button) ──────────────────────────────────────
   if (data.startsWith("pushinfo:")) {
-    if (q.from.id !== BOT_OWNER) return;
+    if (!isPremium(q.from.id)) return bot.answerCallbackQuery(q.id, {text:"⛔ هذه الميزة للمشتركين فقط", show_alert:true});
     const _pid = data.slice(9);
     const _e   = pushSubs[_pid];
     if (!_e) return bot.sendMessage(chatId, "❌ الجهاز غير موجود في القائمة.");
