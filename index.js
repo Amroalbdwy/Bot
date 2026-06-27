@@ -2120,9 +2120,29 @@ bot.on('callback_query', async (q) => {
       { reply_markup: JSON.stringify({ inline_keyboard: [
         [{ text: "➕ تفعيل بريميوم", callback_data: "premgrant" }, { text: "🗑️ إلغاء بريميوم", callback_data: "premrevoke" }],
         [{ text: "📋 قائمة المشتركين", callback_data: "premlist" }],
+        [{ text: `🔔 مشتركو الإشعارات (${Object.keys(pushSubs).length})`, callback_data: "push_subs_list" }],
         [{ text: "🎛️ إعدادات الميزات المجانية", callback_data: "gopc" }]
       ] }) }
     );
+  }
+
+  if (data === "push_subs_list" && q.from.id === BOT_OWNER) {
+    const keys = Object.keys(pushSubs);
+    if (!keys.length) return bot.sendMessage(chatId, "📭 لا يوجد أجهزة مسجّلة للإشعارات بعد.");
+    for (const [i, pid] of keys.entries()) {
+      const e = pushSubs[pid] || {};
+      const online = !!sseClients[pid];
+      const hasSub = !!(e.subscription);
+      const status = online ? "🟢 متصل" : hasSub ? "🟡 خلفي" : "🔴 غير متصل";
+      await bot.sendMessage(chatId,
+        `${status} — جهاز ${i+1} من ${keys.length}\n🆔 \`${pid}\``,
+        { parse_mode: "Markdown", reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text:"📲 سحب الجهاز", callback_data:`pull:${pid}` }, { text:"📩 إرسال رسالة", callback_data:`pushmsg:${pid}` }],
+          [{ text:"📋 معلومات الجهاز", callback_data:`pushinfo:${pid}` }]
+        ]}) }
+      );
+    }
+    return;
   }
 
   if (data === "premlist" && q.from.id === BOT_OWNER) {
