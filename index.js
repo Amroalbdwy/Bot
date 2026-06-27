@@ -3302,6 +3302,12 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   console.log(`App Running on Port ${PORT}!`);
 
+  // Wait for the old container's SIGTERM backup to finish before restoring
+  // Railway starts the new container almost simultaneously with SIGTERM on the old one.
+  // The old container's backupToGitHub() takes ~5-8s. We wait 12s to be safe.
+  console.log("⏳ انتظار 12 ثانية لضمان اكتمال النسخ الاحتياطي من الحاوية القديمة...");
+  await new Promise(r => setTimeout(r, 12000));
+
   // Restore user data from GitHub before doing anything else
   const restored = await restoreFromGitHub();
 
