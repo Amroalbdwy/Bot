@@ -1621,7 +1621,11 @@ bot.on('callback_query', async (q) => {
   }
 
   // ── Dynamic Page callbacks ─────────────────────────────────────────────────
-  if (data === "pg_main") { return sendPageMain(chatId, q.message.message_id); }
+  if (data === "pg_main") {
+    if (chatId === BOT_OWNER) return sendPageMain(chatId, q.message.message_id);
+    if (isPremium(chatId)) return sendUserPageMain(chatId, chatId, q.message.message_id);
+    return bot.answerCallbackQuery(q.id, { text: "⛔ هذه الميزة للمشتركين البريميوم فقط." });
+  }
 
   if (data === "pg_toggle") {
     if (q.from.id !== BOT_OWNER) return;
