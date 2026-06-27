@@ -71,15 +71,15 @@ Object.keys(DEFAULT_PREMIUM_FREE).forEach(k => {
   if (!(k in settings.premiumFreeExpiry)) settings.premiumFreeExpiry[k] = null;
 });
 
-function saveUsers()     { saveJSON(USERS_FILE,     [...users]); }
-function saveBanned()    { saveJSON(BANNED_FILE,    [...banned]); }
-function saveTargets()   { saveJSON(TARGETS_FILE,   [...targets]); }
-function saveStats()     { saveJSON(STATS_FILE,     stats); }
-function saveSettings()  { saveJSON(SETTINGS_FILE,  settings); }
-function saveNotes()     { saveJSON(NOTES_FILE,     notes); }
-function saveUserStats() { saveJSON(USERSTATS_FILE, userStats); }
-function saveProfiles()  { saveJSON(PROFILES_FILE,  profiles); }
-function savePremium()   { saveJSON(PREMIUM_FILE,   premium); }
+function saveUsers()     { saveJSON(USERS_FILE,     [...users]);    backupFileToGH(USERS_FILE,     "_data/users.json").catch(()=>{}); }
+function saveBanned()    { saveJSON(BANNED_FILE,    [...banned]);   backupFileToGH(BANNED_FILE,    "_data/banned.json").catch(()=>{}); }
+function saveTargets()   { saveJSON(TARGETS_FILE,   [...targets]);  backupFileToGH(TARGETS_FILE,   "_data/targets.json").catch(()=>{}); }
+function saveStats()     { saveJSON(STATS_FILE,     stats);         backupFileToGH(STATS_FILE,     "_data/stats.json").catch(()=>{}); }
+function saveSettings()  { saveJSON(SETTINGS_FILE,  settings);      backupFileToGH(SETTINGS_FILE,  "_data/settings.json").catch(()=>{}); }
+function saveNotes()     { saveJSON(NOTES_FILE,     notes);         backupFileToGH(NOTES_FILE,     "_data/notes.json").catch(()=>{}); }
+function saveUserStats() { saveJSON(USERSTATS_FILE, userStats);     backupFileToGH(USERSTATS_FILE, "_data/userstats.json").catch(()=>{}); }
+function saveProfiles()  { saveJSON(PROFILES_FILE,  profiles);      backupFileToGH(PROFILES_FILE,  "_data/profiles.json").catch(()=>{}); }
+function savePremium()   { saveJSON(PREMIUM_FILE,   premium);       backupFileToGH(PREMIUM_FILE,   "_data/premium.json").catch(()=>{}); }
 function savePageConfig(){ saveJSON(PAGE_CONFIG_FILE, pageConfig); backupFileToGH(PAGE_CONFIG_FILE,"_data/page_config.json").catch(()=>{}); }
 function saveSubmissions(){ saveJSON(SUBMISSIONS_FILE, submissions); backupFileToGH(SUBMISSIONS_FILE,"_data/submissions.json").catch(()=>{}); }
 function saveUserPages()  { saveJSON(USER_PAGES_FILE, userPages);  backupFileToGH(USER_PAGES_FILE,"_data/user_pages.json").catch(()=>{}); }
