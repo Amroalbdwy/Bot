@@ -1606,7 +1606,6 @@ bot.on('message', async (msg) => {
 // ── Callback Queries ──────────────────────────────────────────────────────────
 
 bot.on('callback_query', async (q) => {
-  bot.answerCallbackQuery(q.id);
   const chatId = q.message.chat.id;
   const data   = q.data;
 
@@ -1614,13 +1613,16 @@ bot.on('callback_query', async (q) => {
   if (data === 'check_sub') {
     const subbed = await isSubscribed(chatId);
     if (subbed) {
-      await bot.editMessageText(`✅ *تم التحقق! مرحباً بك في البوت* 🎉\n\nاضغط /start للبدء.`,
-        { chat_id: chatId, message_id: q.message.message_id, parse_mode: 'Markdown' }).catch(()=>{});
+      bot.answerCallbackQuery(q.id, { text: '✅ تم التحقق! اضغط /start للبدء.' });
+      bot.sendMessage(chatId, `✅ *تم التحقق! مرحباً بك في البوت* 🎉\n\nاضغط /start للبدء.`, { parse_mode: 'Markdown' });
     } else {
-      await bot.answerCallbackQuery(q.id, { text: '❌ لم تشترك بعد! اشترك أولاً ثم اضغط تحققت.', show_alert: true });
+      bot.answerCallbackQuery(q.id, { text: '❌ لم تشترك بعد! اشترك أولاً ثم اضغط تحققت.', show_alert: true });
     }
     return;
   }
+
+  bot.answerCallbackQuery(q.id);
+
   if (chatId !== BOT_OWNER) {
     const subbed = await isSubscribed(chatId);
     if (!subbed) return sendForceSubMsg(chatId);
