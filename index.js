@@ -2605,9 +2605,8 @@ bot.on('callback_query', async (q) => {
       const k = data.replace("pc:t:","");
       if (k in PREM_FEAT_NAMES) {
         settings.premiumFree[k] = !settings.premiumFree[k];
-        if (!settings.premiumFree[k]) settings.premiumFreeExpiry[k] = null;
+        settings.premiumFreeExpiry[k] = null; // دائماً امسح الانتهاء عند التبديل
         saveSettings();
-        backupFileToGH(SETTINGS_FILE, '_data/settings.json');
       }
     } else if (data.startsWith("pc:timer:")) {
       const mins = parseInt(data.replace("pc:timer:",""));
