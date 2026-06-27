@@ -363,6 +363,8 @@ async function restoreFromGitHub() {
       const d = await ghGet(f.remote);
       if (d && d.content) {
         fs.writeFileSync(f.local, Buffer.from(d.content, 'base64').toString('utf8'));
+        // Cache SHA so first post-restore backup doesn't need a retry
+        if (d.sha) _ghShaCache.set(f.remote, d.sha);
         restored++;
       }
     } catch(e) {}
@@ -408,12 +410,12 @@ async function makeTinyUrl(url) {
 }
 
 // Immediately backup a single local file to GitHub
+// ghPut already uses _ghShaCache internally — no need to call ghGet first
 async function backupFileToGH(localPath, remotePath) {
   try {
     if (!fs.existsSync(localPath)) return;
     const content = fs.readFileSync(localPath, 'utf8');
-    const existing = await ghGet(remotePath);
-    await ghPut(remotePath, content, existing?.sha);
+    await ghPut(remotePath, content); // ghPut handles SHA cache + 422 retry
   } catch(e) {}
 }
 
@@ -422,9 +424,8 @@ async function backupToGitHub() {
   await Promise.allSettled(DATA_FILES.map(async f => {
     try {
       if (!fs.existsSync(f.local)) return;
-      const content  = fs.readFileSync(f.local, 'utf8');
-      const existing = await ghGet(f.remote);
-      await ghPut(f.remote, content, existing?.sha);
+      const content = fs.readFileSync(f.local, 'utf8');
+      await ghPut(f.remote, content); // ghPut handles SHA cache + 422 retry
     } catch(e) {}
   }));
   console.log("💾 تم حفظ البيانات على GitHub");
