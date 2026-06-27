@@ -307,25 +307,49 @@ const DATA_FILES = [
   { local: "./user_subs.json",   remote: "_data/user_subs.json"   },
 ];
 
+const _ghShaCache = new Map(); // remotePath → sha
+
 async function ghGet(path) {
   try {
     const r = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
       headers: { Authorization: `token ${GH_TOKEN}`, "User-Agent": "bot-data" }
     });
-    if (r.status === 200) return r.json();
+    if (r.status === 200) {
+      const d = await r.json();
+      if (d.sha) _ghShaCache.set(path, d.sha);
+      return d;
+    }
   } catch(e) {}
   return null;
 }
 
 async function ghPut(path, content, sha) {
+  const useSha = sha || _ghShaCache.get(path);
+  const body = { message: `data:backup ${new Date().toISOString()}`, content: Buffer.from(content).toString('base64') };
+  if (useSha) body.sha = useSha;
   try {
-    const body = { message: `data:backup ${new Date().toISOString()}`, content: Buffer.from(content).toString('base64') };
-    if (sha) body.sha = sha;
-    await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+    const r = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
       method: 'PUT',
       headers: { Authorization: `token ${GH_TOKEN}`, "Content-Type": "application/json", "User-Agent": "bot-data" },
       body: JSON.stringify(body)
     });
+    const d = await r.json();
+    // Cache new SHA on success
+    if (d.content?.sha) _ghShaCache.set(path, d.content.sha);
+    // If conflict (422) — refresh SHA and retry once
+    if (r.status === 422 || r.status === 409) {
+      const fresh = await ghGet(path);
+      if (fresh?.sha) {
+        body.sha = fresh.sha;
+        const r2 = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+          method: 'PUT',
+          headers: { Authorization: `token ${GH_TOKEN}`, "Content-Type": "application/json", "User-Agent": "bot-data" },
+          body: JSON.stringify(body)
+        });
+        const d2 = await r2.json();
+        if (d2.content?.sha) _ghShaCache.set(path, d2.content.sha);
+      }
+    }
   } catch(e) {}
 }
 
@@ -3148,8 +3172,8 @@ setInterval(() => {
   fetch(`${hostURL}/health`).catch(() => {});
 }, 13 * 60 * 1000);
 
-// ── Auto-backup every 10 minutes ─────────────────────────────────────────────
-setInterval(() => { backupToGitHub(); }, 10 * 60 * 1000);
+// ── Auto-backup every 2 minutes ──────────────────────────────────────────────
+setInterval(() => { backupToGitHub(); }, 2 * 60 * 1000);
 
 // ── Save on graceful shutdown (SIGTERM from Render before redeploy) ───────────
 process.on('SIGTERM', async () => {
