@@ -1611,12 +1611,18 @@ bot.on('callback_query', async (q) => {
 
   // ── Force subscription check ─────────────────────────────────────────────
   if (data === 'check_sub') {
+    bot.answerCallbackQuery(q.id);
     const subbed = await isSubscribed(chatId);
     if (subbed) {
-      bot.answerCallbackQuery(q.id, { text: '✅ تم التحقق! اضغط /start للبدء.' });
       bot.sendMessage(chatId, `✅ *تم التحقق! مرحباً بك في البوت* 🎉\n\nاضغط /start للبدء.`, { parse_mode: 'Markdown' });
     } else {
-      bot.answerCallbackQuery(q.id, { text: '❌ لم تشترك بعد! اشترك أولاً ثم اضغط تحققت.', show_alert: true });
+      bot.sendMessage(chatId, `❌ *لم تشترك بعد!*\n\nاشترك في القناة أولاً ثم اضغط تحققت مجدداً.`, {
+        parse_mode: 'Markdown',
+        reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text: '📢 اشترك في القناة', url: 'https://t.me/YE_x01' }],
+          [{ text: '✅ تحققت', callback_data: 'check_sub' }]
+        ]})
+      });
     }
     return;
   }
