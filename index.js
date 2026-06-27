@@ -924,13 +924,16 @@ bot.on('message', async (msg) => {
   if (msg.text === "/start") {
     const isNew = !userStats[String(chatId)];
     const isOwner = chatId === BOT_OWNER;
+    const isPrem  = isPremium(chatId);
     const baseRows = [
       [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
       [{ text: "💎 مميزات البريميوم", callback_data: "pinfo" }],
       [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }],
       [{ text: "📊 إحصائياتي", callback_data: "mystats" }],
+      ...(isPrem && !isOwner ? [[{ text: "🖥️ لوحة صفحتي", callback_data: "pg_main" }]] : []),
       ...(isOwner ? [
         [{ text: "👑 إدارة البريميوم", callback_data: "premadmin" }],
+        [{ text: "🖥️ الصفحة الديناميكية", callback_data: "pg_main" }],
         [{ text: "💾 نسخ احتياطي كامل", callback_data: "do_backup" }]
       ] : [])
     ];
