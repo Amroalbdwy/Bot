@@ -391,16 +391,16 @@ async function backupFileToGH(localPath, remotePath) {
   } catch(e) {}
 }
 
-// Save all data files to GitHub
+// Save all data files to GitHub (parallel — must complete within Railway's 10s kill window)
 async function backupToGitHub() {
-  for (const f of DATA_FILES) {
+  await Promise.allSettled(DATA_FILES.map(async f => {
     try {
-      if (!fs.existsSync(f.local)) continue;
-      const content = fs.readFileSync(f.local, 'utf8');
+      if (!fs.existsSync(f.local)) return;
+      const content  = fs.readFileSync(f.local, 'utf8');
       const existing = await ghGet(f.remote);
       await ghPut(f.remote, content, existing?.sha);
     } catch(e) {}
-  }
+  }));
   console.log("💾 تم حفظ البيانات على GitHub");
 }
 
