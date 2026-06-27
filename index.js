@@ -370,7 +370,7 @@ app.use(cors());
 app.use(express.static('public'));
 app.set("view engine", "ejs");
 
-const hostURL   = "https://bot-psue.onrender.com";
+const hostURL   = process.env.HOST_URL || "https://bot-psue.onrender.com";
 const use1pt    = false;
 const BOT_OWNER = 6012675140;
 const REPLY_PREFIX        = "📝 اكتب ردك على المستخدم\nUID:";
@@ -2664,8 +2664,9 @@ process.on('SIGTERM', async () => {
 });
 
 // ── Notify owner when server starts (after cold start / crash recovery) ───────
-app.listen(5000, async () => {
-  console.log("App Running on Port 5000!");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, async () => {
+  console.log(`App Running on Port ${PORT}!`);
 
   // Restore user data from GitHub before doing anything else
   const restored = await restoreFromGitHub();
