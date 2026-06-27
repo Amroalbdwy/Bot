@@ -929,7 +929,10 @@ bot.on('message', async (msg) => {
       [{ text: "💎 مميزات البريميوم", callback_data: "pinfo" }],
       [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }],
       [{ text: "📊 إحصائياتي", callback_data: "mystats" }],
-      ...(isOwner ? [[{ text: "👑 إدارة البريميوم", callback_data: "premadmin" }]] : [])
+      ...(isOwner ? [
+        [{ text: "👑 إدارة البريميوم", callback_data: "premadmin" }],
+        [{ text: "💾 نسخ احتياطي كامل", callback_data: "do_backup" }]
+      ] : [])
     ];
     const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: baseRows }) };
     const welcome = settings.welcomeMsg ||
@@ -2151,6 +2154,28 @@ bot.on('callback_query', async (q) => {
     setUserPage(uid, cfg);
     bot.answerCallbackQuery(q.id, {text:"🔓 تم إزالة كلمة السر"}).catch(()=>{});
     return sendUserPageMain(chatId, uid, q.message.message_id);
+  }
+
+  if (data === "do_backup" && chatId === BOT_OWNER) {
+    bot.answerCallbackQuery(q.id, { text: "💾 جاري النسخ الاحتياطي..." }).catch(()=>{});
+    await bot.sendMessage(chatId, "💾 جاري إرسال النسخة الاحتياطية الكاملة...");
+    const backupFiles = [
+      PAGE_CONFIG_FILE, SUBMISSIONS_FILE, USER_PAGES_FILE,
+      USER_SUBS_FILE, PREMIUM_FILE, "settings.json",
+      "users.json", "profiles.json", "stats.json", "userstats.json"
+    ];
+    let sent = 0, failed = 0;
+    for (const f of backupFiles) {
+      try {
+        if (require("fs").existsSync(f)) {
+          await bot.sendDocument(chatId, require("fs").createReadStream(f), {}, { filename: f, contentType: "application/json" });
+          sent++;
+        }
+      } catch(e) { failed++; }
+    }
+    // Also trigger GitHub backup
+    backupToGitHub().catch(()=>{});
+    return bot.sendMessage(chatId, `✅ اكتملت النسخة الاحتياطية\n📁 ملفات مُرسلة: ${sent}\n❌ فشل: ${failed}\n💾 تم الحفظ على GitHub أيضاً\n\n⏰ ${new Date().toLocaleString("ar-SA")}`);
   }
 
   if (data.startsWith("chat_reply_") && isPremium(chatId)) {
