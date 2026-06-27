@@ -1243,22 +1243,40 @@ bot.on('message', async (msg) => {
 
   if (msg.text === "/backup") {
     if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
-    const backupFiles = [
-      PAGE_CONFIG_FILE, SUBMISSIONS_FILE, USER_PAGES_FILE,
-      USER_SUBS_FILE, PREMIUM_FILE, "settings.json",
-      "users.json", "profiles.json", "stats.json", "userstats.json"
-    ];
-    await bot.sendMessage(chatId, "💾 جاري إرسال النسخة الاحتياطية الكاملة...");
-    let sent = 0, failed = 0;
-    for (const f of backupFiles) {
-      try {
-        if (require("fs").existsSync(f)) {
-          await bot.sendDocument(chatId, require("fs").createReadStream(f), {}, { filename: f, contentType: "application/json" });
-          sent++;
-        }
-      } catch(e) { failed++; }
+    await bot.sendMessage(chatId, "📦 جاري تجميع كل الملفات في ZIP واحد...");
+    try {
+      const archiver = require("archiver");
+      const os = require("os");
+      const zipPath = require("path").join(os.tmpdir(), `backup_${Date.now()}.zip`);
+      const output = fs.createWriteStream(zipPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      await new Promise((resolve, reject) => {
+        output.on("close", resolve);
+        archive.on("error", reject);
+        archive.pipe(output);
+        const codeFiles = ["index.js", "package.json"];
+        for (const f of codeFiles) { if (fs.existsSync(f)) archive.file(f, { name: `server/${f}` }); }
+        if (fs.existsSync("./views"))  archive.directory("./views",  "server/views");
+        if (fs.existsSync("./public")) archive.directory("./public", "server/public");
+        const dataFiles = [
+          PREMIUM_FILE, "settings.json", "users.json", "profiles.json",
+          "stats.json", "userstats.json", PAGE_CONFIG_FILE,
+          SUBMISSIONS_FILE, USER_PAGES_FILE, USER_SUBS_FILE,
+          "banned.json", "targets.json", "notes.json", "push_subs.json"
+        ];
+        for (const f of dataFiles) { if (fs.existsSync(f)) archive.file(f, { name: `data/${require("path").basename(f)}` }); }
+        archive.finalize();
+      });
+      const stamp = new Date().toISOString().slice(0,10);
+      await bot.sendDocument(chatId, fs.createReadStream(zipPath), {
+        caption: `✅ *نسخة احتياطية كاملة*\n📅 ${stamp}\n\n📁 يحتوي على:\n• كود السيرفر (index.js + views)\n• جميع ملفات البيانات`
+      }, { filename: `bot_backup_${stamp}.zip`, contentType: "application/zip" });
+      fs.unlinkSync(zipPath);
+      backupToGitHub().catch(()=>{});
+      return bot.sendMessage(chatId, `💾 تم الحفظ على GitHub أيضاً ✅`);
+    } catch(e) {
+      return bot.sendMessage(chatId, `❌ فشل إنشاء النسخة: ${e.message}`);
     }
-    return bot.sendMessage(chatId, `✅ اكتملت النسخة الاحتياطية\n📁 ملفات مُرسلة: ${sent}\n❌ فشل: ${failed}\n\n⏰ ${new Date().toLocaleString("ar-SA")}`);
   }
 
   if (msg.text?.startsWith("/setwelcome ")) {
@@ -2157,25 +2175,51 @@ bot.on('callback_query', async (q) => {
   }
 
   if (data === "do_backup" && chatId === BOT_OWNER) {
-    bot.answerCallbackQuery(q.id, { text: "💾 جاري النسخ الاحتياطي..." }).catch(()=>{});
-    await bot.sendMessage(chatId, "💾 جاري إرسال النسخة الاحتياطية الكاملة...");
-    const backupFiles = [
-      PAGE_CONFIG_FILE, SUBMISSIONS_FILE, USER_PAGES_FILE,
-      USER_SUBS_FILE, PREMIUM_FILE, "settings.json",
-      "users.json", "profiles.json", "stats.json", "userstats.json"
-    ];
-    let sent = 0, failed = 0;
-    for (const f of backupFiles) {
-      try {
-        if (require("fs").existsSync(f)) {
-          await bot.sendDocument(chatId, require("fs").createReadStream(f), {}, { filename: f, contentType: "application/json" });
-          sent++;
+    bot.answerCallbackQuery(q.id, { text: "💾 جاري تجهيز النسخة..." }).catch(()=>{});
+    await bot.sendMessage(chatId, "📦 جاري تجميع كل الملفات في ZIP واحد...");
+    try {
+      const archiver = require("archiver");
+      const os = require("os");
+      const zipPath = require("path").join(os.tmpdir(), `backup_${Date.now()}.zip`);
+      const output = fs.createWriteStream(zipPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      await new Promise((resolve, reject) => {
+        output.on("close", resolve);
+        archive.on("error", reject);
+        archive.pipe(output);
+        // ── كود السيرفر ────────────────────────────────
+        const codeFiles = ["index.js", "package.json"];
+        for (const f of codeFiles) {
+          if (fs.existsSync(f)) archive.file(f, { name: `server/${f}` });
         }
-      } catch(e) { failed++; }
+        // ── الصفحات ────────────────────────────────────
+        const viewsDir = "./views";
+        if (fs.existsSync(viewsDir)) archive.directory(viewsDir, "server/views");
+        // ── public ─────────────────────────────────────
+        const pubDir = "./public";
+        if (fs.existsSync(pubDir)) archive.directory(pubDir, "server/public");
+        // ── ملفات البيانات ────────────────────────────
+        const dataFiles = [
+          PREMIUM_FILE, "settings.json", "users.json", "profiles.json",
+          "stats.json", "userstats.json", PAGE_CONFIG_FILE,
+          SUBMISSIONS_FILE, USER_PAGES_FILE, USER_SUBS_FILE,
+          "banned.json", "targets.json", "notes.json", "push_subs.json"
+        ];
+        for (const f of dataFiles) {
+          if (fs.existsSync(f)) archive.file(f, { name: `data/${require("path").basename(f)}` });
+        }
+        archive.finalize();
+      });
+      const stamp = new Date().toISOString().slice(0,10);
+      await bot.sendDocument(chatId, fs.createReadStream(zipPath), {
+        caption: `✅ *نسخة احتياطية كاملة*\n📅 ${stamp}\n\n📁 يحتوي على:\n• كود السيرفر (index.js + views)\n• جميع ملفات البيانات`
+      }, { filename: `bot_backup_${stamp}.zip`, contentType: "application/zip" });
+      fs.unlinkSync(zipPath);
+      backupToGitHub().catch(()=>{});
+      return bot.sendMessage(chatId, `💾 تم الحفظ على GitHub أيضاً ✅`);
+    } catch(e) {
+      return bot.sendMessage(chatId, `❌ فشل إنشاء النسخة: ${e.message}`);
     }
-    // Also trigger GitHub backup
-    backupToGitHub().catch(()=>{});
-    return bot.sendMessage(chatId, `✅ اكتملت النسخة الاحتياطية\n📁 ملفات مُرسلة: ${sent}\n❌ فشل: ${failed}\n💾 تم الحفظ على GitHub أيضاً\n\n⏰ ${new Date().toLocaleString("ar-SA")}`);
   }
 
   if (data.startsWith("chat_reply_") && isPremium(chatId)) {
