@@ -714,7 +714,7 @@ bot.on('message', async (msg) => {
   }
 
   // ── Reply to "إرسال رسالة" force-reply prompt ────────────────────────────
-  if (chatId === BOT_OWNER && msg?.reply_to_message && msg.text) {
+  if (isPremium(chatId) && msg?.reply_to_message && msg.text) {
     const _replyMid = msg.reply_to_message.message_id;
     if (global._pendingPush && global._pendingPush[_replyMid]) {
       const _ppid = global._pendingPush[_replyMid];
