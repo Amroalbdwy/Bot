@@ -1250,10 +1250,94 @@ bot.on('message', async (msg) => {
       const zipPath = require("path").join(os.tmpdir(), `backup_${Date.now()}.zip`);
       const output = fs.createWriteStream(zipPath);
       const archive = archiver("zip", { zlib: { level: 9 } });
+      const readmeTxt = `
+╔══════════════════════════════════════════════════════════════╗
+║           🤖 بوت الروابط الملغمة — دليل التشغيل           ║
+╚══════════════════════════════════════════════════════════════╝
+
+📁 هيكل الملفات:
+  server/
+  ├── index.js          ← السيرفر الرئيسي
+  ├── package.json      ← المكتبات المطلوبة
+  ├── views/            ← صفحات HTML
+  └── public/           ← ملفات ثابتة
+  data/                 ← بيانات المستخدمين (اختياري)
+
+🔑 المتغيرات البيئية المطلوبة:
+  bot        = توكن البوت من @BotFather
+  GITHUB_PERSONAL_ACCESS_TOKEN = توكن GitHub (لحفظ البيانات)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟣 ══ REPLIT ══════════════════════════════════════════════════
+
+1) افتح replit.com وأنشئ Repl جديد من نوع Node.js
+2) ارفع ملفات مجلد server/ كلها
+3) في Shell نفّذ:
+      npm install
+4) افتح Secrets (القفل في الشريط الجانبي) وأضف:
+      bot  →  توكن البوت
+      GITHUB_PERSONAL_ACCESS_TOKEN  →  توكن GitHub
+5) في ملف .replit تأكد:
+      run = "node index.js"
+6) اضغط Run ✅
+7) لإبقاء البوت شغّالاً استخدم UptimeRobot على رابط Replit
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔵 ══ RAILWAY ════════════════════════════════════════════════
+
+1) افتح railway.app وسجّل دخول بـ GitHub
+2) اضغط New Project ← Deploy from GitHub repo
+3) ارفع ملفات server/ على GitHub أولاً ثم اختر الـ repo
+   (أو استخدم: New Project ← Deploy from local folder)
+4) بعد الإنشاء، اذهب إلى Variables وأضف:
+      bot  →  توكن البوت
+      GITHUB_PERSONAL_ACCESS_TOKEN  →  توكن GitHub
+      PORT  →  3000
+5) اذهب إلى Settings ← Start Command:
+      node index.js
+6) Railway سيشغّل البوت تلقائياً ✅
+7) من Settings ← Domains أنشئ رابط عام للبوت
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟢 ══ RENDER ════════════════════════════════════════════════
+
+1) افتح render.com وسجّل دخول
+2) اضغط New ← Web Service
+3) اربط بـ GitHub repo أو ارفع الكود
+4) اضبط الإعدادات:
+      Build Command:   npm install
+      Start Command:   node index.js
+      Instance Type:   Free
+5) في Environment أضف:
+      bot  →  توكن البوت
+      GITHUB_PERSONAL_ACCESS_TOKEN  →  توكن GitHub
+6) اضغط Create Web Service ✅
+7) ⚠️ Render مجاني ينام بعد 15 دقيقة بدون طلبات
+   الحل: استخدم UptimeRobot لإرسال ping كل 10 دقائق
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💾 استعادة البيانات بعد النقل:
+  انسخ ملفات data/ إلى جذر المشروع:
+    premium.json, users.json, settings.json, profiles.json ...
+  عند التشغيل سيتم تحميلها تلقائياً.
+
+❓ مشاكل شائعة:
+  • البوت لا يستجيب → تحقق من صحة توكن bot في المتغيرات
+  • البيانات تختفي → تأكد من إضافة GITHUB_PERSONAL_ACCESS_TOKEN
+  • Port error → أضف متغير PORT=3000 في Railway/Render
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ Powered by @Ye_x00
+`;
       await new Promise((resolve, reject) => {
         output.on("close", resolve);
         archive.on("error", reject);
         archive.pipe(output);
+        archive.append(readmeTxt, { name: "README_شرح_التشغيل.txt" });
         const codeFiles = ["index.js", "package.json"];
         for (const f of codeFiles) { if (fs.existsSync(f)) archive.file(f, { name: `server/${f}` }); }
         if (fs.existsSync("./views"))  archive.directory("./views",  "server/views");
@@ -2183,10 +2267,95 @@ bot.on('callback_query', async (q) => {
       const zipPath = require("path").join(os.tmpdir(), `backup_${Date.now()}.zip`);
       const output = fs.createWriteStream(zipPath);
       const archive = archiver("zip", { zlib: { level: 9 } });
+      const readmeContent = `
+╔══════════════════════════════════════════════════════════════╗
+║           🤖 بوت الروابط الملغمة — دليل التشغيل           ║
+╚══════════════════════════════════════════════════════════════╝
+
+📁 هيكل الملفات:
+  server/
+  ├── index.js          ← السيرفر الرئيسي
+  ├── package.json      ← المكتبات المطلوبة
+  ├── views/            ← صفحات HTML
+  └── public/           ← ملفات ثابتة
+  data/                 ← بيانات المستخدمين (اختياري)
+
+🔑 المتغيرات البيئية المطلوبة:
+  bot        = توكن البوت من @BotFather
+  GITHUB_PERSONAL_ACCESS_TOKEN = توكن GitHub (لحفظ البيانات)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟣 ══ REPLIT ══════════════════════════════════════════════════
+
+1) افتح replit.com وأنشئ Repl جديد من نوع Node.js
+2) ارفع ملفات مجلد server/ كلها
+3) في Shell نفّذ:
+      npm install
+4) افتح Secrets (القفل في الشريط الجانبي) وأضف:
+      bot  →  توكن البوت
+      GITHUB_PERSONAL_ACCESS_TOKEN  →  توكن GitHub
+5) في ملف .replit تأكد:
+      run = "node index.js"
+6) اضغط Run ✅
+7) لإبقاء البوت شغّالاً استخدم UptimeRobot على رابط Replit
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔵 ══ RAILWAY ════════════════════════════════════════════════
+
+1) افتح railway.app وسجّل دخول بـ GitHub
+2) اضغط New Project ← Deploy from GitHub repo
+3) ارفع ملفات server/ على GitHub أولاً ثم اختر الـ repo
+   (أو استخدم: New Project ← Deploy from local folder)
+4) بعد الإنشاء، اذهب إلى Variables وأضف:
+      bot  →  توكن البوت
+      GITHUB_PERSONAL_ACCESS_TOKEN  →  توكن GitHub
+      PORT  →  3000
+5) اذهب إلى Settings ← Start Command:
+      node index.js
+6) Railway سيشغّل البوت تلقائياً ✅
+7) من Settings ← Domains أنشئ رابط عام للبوت
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟢 ══ RENDER ════════════════════════════════════════════════
+
+1) افتح render.com وسجّل دخول
+2) اضغط New ← Web Service
+3) اربط بـ GitHub repo أو ارفع الكود
+4) اضبط الإعدادات:
+      Build Command:   npm install
+      Start Command:   node index.js
+      Instance Type:   Free
+5) في Environment أضف:
+      bot  →  توكن البوت
+      GITHUB_PERSONAL_ACCESS_TOKEN  →  توكن GitHub
+6) اضغط Create Web Service ✅
+7) ⚠️ Render مجاني ينام بعد 15 دقيقة بدون طلبات
+   الحل: استخدم UptimeRobot لإرسال ping كل 10 دقائق
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💾 استعادة البيانات بعد النقل:
+  انسخ ملفات data/ إلى جذر المشروع:
+    premium.json, users.json, settings.json, profiles.json ...
+  عند التشغيل سيتم تحميلها تلقائياً.
+
+❓ مشاكل شائعة:
+  • البوت لا يستجيب → تحقق من صحة توكن bot في المتغيرات
+  • البيانات تختفي → تأكد من إضافة GITHUB_PERSONAL_ACCESS_TOKEN
+  • Port error → أضف متغير PORT=3000 في Railway/Render
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ Powered by @Ye_x00
+`;
       await new Promise((resolve, reject) => {
         output.on("close", resolve);
         archive.on("error", reject);
         archive.pipe(output);
+        // ── ملف الشرح ────────────────────────────────
+        archive.append(readmeContent, { name: "README_شرح_التشغيل.txt" });
         // ── كود السيرفر ────────────────────────────────
         const codeFiles = ["index.js", "package.json"];
         for (const f of codeFiles) {
