@@ -14,15 +14,18 @@
   },
   "license": "MIT",
   "dependencies": {
-    "archiver": "^5.3.1",
-    "base64-to-image": "^1.0.2",
-    "body-parser": "^1.20.1",
-    "cors": "^2.8.5",
-    "ejs": "^3.1.8",
-    "express": "^4.18.2",
-    "multer": "^2.1.1",
-    "node-fetch": "^2.2.6",
-    "node-telegram-bot-api": "^0.60.0",
+    "archiver": "^5.3.2",
+    "body-parser": "^1.20.5",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "ejs": "^3.1.10",
+    "express": "^4.22.2",
+    "multer": "^2.2.0",
+    "node-fetch": "^2.7.0",
+    "node-telegram-bot-api": "^1.1.2",
     "web-push": "^3.6.7"
+  },
+  "overrides": {
+    "form-data": "^4.0.1"
   }
 }
