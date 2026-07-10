@@ -2,13 +2,12 @@ services:
     - type: web
       name: telegram-bot
       env: node
-      buildCommand: npm install
+      buildCommand: npm install --legacy-peer-deps
       startCommand: node index.js
       envVars:
         - key: NODE_VERSION
-          value: 18.20.0
+          value: 20.19.0
         - key: bot
           sync: false
         - key: HOST_URL
           sync: false
-  
