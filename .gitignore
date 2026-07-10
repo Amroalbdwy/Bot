@@ -1,0 +1,10 @@
+node_modules/
+
+# Runtime data files — never commit user data
+data/
+_data/
+*.json
+!package.json
+!package-lock.json
+!data/langs.json
+!data/link_mgmt_allowed.json
