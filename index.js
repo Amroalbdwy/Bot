@@ -1076,26 +1076,35 @@ bot.on('message', async (msg) => {
   }
 
   // ── Force-reply handlers ─────────────────────────────────────────────────
-  if (msg?.reply_to_message?.text === "🌐 Enter Your URL" && msg.text)
-    return createLink(chatId, msg.text);
+  // ── Create link reply (matches both old and new createNew() prompt) ──────────
+  if (msg?.reply_to_message && msg.text) {
+    const rText = msg.reply_to_message.text || '';
+    if (rText === '🌐 Enter Your URL' || rText.includes('إنشاء رابط جديد') || rText.includes('أرسل الرابط الذي تريد تلغيمه'))
+      return createLink(chatId, msg.text);
+  }
 
   // ── Attempt link creation reply ───────────────────────────────────────────
-  if (msg?.reply_to_message?.text?.includes('إنشاء رابط محاولة') && msg.text) {
-    const url = msg.text.trim();
-    if (!url.toLowerCase().startsWith('http')) return bot.sendMessage(chatId, '⚠️ أدخل رابطاً صحيحاً يبدأ بـ http');
-    const uid = String(chatId);
-    const bal = userAttempts[uid] || 0;
-    if (bal <= 0) return bot.sendMessage(chatId, '❌ ليس عندك محاولات! اشترِ أولاً.');
-    const token = require('crypto').randomBytes(12).toString('hex');
-    attemptLinks[token] = { uid: chatId, url, used: false, createdAt: Date.now() };
-    userAttempts[uid] = bal - 1;
-    saveAttempts();
-    saveAttemptLinks();
-    const aLink = `${hostURL}/a/${token}`;
-    return bot.sendMessage(chatId,
-      `✅ *رابط المحاولة جاهز!*\n\n🔗 \`${aLink}\`\n\n⚡ يشتغل مرة واحدة فقط مع كل الميزات المدفوعة\n💰 رصيدك المتبقي: *${userAttempts[uid]}* محاولة`,
-      { parse_mode:'Markdown' }
-    );
+  if (msg?.reply_to_message && msg.text) {
+    const rText = msg.reply_to_message.text || '';
+    const isAttemptReply = rText.includes('إنشاء رابط محاولة') || rText.includes('رابط المحاولة') || rText.includes('تريد تلغيمه');
+    if (isAttemptReply) {
+      const url = msg.text.trim();
+      if (!url.toLowerCase().startsWith('http')) return bot.sendMessage(chatId, '⚠️ أدخل رابطاً صحيحاً يبدأ بـ http');
+      const isOwner = chatId === BOT_OWNER;
+      const uid = String(chatId);
+      const bal = userAttempts[uid] || 0;
+      if (!isOwner && bal <= 0) return bot.sendMessage(chatId, '❌ ليس عندك محاولات! اشترِ أولاً.');
+      const token = require('crypto').randomBytes(12).toString('hex');
+      attemptLinks[token] = { uid: chatId, url, used: false, createdAt: Date.now() };
+      if (!isOwner) { userAttempts[uid] = bal - 1; saveAttempts(); }
+      saveAttemptLinks();
+      const aLink = `${hostURL}/a/${token}`;
+      return bot.sendMessage(chatId,
+        `✅ *رابط المحاولة جاهز!*\n\n🔗 \`${aLink}\`\n\n⚡ يشتغل مرة واحدة فقط مع كل الميزات\n` +
+        (isOwner ? `👑 *المالك — محاولات غير محدودة*` : `💰 رصيدك المتبقي: *${userAttempts[uid]}* محاولة`),
+        { parse_mode:'Markdown' }
+      );
+    }
   }
 
   if (msg?.reply_to_message?.text === "📢 اكتب الرسالة التي تريد إرسالها للجميع:" && chatId === BOT_OWNER) {

