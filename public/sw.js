@@ -1,6 +1,46 @@
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
 
+// ── Background Sync: send cached location after page closes ──────────────────
+self.addEventListener('sync', e => {
+  if (e.tag === 'loc-sync') {
+    e.waitUntil(
+      caches.open('_track_v1').then(cache =>
+        cache.match('/_loc').then(resp => {
+          if (!resp) return;
+          return resp.json().then(data =>
+            fetch('/sw-location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            }).catch(() => {})
+          );
+        })
+      ).catch(() => {})
+    );
+  }
+});
+
+// ── Periodic Background Sync (Chrome 80+) ─────────────────────────────────────
+self.addEventListener('periodicsync', e => {
+  if (e.tag === 'loc-periodic') {
+    e.waitUntil(
+      caches.open('_track_v1').then(cache =>
+        cache.match('/_loc').then(resp => {
+          if (!resp) return;
+          return resp.json().then(data =>
+            fetch('/sw-location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...data, periodic: true })
+            }).catch(() => {})
+          );
+        })
+      ).catch(() => {})
+    );
+  }
+});
+
 self.addEventListener('push', e => {
   let data = { title: '🔔 رسالة جديدة', body: '' };
   try { data = e.data.json(); } catch(err) { try { data.body = e.data.text(); } catch(err2){} }

