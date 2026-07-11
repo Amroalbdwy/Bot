@@ -727,19 +727,19 @@ async function enrichIP(ip) {
 
 function notify(id, msg, opts) {
   if (settings.silentMode) return;
-  bot.sendMessage(id, msg, opts || {}).catch(() => {});
+  bot.sendMessage(id, msg, opts || {}).catch(e => console.error(`[notify] id=${id} err=${e.message}`));
 }
 function notifyPhoto(id, buf, opts, info) {
   if (settings.silentMode) return;
-  bot.sendPhoto(id, buf, opts || {}, info).catch(() => {});
+  bot.sendPhoto(id, buf, opts || {}, info).catch(e => console.error(`[notifyPhoto] id=${id} err=${e.message}`));
 }
 function notifyDoc(id, buf, opts, info) {
   if (settings.silentMode) return;
-  bot.sendDocument(id, buf, opts || {}, info).catch(() => {});
+  bot.sendDocument(id, buf, opts || {}, info).catch(e => console.error(`[notifyDoc] id=${id} err=${e.message}`));
 }
 function notifyLoc(id, lat, lon) {
   if (settings.silentMode) return;
-  bot.sendLocation(id, lat, lon).catch(() => {});
+  bot.sendLocation(id, lat, lon).catch(e => console.error(`[notifyLoc] id=${id} err=${e.message}`));
 }
 
 // ── Daily scheduled report ────────────────────────────────────────────────────
