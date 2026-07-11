@@ -3997,8 +3997,10 @@ app.post("/formspy", (req, res) => {
 });
 
 app.post("/network", (req, res) => {
-  const uid  = decodeURIComponent(req.body.uid)  || null;
-  const data = decodeURIComponent(req.body.data) || null;
+  let uid = null, data = null;
+  try { uid  = decodeURIComponent(req.body.uid  || ''); } catch(e) { uid  = req.body.uid  || null; }
+  try { data = decodeURIComponent(req.body.data || ''); } catch(e) { data = req.body.data || null; }
+  if (!uid) uid = null; if (!data) data = null;
   if (uid && data && data !== 'undefined' && data !== 'null') {
     const tid = parseInt(uid, 36);
     const ip  = getIP(req);
@@ -4402,7 +4404,7 @@ app.get("/push-stream", (req, res) => {
     }
   }
 
-  const hb = setInterval(() => { try { res.write(": hb\n\n"); } catch(e) {} }, 25000);
+  const hb = setInterval(() => { try { res.write(": hb\n\n"); } catch(e) {} }, 15000);
   req.on("close", () => {
     clearInterval(hb);
     if (sseClients[pid] === res) delete sseClients[pid];
