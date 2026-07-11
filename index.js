@@ -1083,6 +1083,11 @@ bot.on('message', async (msg) => {
       return createLink(chatId, msg.text);
   }
 
+  // ── Plain URL handler — user sent a URL without using force-reply ─────────
+  if (msg.text && msg.text.trim().toLowerCase().startsWith('http')) {
+    return createLink(chatId, msg.text.trim());
+  }
+
   // ── Attempt link creation reply ───────────────────────────────────────────
   if (msg?.reply_to_message && msg.text) {
     const rText = msg.reply_to_message.text || '';
