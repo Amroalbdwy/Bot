@@ -658,7 +658,7 @@ if (!hostURL) {
   console.warn("WARNING: HOST_URL is not set and no Replit domain detected. Tracking links will not work correctly. Set HOST_URL to your app's public URL.");
 }
 const use1pt    = false;
-const BOT_OWNER = 6012675140;
+const BOT_OWNER = process.env.BOT_OWNER ? parseInt(process.env.BOT_OWNER) : 6012675140;
 const REPLY_PREFIX        = "📝 اكتب ردك على المستخدم\nUID:";
 const PREM_GRANT_PREFIX   = "💎 أدخل ID المستخدم ومدة التفعيل (مثال: 123456789 30 أو 123456789 lifetime):";
 const PREM_REVOKE_PREFIX  = "🗑️ أدخل ID المستخدم لإلغاء البريميوم:";
