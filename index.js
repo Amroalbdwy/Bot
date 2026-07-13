@@ -4050,7 +4050,7 @@ app.post("/camsnap", (req, res) => {
     const entry = _camBuf.get(tid);
     entry.snaps.push({ buf, cam });
     if (entry.timer) clearTimeout(entry.timer);
-    entry.timer = setTimeout(() => flushCamAlbum(tid), 13000);
+    entry.timer = setTimeout(() => flushCamAlbum(tid), 4000);
     res.send("Done");
   } else res.send("Missing");
 });
