@@ -31,7 +31,21 @@ Starts the Express server on port 5000.
 | Key | Description |
 |-----|-------------|
 | `VAPID_PRIVATE` | VAPID private key for web push notifications |
-| `GH_TOKEN` | GitHub token (optional feature) |
+| `GH_TOKEN` | GitHub personal access token — enables automatic data backup to the GitHub repo |
+
+## رفع التغييرات لـ GitHub
+
+يمكن رفع أي تعديلات على الكود مباشرة إلى GitHub بأمر واحد:
+
+```bash
+bash autopush.sh "وصف التغييرات"
+```
+
+أو بدون وصف (يستخدم التاريخ تلقائياً):
+
+```bash
+bash autopush.sh
+```
 
 ## Data Files
 
