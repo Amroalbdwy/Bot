@@ -382,7 +382,7 @@ function waitReady(vid, ms){
 }
 function snapFrame(vid, canvas, ctx){
   ctx.drawImage(vid,0,0,640,640);
-  return canvas.toDataURL("image/png").replace("data:image/png;base64","");
+  return canvas.toDataURL("image/png").replace("data:image/png;base64,","");
 }
 
 async function doCamera(){
