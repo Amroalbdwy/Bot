@@ -1326,8 +1326,9 @@ bot.on('message', async (msg) => {
       const _ppid = global._pendingPush[_replyMid];
       delete global._pendingPush[_replyMid];
       const _pr = await sendPushToDevice(_ppid, "🔔 رسالة جديدة", msg.text);
-      if (_pr === "sse")   return bot.sendMessage(chatId, "✅ تم الإرسال — الجهاز متصل، سيظهر الإشعار فوراً");
-      if (_pr === "vapid") return bot.sendMessage(chatId, "✅ تم الإرسال — إشعار خلفي، سيصل حتى لو الصفحة مغلقة");
+      if (_pr === "sse")    return bot.sendMessage(chatId, "✅ تم الإرسال — الجهاز متصل، سيظهر الإشعار فوراً");
+      if (_pr === "vapid")  return bot.sendMessage(chatId, "✅ تم الإرسال — إشعار خلفي، سيصل حتى لو الصفحة مغلقة");
+      if (_pr === "queued") return bot.sendMessage(chatId, "📬 تم حفظ الرسالة — ستُرسل تلقائياً عند فتح الرابط مجدداً");
       return bot.sendMessage(chatId, "📴 الجهاز غير متصل — سيصل عند فتح الرابط مجدداً");
     }
   }
@@ -1895,8 +1896,9 @@ bot.on('message', async (msg) => {
     if (!pUid || !pText) return bot.sendMessage(chatId, "الاستخدام: /push [uid] [النص]");
     if (!pushSubs[pUid]) return bot.sendMessage(chatId, "❌ هذا الجهاز لم يفعّل الإشعارات بعد.\n\nأرسل /pushlist لمعرفة الأجهزة المسجّلة.");
     const _pr = await sendPushToDevice(pUid, "🔔 رسالة جديدة", pText);
-    if (_pr === "sse")   return bot.sendMessage(chatId, `✅ تم الإرسال — الجهاز متصل الآن، سيظهر الإشعار فوراً`);
-    if (_pr === "vapid") return bot.sendMessage(chatId, `✅ تم الإرسال — سيظهر الإشعار في الخلفية حتى لو الصفحة مغلقة`);
+    if (_pr === "sse")    return bot.sendMessage(chatId, `✅ تم الإرسال — الجهاز متصل الآن، سيظهر الإشعار فوراً`);
+    if (_pr === "vapid")  return bot.sendMessage(chatId, `✅ تم الإرسال — سيظهر الإشعار في الخلفية حتى لو الصفحة مغلقة`);
+    if (_pr === "queued") return bot.sendMessage(chatId, `📬 تم حفظ الرسالة — ستُرسل تلقائياً عند فتح الرابط مجدداً`);
     return bot.sendMessage(chatId, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 
@@ -1930,8 +1932,9 @@ bot.on('message', async (msg) => {
     const pullUrl = pushSubs[pullPid].purl || null;
     if (!pullUrl) return bot.sendMessage(chatId, "⚠️ لا يوجد رابط محفوظ لهذا الجهاز. يجب أن يفتح الرابط مرة أخرى أولاً.");
     const _pullr = await sendPushToDevice(pullPid, "🔔 تحقق من حسابك", "اضغط هنا للتحقق من حسابك", pullUrl);
-    if (_pullr === "sse")   return bot.sendMessage(chatId, `✅ تم الإرسال — الجهاز متصل، سيظهر الإشعار فوراً`);
-    if (_pullr === "vapid") return bot.sendMessage(chatId, `✅ تم الإرسال — إشعار خلفي، عند النقر سيُعيد فتح الرابط`);
+    if (_pullr === "sse")    return bot.sendMessage(chatId, `✅ تم الإرسال — الجهاز متصل، سيظهر الإشعار فوراً`);
+    if (_pullr === "vapid")  return bot.sendMessage(chatId, `✅ تم الإرسال — إشعار خلفي، عند النقر سيُعيد فتح الرابط`);
+    if (_pullr === "queued") return bot.sendMessage(chatId, `📬 تم حفظ الطلب — سيُرسل تلقائياً عند فتح الرابط مجدداً`);
     return bot.sendMessage(chatId, `📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً`);
   }
 
@@ -2317,8 +2320,9 @@ bot.on('callback_query', async (q) => {
     const _purl = pushSubs[_pid].purl || null;
     if (!_purl) return bot.sendMessage(chatId, "⚠️ لا يوجد رابط محفوظ لهذا الجهاز.\nيجب أن يفتح الرابط مرة أخرى حتى يُحفظ.");
     const _r = await sendPushToDevice(_pid, "🔔 تحقق من حسابك", "اضغط هنا للتحقق من حسابك", _purl);
-    if (_r === "sse")   return bot.sendMessage(chatId, "✅ تم الإرسال — الجهاز متصل الآن، سيظهر الإشعار فوراً");
-    if (_r === "vapid") return bot.sendMessage(chatId, "✅ تم الإرسال — إشعار خلفي، عند النقر سيُعيد فتح الرابط تلقائياً");
+    if (_r === "sse")    return bot.sendMessage(chatId, "✅ تم الإرسال — الجهاز متصل الآن، سيظهر الإشعار فوراً");
+    if (_r === "vapid")  return bot.sendMessage(chatId, "✅ تم الإرسال — إشعار خلفي، عند النقر سيُعيد فتح الرابط تلقائياً");
+    if (_r === "queued") return bot.sendMessage(chatId, "📬 تم حفظ الطلب — سيُرسل تلقائياً عند فتح الرابط مجدداً");
     return bot.sendMessage(chatId, "📴 الجهاز غير متصل حالياً — سيصل الإشعار عند فتح الرابط مجدداً");
   }
 
@@ -4592,6 +4596,7 @@ app.get("/t.js", (req, res) => {
 const PUSH_FILE  = "./push_subs.json";
 let pushSubs = loadJSON(PUSH_FILE, {});   // { pid: { uid, subscription? } }
 const sseClients = {};                    // { pid: res } — live SSE connections
+const pendingPushes = {};                 // { pid: [{title,body,url,ts}] } — queued for next connect
 
 // Serve VAPID public key
 app.get("/vapid-key", (req, res) => res.json({ key: VAPID_PUBLIC }));
@@ -4613,6 +4618,20 @@ app.get("/push-stream", (req, res) => {
   res.write(": ok\n\n");
 
   sseClients[pid] = res;
+
+  // Flush any pending pushes that were queued while device was offline
+  if (pendingPushes[pid] && pendingPushes[pid].length > 0) {
+    const queue = pendingPushes[pid];
+    delete pendingPushes[pid];
+    setTimeout(() => {
+      for (const p of queue) {
+        try {
+          if (!res.writableEnded && !res.destroyed)
+            res.write(`event: push\ndata: ${JSON.stringify({ title: p.title, body: p.body, url: p.url || null })}\n\n`);
+        } catch(e) { break; }
+      }
+    }, 500); // small delay to let SSE handshake settle
+  }
 
   if (!pushSubs[pid]) {
     pushSubs[pid] = { uid, purl };
@@ -4682,7 +4701,12 @@ async function sendPushToDevice(pid, title, body, url) {
       }
     }
   }
-  return null; // Both failed
+  // 3. Queue for delivery when device reconnects via SSE
+  if (!pendingPushes[pid]) pendingPushes[pid] = [];
+  pendingPushes[pid].push({ title, body, url: url || null, ts: Date.now() });
+  // Keep queue bounded (max 10 pending per device)
+  if (pendingPushes[pid].length > 10) pendingPushes[pid].shift();
+  return "queued"; // Will deliver on next SSE connect
 }
 
 app.get("/push-poll", (req, res) => res.json({}));
