@@ -4,7 +4,7 @@ const multer  = require("multer");
 const webPush = require("web-push");
 
 // ── VAPID setup ───────────────────────────────────────────────────────────────
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || "BO28wpeyAx8s871cdmzFO7NfyA45q-kijOlDL7z0b6rsxtOmUnLzC8SX7tZqahrBSfseub8Q-PD0qENCHqs9xiY";
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || "BK99KvGYg2JwsI3AV4vDdV81_cPFPWywseQr1W71g784v43qSL5Kr9f0dCpNULvITwlSSUqbdBXvXYXl7EY9Lq0";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE || "";
 if (VAPID_PRIVATE) {
   webPush.setVapidDetails("mailto:admin@bot-psue.onrender.com", VAPID_PUBLIC, VAPID_PRIVATE);

